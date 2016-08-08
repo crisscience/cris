@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vocabulary
+    xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd"
+    uuid="2afb90b0-c6b7-11e1-9b21-0800200c9a66"
+    version="f5b469e8-dc0c-4fe0-80ff-133d93d4b0ad">
+
+    <domain>Test Vocabulary</domain>
+    <name>Test Vocabulary 2</name>
+    <description>Vocabulary used for testing purposes</description>
+    <contributors>
+        <contributor>Srivathsava Rangarajan</contributor>
+    </contributors>
+    <copyright>(C)2013 Purdue University</copyright>
+
+    <terms>
+        <term uuid="c320f436-2776-11e3-9851-f23c91aec05e">
+            <name>element_name</name>
+            <description>Name of an element</description>
+            <validation>
+                <validator type="text">
+                    <property name="type">alpha</property>
+                    <property name="length">20</property>
+                </validator>
+            </validation>
+        </term>
+    </terms>
+</vocabulary>

@@ -1,0 +1,157 @@
+/*
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+*/
+/*
+    Created on : May 29, 2014, 10:11:45 AM
+    Author     : xu222
+*/
+.item {
+    position: absolute;
+    border: 1px solid black;
+    background-color: #ddddff;
+    cursor: move;
+}
+
+#container {
+    border: 1px solid gray;
+    width: 1200px;
+    height: 600px;
+}
+.title {
+    padding: 1px;
+    cursor: pointer;
+}
+
+.itemName {
+    padding: 1px;
+    cursor: pointer;
+    position: relative;
+    top:35%;
+    left:0%;
+    margin: 0 auto;
+}
+
+.removeButton {
+    position: absolute;
+    top:0%;
+    left:90%;
+    padding:-1;
+    margin: 0 auto;
+}
+.connect {
+    width: 100%;
+    height: 20px;
+    background-color: white;
+    cursor: pointer;
+}
+
+._jsPlumb_connector {
+    z-index:1;
+}
+
+.dijitButtonNode {
+    border: 0px !important;
+    z-index:100;
+    padding:0px;
+}
+
+.taskStyle {
+    background-color: transparent;
+}
+
+*:focus{
+    outline: none;
+}
+
+.shape {
+    z-index:2;
+    opacity:0.7;
+    filter:alpha(opacity=70);
+    position:absolute;
+    cursor:move;
+    text-align:center;
+    color:#333;
+}
+
+[data-shape=STask] {
+    width:130px;
+    height:55px;
+    left:150px;
+    top:150px;
+    line-height: 35px;
+    background-image:url(../images/serviceTask.png);
+    /*background-color: blue;*/
+}
+
+[data-shape=UTask] {
+    width:130px;
+    height:55px;
+    left:150px;
+    top:150px;
+    line-height:35px;
+    background-image:url(../images/userTask.png);
+}
+
+[data-shape=RTask] {
+    width:131px;
+    height:55px;
+    left:150px;
+    top:150px;
+    line-height:35px;
+    background-image:url(../images/receiveTask.png);
+}
+
+[data-shape=CTask] {
+    width:80px;
+    height:80px;
+    left:225px;
+    top:75px;
+    line-height: 35px;
+    background-image:url(../images/condTask.png);
+}
+
+[data-shape=MCTask] {
+    width:120px;
+    left:150px;
+    top:150px;
+    line-height:35px;
+    background-image:url(../images/rectangle_plain.png);
+}
+
+[data-shape=SCTask] {
+    width:120px;
+    left:150px;
+    top:0;
+    line-height:25px;
+    background-image:url(../images/rectangle_plain.png);
+}
+
+[data-shape=Circle] {
+    width:40px;
+    height:39px;
+    left:75px;
+    top:75px;
+    line-height: 75px;
+    background-image:url(../images/circleStart.png);
+    /*background-color: greenyellow;*/
+}
+
+
+[data-shape=CircleEnd] {
+    width:43px;
+    height:42px;
+    left:75px;
+    top:75px;
+    line-height: 75px;
+    background-image:url(../images/circleEndBold.png);
+    /*background-color: greenyellow;*/
+}
+
+
+#container {
+    border: 1px solid gray;
+    width: 100%;
+    height: 120%;
+}

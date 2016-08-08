@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<term uuid="f4994000-877e-11e3-baa7-0800200c9a66"
+      xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd">
+
+    <name>Acme HPLC Instrument Collection (Cleaned)</name>
+    <description>HPLC Instrument Collection (Cleaned)</description>
+
+    <term uuid="ef8955b0-723e-11e2-bcfd-0800200c9a66" alias="hplc_id"/>
+    <term uuid="f3585f10-723e-11e2-bcfd-0800200c9a66" alias="hplc_name"/>
+    <term uuid="f8171950-6f01-11e2-bcfd-0800200c9a66" alias="hplc_owner"/>
+    <term uuid="ff9c73f0-6f01-11e2-bcfd-0800200c9a66" alias="hplc_make"/>
+    <term uuid="ea68fbf0-6f03-11e2-bcfd-0800200c9a66" alias="hplc_model"/>
+    <term uuid="ae0aa4a2-8d87-11e1-b0c4-0800200c9a66" alias="hplc_serialnum"/>
+    <term uuid="614c46b0-6f03-11e2-bcfd-0800200c9a66" alias="hplc_description"/>
+</term>

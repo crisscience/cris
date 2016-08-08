@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<term xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="ae8bd3c0-73cf-11e2-bcfd-0800200c9a66" version="8fc1dacf-d278-4fd8-9357-46e837f00167" xsi:schemaLocation="http://www.purdue.edu/cybercenter/schemas/template Template.xsd">
+    <name>HPLC Setup Collection</name>
+    <description>HPLC Setup Data Collection</description>
+    <term alias="age" uuid="4c4e3df0-6f02-11e2-bcfd-0800200c9a66" version="6e196dbb-81e4-41be-8b14-6175877f2ab9"/>
+    <term alias="temp" uuid="5595baf0-6f02-11e2-bcfd-0800200c9a66" version="b58eb076-85c7-4c02-a5a6-9564664fad12"/>
+</term>

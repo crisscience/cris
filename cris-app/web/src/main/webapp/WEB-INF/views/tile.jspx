@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:fn="http://java.sun.com/jsp/jstl/functions" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <spring:url value="/tiles" var="urlTiles" />
+    <spring:url value="/tiles/layout" var="urlTilesLayout" />
+
+    <spring:url value="/projects" var="urlProjects"/>
+    <spring:url value="/experiments" var="urlExperiments"/>
+    <spring:url value="/workflows" var="urlWorkflows"/>
+
+    <div id="idTileDialog" style='width: 400px;' data-dojo-type="dijit/Dialog" title="Create a tile for the current page">
+        <div id="idTileDialogScope" data-ng-controller="DialogTileInfoController">
+        <form id="idTileForm" data-dojo-type="dijit/form/Form">
+            <h3>Tile Information</h3>
+
+            <table style="width: 100%">
+                <tr>
+                    <td>Tile ID:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: true" data-ng-model="tileId"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Tile Name*:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="required: true" data-ng-model="name"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Tile Description:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="description"/>
+                    </td>
+                </tr>
+                <tr data-ng-if="isNewJobPage">
+                    <td>Project*:</td>
+                    <td>
+                        <input id="idTileProject" data-dojo-widget="dijit/form/FilteringSelect" data-dojo-store="storeProjects" data-ng-model="jobInfo.projectId"/>
+                    </td>
+                </tr>
+                <tr data-ng-if="isNewJobPage">
+                    <td>Experiment*:</td>
+                    <td>
+                        <input id="idTileExperiment" data-dojo-widget="dijit/form/FilteringSelect" data-dojo-store="storeExperiments" data-ng-model="jobInfo.experimentId"/>
+                    </td>
+                </tr>
+                <tr data-ng-if="isNewJobPage">
+                    <td>Workflow*:</td>
+                    <td>
+                        <input id="idTileWorkflow" data-dojo-widget="dijit/form/FilteringSelect" data-dojo-props="fetchProperties: {sort: [{attribute:'name',ascending: true}]}" data-dojo-store="storeWorkflows" data-ng-model="jobInfo.workflowId"/>
+                    </td>
+                </tr>
+                <tr data-ng-if="isNewJobPage">
+                    <td>Job Name*:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="required: true" data-ng-model="jobInfo.name"/>
+                    </td>
+                </tr>
+                <tr data-ng-if="isNewJobPage">
+                    <td>Job Description:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="jobInfo.description"/>
+                    </td>
+                </tr>
+                <tr data-ng-if="isNewJobPage">
+                    <td>Job initParams:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props="promptMessage: 'Enter a initParams for your job', invalidMessage: '', rows: 5" placeHolder="initial parameters" data-ng-model="jobInfo.initParams"/>
+                    </td>
+                </tr>
+                <tr data-ng-if="isNewJobPage">
+                    <td>Job End URL:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="promptMessage: 'Enter a URL to return to after the job finishes', invalidMessage: ''" placeHolder="" data-ng-model="jobInfo.endUri"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Tile Shape:</td>
+                    <td>
+                        <cris-radio-button name='color' data-ng-model="size" items="{'Square': 'square', 'Rectangle': 'rectangle'}"/>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>Tile Color:</td>
+                    <td>
+                        <input data-dojo-widget="dijit/ColorPalette" data-dojo-props="palette:'3x4'" data-ng-model="color"/>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="floatRight">
+                <input id='idButtonTileSave' type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Save'" data-ng-click="save()"/>
+                <input id='idButtonTileCancel' type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Cancel'" data-ng-click="cancel()"/>
+            </div>
+            <br class="clearBoth"/>
+        </form>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    // <![CDATA[
+        cris.require([
+            "dijit/form/FilteringSelect",
+            "dojox/data/JsonRestStore"
+        ]);
+
+        function showCreateTileDialog() {
+            var dialogTileInfo = dijit.byId("idTileDialog");
+            dialogTileInfo.show();
+        }
+
+        function closeCreateTileDialog() {
+            var dialogTileInfo = dijit.byId("idTileDialog");
+            dialogTileInfo.hide();
+        }
+
+        function isNewJobPage(url) {
+            if (!url) {
+                url = window.location.href;
+            }
+            var newJobUrl = cris.baseUrl + "jobs/?form";
+            var isNewJob = (url.indexOf(newJobUrl) !== -1);
+            return isNewJob;
+        }
+
+        function isInputValid() {
+            var form = dijit.byId("idTileForm");
+            var isValid = form.validate();
+            return isValid;
+        }
+
+        function saveSuccessHandler(data) {
+            var dialog = showMessage("Tile: " + data.name + " is saved.");
+            setTimeout(function() {
+                dialog.hide();
+            }, 1000);
+            closeCreateTileDialog();
+        }
+
+        function saveFailureHandler(error) {
+            var message;
+            if (error.responseText) {
+                var response = dojo.fromJson(error.responseText);
+                if (response.message) {
+                    message = response.message;
+                } else {
+                    message = error.responseText;
+                }
+            } else if (error.message) {
+                message = error.message;
+            } else {
+                message = error;
+            }
+            showMessage(message);
+        }
+
+        angular.module('crisDialogTileInfo', ['angular-dojo']);
+
+        angular.module('crisDialogTileInfo').factory("tileService", ["$http", function($http) {
+            var baseUrl = "${urlTiles}";
+            var urlTilesLayout = "${urlTilesLayout}";
+
+            var factory = {};
+
+            factory.getAll = function () {
+                return $http.get(baseUrl);
+            };
+
+            factory.getById = function (id) {
+                return $http.get(baseUrl + "/" + id);
+            };
+
+            factory.create = function (item) {
+                return $http.post(baseUrl, item);
+            };
+
+            factory.update = function (item) {
+                return $http.put(baseUrl + "/" + item.id, item);
+            };
+
+            factory.delete = function (id) {
+                return $http.delete(baseUrl + "/" + id);
+            };
+
+            factory.saveLayout = function (layout) {
+                return $http.put(urlTilesLayout, layout);
+            };
+
+            return factory;
+        }]);
+
+        angular.module('crisDialogTileInfo').controller('DialogTileInfoController', ['$scope', 'tileService', function($scope, tileService){
+            $scope.baseUrl = cris.baseUrl;
+
+            $scope.tileId = null;
+            $scope.shortcutId = null;
+            $scope.url = window.location.href;
+            $scope.name = null;
+            $scope.description = null;
+            $scope.size = "square";
+            $scope.color = "#0000FF";
+
+            $scope.jobInfo = {
+                projectId: null,
+                experimentID: null,
+                workflowId: null,
+                name: null,
+                description: null,
+                initParams: null,
+                endUri: null
+            };
+
+            $scope.isNewJobPage = isNewJobPage();
+            $scope.showDialog = showCreateTileDialog;
+            $scope.closeDialog = closeCreateTileDialog;
+            $scope.isInputValid = isInputValid;
+            $scope.saveSuccessHandler = saveSuccessHandler;
+            $scope.saveFailureHandler = saveFailureHandler;
+            $scope.storeProjects = createJsonRestStore("${urlProjects}");
+            $scope.storeExperiments = createJsonRestStore("${urlExperiments}");
+            $scope.storeWorkflows = createJsonRestStore("${urlWorkflows}");
+
+            $scope.save = function() {
+                /*
+                 * TODO: let server do it
+                 * Currently there's a bug in dojo form
+                var isValid = $scope.isInputValid();
+                if (!isValid) {
+                    return;
+                }
+                 */
+                var url;
+                if ($scope.isNewJobPage) {
+                    var context = {};
+                    context.projectId = $scope.jobInfo.projectId;
+                    context.experimentId = $scope.jobInfo.experimentId;
+                    context.workflowId = $scope.jobInfo.workflowId;
+                    context.name = $scope.jobInfo.name ? $scope.jobInfo.name : "";
+                    context.description = $scope.jobInfo.description ? $scope.jobInfo.description : "";
+                    context.initParams = $scope.jobInfo.initParams ? $scope.jobInfo.initParams : "";
+                    context.endUri = $scope.jobInfo.endUri ? $scope.jobInfo.endUri : "";
+
+                    // re-construct the url
+                    var urlTemplate = "/jobs/run?projectId={projectId}&experimentId={experimentId}&workflowId={workflowId}&name={name}&description={description}&initParams={initParams}&endUri={endUri}";
+                    url = getBaseUrl() + dojo.replace(urlTemplate, context);
+                } else {
+                    url = $scope.url;
+                }
+
+                var json = {tileId: $scope.tileId, shortcutId: $scope.shortcutId, url: url, name: $scope.name, description: $scope.description, size: $scope.size, color: $scope.color};
+                if ($scope.tileId) {
+                    tileService.update(json).success($scope.saveSuccessHandler).error($scope.saveFailureHandler);
+                } else {
+                    tileService.create(json).success($scope.saveSuccessHandler).error($scope.saveFailureHandler);
+                }
+            };
+
+            $scope.cancel = function() {
+                $scope.closeDialog();
+            };
+        }]);
+
+        cris.bootstrapAngular("idTileDialog", "crisDialogTileInfo");
+
+        cris.ready(function () {
+            var fsProject = dijit.byId("idTileProject");
+            var fsExperiment = dijit.byId("idTileExperiment");
+            dojo.connect(fsProject, "onChange", function(id) {
+                fsExperiment.query.projectId = id;
+                fsExperiment.reset();
+            });
+        });
+    // ]]>
+    </script>
+
+</jsp:root>

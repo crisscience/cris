@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/configurations" var="url"/>
+
+    <script type="text/javascript">
+    // <![CDATA[
+        cris.require('dijit/form/Form');
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/SimpleTextarea");
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dojox/grid/EnhancedGrid");
+        cris.require("dojox/grid/enhanced/plugins/Pagination");
+        cris.require("dojox/grid/enhanced/plugins/Selector");
+        cris.require("dojox/grid/enhanced/plugins/Filter");
+
+        function updateDetail(item) {
+            dojo.byId("configId").innerHTML = item.id || "";
+            dojo.byId("name").innerHTML = item.name || "";
+            dijit.byId("value").setValue(item.valueText || "");
+            dojo.byId("description").innerHTML = item.description || "";
+            dojo.byId("timeCreated").innerHTML = item.timeCreated ? dateIsoToLocale(item.timeCreated.$date) : "";
+            dojo.byId("lastUpdated").innerHTML = item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
+        }
+
+        function updateStore(item) {
+            store.setValue(item, "valueText", dijit.byId("value").getValue());
+        }
+
+        cris.ready(function() {
+            store = createJsonRestStore("${url}");
+
+            var layout= [{cells: [
+                        { field: 'id', name: 'ID', datatype: "number", width: '50px' },
+                        { field: 'name', name: 'Name', width: 'auto' },
+                        { field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '120px', get: function(row, item){
+                            if (!item) {
+                                return "Loading...";
+                            }
+                            return item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
+                        }}
+                    ]}];
+
+            var asc = true;
+            var args = {
+                sortFields: [{attribute: "name", descending: !asc}]
+            };
+            grid = createGrid(store, layout, "configurations", args);
+            grid.setSortIndex(1, asc);
+
+            dojo.connect(grid, "onSelected", function(index){
+                var item = grid.getItem(index);
+                updateDetail(item);
+            });
+
+            var buttonSave = dijit.byId("buttonSave");
+            dojo.connect(buttonSave, "onClick", function(evt){
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    var modified = false;
+                    var item = grid.selection.getSelected("row")[0];
+
+                    var value = dijit.byId("value");
+                    if (item.valueText !== value.getValue()) {
+                        modified = true;
+                    }
+
+                    if (modified) {
+                        updateStore(item);
+                        var pd = createProgressDialog();
+                        store.save({
+                            onComplete: function(response) {
+                                grid.updateRow(grid.selection.selectedIndex);
+                                var data = response[0].content;
+                                updateDetail(data);
+                                pd.hide();
+                            },
+                            onError: function(error) {
+                                pd.setContent("Failed to save changes. " + error);
+                            }
+                        });
+                    } else {
+                        showMessage("No change is made");
+                        return;
+                    }
+                } else {
+                    showMessage("Please select a configuration");
+                }
+            });
+
+            var buttonReset = dijit.byId("buttonReset");
+            dojo.connect(buttonReset, "onClick", function(evt){
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    var item = grid.selection.getSelected("row")[0];
+                    updateDetail(item);
+                } else {
+                    updateDetail({});
+                }
+            });
+        });
+
+    // ]]>
+    </script>
+
+    <div class="halfMinus floatLeft">
+        <h2>Configurations</h2>
+        <div id="configurations"><!-- fix ff problem --></div>
+    </div>
+
+    <div class="half floatRight">
+        <h2>Details</h2>
+        <form id="form" data-dojo-type="dijit.form.Form">
+            <div>
+                <table class="form" style="width: 100%;">
+                    <tr>
+                        <td style="width: 30%">ID:</td><td id="configId" style="width: 70%"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Name:</td><td id="name"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Description:</td><td id="description"><!-- --></td>
+                    </tr>
+                    <tr>
+                        <td>Value:</td><td class="tdTextArea"><textarea id="value" rows="8" height="8" dojoType="dijit.form.SimpleTextarea"><!-- --></textarea></td>
+                    </tr>
+                    <tr>
+                        <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                    </tr>
+                </table>
+            </div>
+            <p/>
+            <div style="float: right">
+                <input id="buttonSave" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Save"'/>
+                <input id="buttonReset" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Reset"'/>
+            </div>
+        </form>
+    </div>
+
+    <p style="clear: both"/>
+
+</jsp:root>

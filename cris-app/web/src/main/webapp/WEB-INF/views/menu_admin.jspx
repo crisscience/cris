@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+    xmlns:jsp="http://java.sun.com/JSP/Page"
+    xmlns:c="http://java.sun.com/jsp/jstl/core"
+    xmlns:spring="http://www.springframework.org/tags"
+    >
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <c:choose>
+        <c:when test="${param.selected == 'home'}">
+            <c:set value="true" var="selectedHome"/>
+        </c:when>
+        <c:when test="${param.selected == 'datasets'}">
+            <c:set value="true" var="selectedDatasets"/>
+        </c:when>
+        <c:when test="${param.selected == 'projects'}">
+            <c:set value="true" var="selectedProjects"/>
+        </c:when>
+        <c:when test="${param.selected == 'experiments'}">
+            <c:set value="true" var="selectedExperiments"/>
+        </c:when>
+        <c:when test="${param.selected == 'reports'}">
+            <c:set value="true" var="selectedReports"/>
+        </c:when>
+        <c:when test="${param.selected == 'tools'}">
+            <c:set value="true" var="selectedTools"/>
+        </c:when>
+        <c:when test="${param.selected == 'workflows'}">
+            <c:set value="true" var="selectedWorkflows"/>
+        </c:when>
+        <c:when test="${param.selected == 'templates'}">
+            <c:set value="true" var="selectedTemplates"/>
+        </c:when>
+        <c:when test="${param.selected == 'vocabularys'}">
+            <c:set value="true" var="selectedVocabularys"/>
+        </c:when>
+        <c:when test="${param.selected == 'storagefiles'}">
+            <c:set value="true" var="selectedStorageFiles"/>
+        </c:when>
+        <c:when test="${param.selected == 'users'}">
+            <c:set value="true" var="selectedUsers"/>
+        </c:when>
+        <c:when test="${param.selected == 'groups'}">
+            <c:set value="true" var="selectedGroups"/>
+        </c:when>
+        <c:when test="${param.selected == 'permissions'}">
+            <c:set value="true" var="selectedPermissions"/>
+        </c:when>
+        <c:when test="${param.selected == 'storages'}">
+            <c:set value="true" var="selectedStorages"/>
+        </c:when>
+        <c:when test="${param.selected == 'computationalnodes'}">
+            <c:set value="true" var="selectedComputationalNodes"/>
+        </c:when>
+        <c:when test="${param.selected == 'configurations'}">
+            <c:set value="true" var="selectedConfigurations"/>
+        </c:when>
+    </c:choose>
+
+    <script type="text/javascript">
+        cris.require([
+            "dijit/MenuBar",
+            "dijit/MenuBarItem",
+            "dijit/PopupMenuBarItem",
+            "dijit/Menu",
+            "dijit/MenuItem"
+        ]);
+
+        cris.ready(function() {
+        });
+    </script>
+
+    <c:set value="${imagesRoot}/famfamfam_silk_icons_v013/icons/color_swatch.png" var="urlHomeIcon"/>
+    <c:set value="${imagesRoot}/famfamfam_silk_icons_v013/icons/cog_add.png" var="urlAddToHomeIcon"/>
+
+    <div id="menu" data-dojo-type="dijit.MenuBar">
+        <spring:url value="/home" var="url"/>
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedHome}'" onClick="window.location.href='${url}?selected=home'">
+            <img src="${urlHomeIcon}" title="Display tiles"/>
+        </div>
+        <spring:url value="/dataset/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedDatasets}'" onClick="window.location.href='${url}?selected=datasets'">
+            <span>
+                Dataset
+            </span>
+        </div>
+        <spring:url value="/projects/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedProjects}'" onClick="window.location.href='${url}?selected=projects'">
+            <span>
+                Project
+            </span>
+        </div>
+        <spring:url value="/experiments/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedExperiments}'" onClick="window.location.href='${url}?selected=experiments'">
+            <span>
+                Experiment
+            </span>
+        </div>
+        <spring:url value="/reports/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedReports}'" onClick="window.location.href='${url}?selected=reports'">
+            <span>
+                Report
+            </span>
+        </div>
+        <spring:url value="/tools/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedTools}'" onClick="window.location.href='${url}?selected=tools'">
+            <span>
+                Tool
+            </span>
+        </div>
+        <spring:url value="/workflows/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedWorkflows}'" onClick="window.location.href='${url}?selected=workflows'">
+            <span>
+                Workflow
+            </span>
+        </div>
+        <spring:url value="/vocabularys/index" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedVocabularys}'" onClick="window.location.href='${url}?selected=vocabularys'">
+            <span>
+                Vocabulary/Template
+            </span>
+        </div>
+        <spring:url value="/storagefiles/index/" var="url" />
+        <!--
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedStorageFiles}'" onClick="window.location.href='${url}?selected=storagefiles'">
+            <span>
+                Storage Files
+            </span>
+        </div>
+        -->
+        <spring:url value="/users/index" var="url"/>
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedUsers}'" onClick="window.location.href='${url}?selected=users'">
+            User
+        </div>
+        <spring:url value="/groups/index" var="url"/>
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedGroups}'" onClick="window.location.href='${url}?selected=groups'">
+            Group
+        </div>
+        <spring:url value="/permissions/index" var="url"/>
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedPermissions}'" onClick="window.location.href='${url}?selected=permissions'">
+            <span>
+                Permission
+            </span>
+        </div>
+        <!--
+        <spring:url value="/storages/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedStorages}'" onClick="window.location.href='${url}?selected=storages'">
+            <span>
+                Storage
+            </span>
+        </div>
+        <spring:url value="/computationalnodes/index" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedComputationalNodes}'" onClick="window.location.href='${url}?selected=computationalnodes'">
+            <span>
+                Computation Node
+            </span>
+        </div>
+        -->
+        <spring:url value="/configurations/index" var="url"/>
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedConfigurations}'" onClick="window.location.href='${url}?selected=configurations'">
+            <span>
+                Configuration
+            </span>
+        </div>
+
+        <div style="float: right;" data-dojo-type="dijit.MenuBarItem" data-dojo-props="" onClick="showCreateTileDialog">
+            <img src="${urlAddToHomeIcon}" title="Create a tile for the current page"/>
+        </div>
+    </div>
+
+</jsp:root>

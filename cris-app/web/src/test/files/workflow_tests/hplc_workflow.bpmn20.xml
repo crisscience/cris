@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:cris="edu.purdue.cybercenter.dm" xmlns:ns3="http://activiti.org/bpmn" xmlns:ns4="http://www.omg.org/spec/DD/20100524/DI" xmlns:ns5="http://www.omg.org/spec/DD/20100524/DC" xmlns:ns6="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="edu.purdue.cybercenter.dm" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL  http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd">
+	<process id="id_35ae2be6-99ac-4872-8315-c1ae0b0da61f" isExecutable="true" name="Example Workflow">
+		<documentation id="documentation_id"/>
+		<extensionElements>
+			<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisExecutionListener" event="start"/>
+			<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisExecutionListener" event="end"/>
+		</extensionElements>
+		<startEvent id="theStart" ns3:initiator="initiator"/>
+		<userTask id="step_1" name="ut1" ns3:formKey="ae8bd3c0-73cf-11e2-bcfd-0800200c9a66">
+			<documentation id="step_1_documentation_id"/>
+			<extensionElements>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+			</extensionElements>
+		</userTask>
+		<userTask id="step_2" name="Success" ns3:formKey="dataFileSuccess.html">
+			<documentation id="step_2_documentation_id"/>
+			<extensionElements>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+			</extensionElements>
+		</userTask>
+		<userTask id="step_3" name="Error" ns3:formKey="dataFileError.html">
+			<documentation id="step_3_documentation_id"/>
+			<extensionElements>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+			</extensionElements>
+		</userTask>
+		<serviceTask id="step_4" name="script" ns3:class="edu.purdue.cybercenter.dm.activiti.ServiceTaskDelegate">
+			<documentation id="step_4_documentation_id"/>
+			<extensionElements>
+				<ns3:field name="filesToPlace" stringValue="EmbeddedFile:simple_js.js:simple_js.js;EmbeddedFile:js.jar:js.jar"/>
+				<ns3:field name="jsonIn" stringValue="{&quot;ae8bd3c0-73cf-11e2-bcfd-0800200c9a66&quot; : ${ae8bd3c0-73cf-11e2-bcfd-0800200c9a66[]({&quot;_job_id&quot;: #{current_job_id}})}}" />
+				<ns3:field name="commandLine" stringValue="java -jar js.jar simple_js.js"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+			</extensionElements>
+		</serviceTask>
+		<sequenceFlow id="flow_1" sourceRef="theStart" targetRef="step_1">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+		</sequenceFlow>
+		<exclusiveGateway id="isValidGw_1" name="isValid">
+			<extensionElements>
+			</extensionElements>
+		</exclusiveGateway>
+		<sequenceFlow id="flow_2" sourceRef="isValidGw_1" targetRef="step_3">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+			<conditionExpression xsi:type="tFormalExpression">${isValid == &quot;false&quot;}</conditionExpression>
+		</sequenceFlow>
+		<sequenceFlow id="flow_3" sourceRef="isValidGw_1" targetRef="step_2">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+		</sequenceFlow>
+		<sequenceFlow id="flow_4" sourceRef="step_3" targetRef="step_1">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+		</sequenceFlow>
+		<sequenceFlow id="flow_5" sourceRef="step_4" targetRef="isValidGw_1">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+		</sequenceFlow>
+		<sequenceFlow id="flow_6" sourceRef="step_1" targetRef="step_4">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+		</sequenceFlow>
+		<sequenceFlow id="flow_7" sourceRef="step_2" targetRef="theEnd">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+		</sequenceFlow>
+		<endEvent id="theEnd"/>
+	</process>
+</definitions>

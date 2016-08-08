@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:cris="edu.purdue.cybercenter.dm" xmlns:ns3="http://activiti.org/bpmn" xmlns:ns4="http://www.omg.org/spec/DD/20100524/DI" xmlns:ns5="http://www.omg.org/spec/DD/20100524/DC" xmlns:ns6="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="edu.purdue.cybercenter.dm" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL  http://www.omg.org/spec/BPMN/2.0/20100501/BPMN20.xsd">
+	<process id="id_35ae2be6-99ac-4872-8315-c1ae0b0da61f" isExecutable="true" name="Example Workflow">
+		<documentation id="documentation_id"/>
+		<extensionElements>
+			<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisExecutionListener" event="start"/>
+			<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisExecutionListener" event="end"/>
+			<cris:field name="uuid" stringValue="9841705f-4645-4fc1-aac6-992c5397abc5"/>
+			<cris:field name="cris-workflow-implementation-version" stringValue="1.0.0"/>
+		</extensionElements>
+		<startEvent id="theStart" ns3:initiator="initiator"/>
+		<serviceTask id="step_1" name="empty_json" ns3:class="edu.purdue.cybercenter.dm.activiti.ServiceTaskDelegate">
+			<documentation id="step_1_documentation_id"/>
+			<extensionElements>
+				<ns3:field name="filesToPlace" stringValue="EmbeddedFile:read.js:read.js;EmbeddedFile:js.jar:js.jar"/>
+                <ns3:field name="jsonIn" stringValue="{}" />
+				<ns3:field name="commandLine" stringValue="java -jar js.jar read.js"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+				<cris:field name="uiLocation" stringValue="275,369"/>
+			</extensionElements>
+		</serviceTask>
+        <serviceTask id="step_2" name="single_json" ns3:class="edu.purdue.cybercenter.dm.activiti.ServiceTaskDelegate">
+			<documentation id="step_2_documentation_id"/>
+			<extensionElements>
+				<ns3:field name="filesToPlace" stringValue="EmbeddedFile:read.js:read.js;EmbeddedFile:js.jar:js.jar"/>
+                <ns3:field name="jsonIn" stringValue="{&quot;a&quot;:1}" />
+				<ns3:field name="commandLine" stringValue="java -jar js.jar read.js"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+				<cris:field name="uiLocation" stringValue="275,369"/>
+			</extensionElements>
+		</serviceTask>
+        <serviceTask id="step_3" name="multi_json" ns3:class="edu.purdue.cybercenter.dm.activiti.ServiceTaskDelegate">
+			<documentation id="step_3_documentation_id"/>
+			<extensionElements>
+				<ns3:field name="filesToPlace" stringValue="EmbeddedFile:read.js:read.js;EmbeddedFile:js.jar:js.jar"/>
+                <ns3:field name="jsonIn" stringValue="{&quot;a&quot;:2,&quot;b&quot;:&quot;123&quot;}" />
+				<ns3:field name="commandLine" stringValue="java -jar js.jar read.js"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+				<cris:field name="uiLocation" stringValue="275,369"/>
+			</extensionElements>
+		</serviceTask>
+        <serviceTask id="step_4" name="extra_colon" ns3:class="edu.purdue.cybercenter.dm.activiti.ServiceTaskDelegate">
+			<documentation id="step_4_documentation_id"/>
+			<extensionElements>
+				<ns3:field name="filesToPlace" stringValue="EmbeddedFile:read.js:read.js;EmbeddedFile:js.jar:js.jar"/>
+                <ns3:field name="jsonIn" stringValue="{&quot;a&quot;::1}" />
+				<ns3:field name="commandLine" stringValue="java -jar js.jar read.js"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+				<cris:field name="uiLocation" stringValue="275,369"/>
+			</extensionElements>
+		</serviceTask>
+        <serviceTask id="step_5" name="missing_colon" ns3:class="edu.purdue.cybercenter.dm.activiti.ServiceTaskDelegate">
+			<documentation id="step_5_documentation_id"/>
+			<extensionElements>
+				<ns3:field name="filesToPlace" stringValue="EmbeddedFile:read.js:read.js;EmbeddedFile:js.jar:js.jar"/>
+                <ns3:field name="jsonIn" stringValue="{&quot;a&quot;1}" />
+				<ns3:field name="commandLine" stringValue="java -jar js.jar read.js"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+				<ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+				<cris:field name="uiLocation" stringValue="275,369"/>
+			</extensionElements>
+		</serviceTask>
+        <userTask id="step_6" name="Success" ns3:formKey="dataFileSuccess.html">
+            <documentation id="step_6_documentation_id"/>
+            <extensionElements>
+                <ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+                <ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+                <ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+                <cris:field name="uiLocation" stringValue="475,630"/>
+            </extensionElements>
+        </userTask>
+        <userTask id="step_7" name="Error" ns3:formKey="dataFileError.html">
+            <documentation id="step_7_documentation_id"/>
+            <extensionElements>
+                <ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="assignment"/>
+                <ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="create"/>
+                <ns3:taskListener class="edu.purdue.cybercenter.dm.activiti.CrisTaskListener" event="complete"/>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="start"/>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisActivityListener" event="end"/>
+                <cris:field name="uiLocation" stringValue="457,140"/>
+            </extensionElements>
+        </userTask>
+		<sequenceFlow id="flow_1" sourceRef="theStart" targetRef="step_1">
+			<extensionElements>
+				<ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+			</extensionElements>
+		</sequenceFlow>
+        <exclusiveGateway id="isValidGw_1" name="isValid1">
+        <extensionElements>
+            <cris:field name="uiLocation" stringValue="339,535"/>
+        </extensionElements>
+    </exclusiveGateway>
+        <exclusiveGateway id="isValidGw_2" name="isValid2">
+            <extensionElements>
+                <cris:field name="uiLocation" stringValue="339,535"/>
+            </extensionElements>
+        </exclusiveGateway>
+        <exclusiveGateway id="isValidGw_3" name="isValid3">
+            <extensionElements>
+                <cris:field name="uiLocation" stringValue="339,535"/>
+            </extensionElements>
+        </exclusiveGateway>
+        <exclusiveGateway id="isValidGw_4" name="isValid4">
+            <extensionElements>
+                <cris:field name="uiLocation" stringValue="339,535"/>
+            </extensionElements>
+        </exclusiveGateway>
+        <exclusiveGateway id="isValidGw_5" name="isValid5">
+            <extensionElements>
+                <cris:field name="uiLocation" stringValue="339,535"/>
+            </extensionElements>
+        </exclusiveGateway>
+        <sequenceFlow id="flow_2" sourceRef="isValidGw_1" targetRef="step_7">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+            <conditionExpression xsi:type="tFormalExpression">${isEmpty == &quot;false&quot;}</conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow_3" sourceRef="isValidGw_1" targetRef="step_2">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_4" sourceRef="step_1" targetRef="isValidGw_1">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_5" sourceRef="isValidGw_2" targetRef="step_7">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+            <conditionExpression xsi:type="tFormalExpression">${isSingle == &quot;false&quot;}</conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow_6" sourceRef="isValidGw_2" targetRef="step_3">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_7" sourceRef="step_2" targetRef="isValidGw_2">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_8" sourceRef="isValidGw_3" targetRef="step_7">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+            <conditionExpression xsi:type="tFormalExpression">${isMulti == &quot;false&quot;}</conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow_9" sourceRef="isValidGw_3" targetRef="step_4">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_10" sourceRef="step_3" targetRef="isValidGw_3">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_11" sourceRef="isValidGw_4" targetRef="step_7">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+            <conditionExpression xsi:type="tFormalExpression">${errorMessage != &quot;Invalid JSON input&quot;}</conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow_12" sourceRef="isValidGw_4" targetRef="step_5">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_13" sourceRef="step_4" targetRef="isValidGw_4">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_14" sourceRef="isValidGw_5" targetRef="step_7">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+            <conditionExpression xsi:type="tFormalExpression">${errorMessage != &quot;Invalid JSON input&quot;}</conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="flow_15" sourceRef="isValidGw_5" targetRef="step_6">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_16" sourceRef="step_5" targetRef="isValidGw_5">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_17" sourceRef="step_6" targetRef="theEnd">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+        <sequenceFlow id="flow_18" sourceRef="step_7" targetRef="theEnd">
+            <extensionElements>
+                <ns3:executionListener class="edu.purdue.cybercenter.dm.activiti.CrisTransitionListener"/>
+            </extensionElements>
+        </sequenceFlow>
+		<endEvent id="theEnd"/>
+	</process>
+</definitions>

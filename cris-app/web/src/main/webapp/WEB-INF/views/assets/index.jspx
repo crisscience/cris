@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+    xmlns:c="http://java.sun.com/jsp/jstl/core"
+    xmlns:spring="http://www.springframework.org/tags"
+    xmlns:form="http://www.springframework.org/tags/form"
+    xmlns:jsp="http://java.sun.com/JSP/Page"
+    >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <script type="text/javascript">
+
+        cris.require('dijit/form/Form');
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/TextBox");
+        cris.require("dijit/form/SimpleTextarea");
+        cris.require("dijit/layout/TabContainer");
+        cris.require("dijit/layout/ContentPane");
+        cris.require("dojox/data/JsonRestStore");
+
+        cris.ready(function() {
+            <spring:url value="/assets" var="url"/>
+            storeAssets = createJsonRestStore("${url}");
+
+            <spring:url value="/accounts" var="url"/>
+            storeAccounts = createJsonRestStore("${url}");
+
+            <spring:url value="/groups" var="url"/>
+            storeGroups = createJsonRestStore("${url}");
+
+    // <![CDATA[
+            var layoutAssets= [{cells: [
+                        { field: 'id', name: 'ID', datatype: "number", width: '50px'},
+                        { field: 'typeId.name', name: 'Type', width: '50px', get: function(row, item){
+                            if (!item) {
+                                return "Loading...";
+                            }
+                            return item.typeId ? item.typeId.name : "";
+                        }},
+                        { field: 'name', name: 'Name', width: 'auto' },
+                        { field: 'ownerId.name', name: 'Owner', width: 'auto' , get: function(row, item){
+                            if (!item) {
+                                return "Loading...";
+                            }
+                            return item.ownerId ? item.ownerId.name : "";
+                        }},
+                    ]},];
+
+            var layoutAccounts= [{cells: [
+                        { field: 'id', name: 'ID', datatype: "number", width: '50px'},
+                        { field: 'name', name: 'Name', width: 'auto' },
+                        { field: 'accountNumber', name: 'Account Number', width: 'auto' },
+                        { field: 'ownerId.name', name: 'Owner', width: 'auto' , get: function(row, item){
+                            if (!item) {
+                                return "Loading...";
+                            }
+                            return item.ownerId ? item.ownerId.name : "";
+                        }},
+                    ]},];
+
+            var layoutGroups= [{cells: [
+                        { field: 'id', name: 'ID', datatype: "number", width: '50px' },
+                        { field: 'name', name: 'Name', width: 'auto' },
+                    ]},];
+
+            var asc = true;
+            var args = {
+                pageSizes: ["10"],
+                autoHeight: 100,
+                rowsPerPage: 25,
+                pageSizes: ["10", "25", "50"]
+            };
+            gridAssets = createGrid(storeAssets, layoutAssets, "assets", args);
+            gridAssets.setSortIndex(2, asc);
+
+            gridAccounts = createGrid(storeAccounts, layoutAccounts, "accounts", args);
+            gridAccounts.setSortIndex(1, asc);
+
+            gridGroups = createGrid(storeGroups, layoutGroups, "groups", args);
+            gridGroups.setSortIndex(1, asc);
+
+            dojo.connect(dijit.byId("buttonSetOwnership"), "onClick", function(evt) {
+                var tab = dijit.byId("tabContainer").selectedChildWidget;
+
+                var countAssets = gridAssets.selection.getSelectedCount("row");
+                var countAccounts = gridAccounts.selection.getSelectedCount("row");
+                var countGroups = gridGroups.selection.getSelectedCount("row");
+
+                var count = 0;
+                var item = null;
+                var store = null;
+                if (tab.id == "tabAssets") {
+                    count = countAssets;
+                    item = gridAssets.selection.getSelected("row")[0];
+                    store = storeAssets;
+                } else if (tab.id == "tabAccounts") {
+                    count = countAccounts;
+                    item = gridAccounts.selection.getSelected("row")[0];
+                    store = storeAccounts;
+                }
+                var itemGroup = gridGroups.selection.getSelected("row")[0];
+
+                if (countGroups == 0 || count == 0) {
+                    showMessage("You must pick one from each group");
+                    return;
+                }
+
+                var yes = showConfirm("Do you want to change ownership?");
+                if (!yes) {
+                    return;
+                }
+
+                var pd = createProgressDialog();
+                store.setValue(item, "ownerId", itemGroup);
+                store.save({
+                    onComplete: function() {
+                        pd.hide();
+                    },
+                    onError: function(error) {
+                        pd.setContent("Failed to set ownership. " + error);
+                    }
+                });
+            });
+        });
+
+    // ]]>
+    </script>
+
+    <h2>This page is work in progress. It is not working yet</h2>
+    <hr/>
+
+    <h2>Ownership</h2>
+    <div style="width: 42%; float: left">
+        <div id="tabContainer" dojoType="dijit.layout.TabContainer" style="width: 100%" doLayout="false" useMenu="false" useSlider="false">
+            <div id="tabAssets" dojoType="dijit.layout.ContentPane" title="Assets" selected="true" style="border: 0px; padding: 0px">
+                <div id="assets"><!-- fix ff problem --></div>
+            </div>
+            <div id="tabAccounts" dojoType="dijit.layout.ContentPane" title="Accounts" style="border: 0px; padding: 0px">
+                <div id="accounts"><!-- fix ff problem --></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="float: left; width: 16%; text-align: center">
+        <br/><br/><br/><br/><br/><br/><br/>
+        <br/><br/>
+        <button id="buttonSetOwnership" dojoType="dijit.form.Button" type="button">&lt;- Set Ownership</button>
+    </div>
+
+    <div style="width: 42%; float: right">
+        <h2>Groups</h2>
+        <div id="groups"><!-- fix ff problem --></div>
+    </div>
+
+    <br style="clear: both"/>
+
+</jsp:root>

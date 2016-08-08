@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+          xmlns:jsp="http://java.sun.com/JSP/Page"
+          xmlns:c="http://java.sun.com/jsp/jstl/core"
+          xmlns:spring="http://www.springframework.org/tags"
+          >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/viewpjtds/" var="urlViewpjtds"/>
+    <spring:url value="/download/" var="urlDownload"/>
+    <spring:url value="/templates/" var="urlTemplates"/>
+    <spring:url value="/users/" var="urlUsers"/>
+    <spring:url value="/templates/terms" var="urlTemplateTerms"/>
+    <spring:url value="/projects/search/" var="urlSearch"/>
+
+    <style>
+        table table {
+            margin: 0px;
+            border: 0px;
+            padding: 0px;
+        }
+    </style>
+
+    <div id="idExplorer">
+        <div style="width: 100%; min-height: 900px">
+            <div id="idBorderContainer" data-dojo-type="dijit/layout/BorderContainer" data-dojo-props='design : "sidebar", gutters : "true", liveSplitters : "true"' style="height: 600px; padding: 0px;">
+                <div data-dojo-type="dojox/layout/ExpandoPane" data-dojo-props='title : "Explorer", splitter : "true", region : "leading"' style="width: 25%; padding: 0px;">
+                    <div id="treeDataset"><!-- --></div>
+                </div>
+                <div data-dojo-type="dojox/layout/ContentPane" data-dojo-props='splitter : "true", region : "center"' style="padding: 0px;">
+                    <div id="gridDataset"><!-- --></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <c:set value="${jsRoot}/dm/dataset.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for FF3 and Opera --></script>
+
+    <script type="text/javascript">
+        angular.module("crisExplorer", ["dataset"]);
+    </script>
+
+    <script type="text/javascript">
+        //<![CDATA[
+        cris.require('dijit/Tree');
+        cris.require('dijit/layout/BorderContainer');
+        cris.require('dojox/layout/ContentPane');
+        cris.require('dojox/layout/ExpandoPane');
+        cris.require("dojo/store/JsonRest");
+        cris.require("dijit/Dialog");
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dojo/json");
+
+        function isDisplayField(fieldName) {
+            if (fieldName !== "_id"
+            && fieldName !== "_context_id"
+            && fieldName !== "_project_id"
+            && fieldName !== "_experiment_id"
+//            && fieldName !== "_job_id"
+            && fieldName !== "_task_id"
+            && fieldName !== "_site_uuid"
+            && fieldName !== "_tenant_uuid"
+            && fieldName !== "_tenant_id"
+            && fieldName !== "_creator_id"
+            && fieldName !== "_updater_id"
+//            && fieldName !== "_time_created"
+//            && fieldName !== "_time_updated"
+            && fieldName !== "_template_version"
+            && fieldName !== "_user_permission") {
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        function generateHead(json) {
+            var html = "<table class='form'><tbody>";
+
+            // Set the HTML Table Header for an array of object
+            html += "<tr>";
+            for (var key in json) {
+                if (json.hasOwnProperty(key) && isDisplayField(key)) {
+                    html += "<th style=\"font-weight: bold;\">" + prettyPrint(key, "_") + "<br></th>";
+                }
+            }
+
+            html += "</tr>";
+
+            return html;
+        }
+
+        function generateFoot() {
+            html = "</tbody></table>";
+
+            return html;
+        }
+
+        function jsonToHtml(json, noheading) {
+            var html = "";
+
+            if (json instanceof Array) {
+                // arrays
+                if (json.length >= 1 && json[0] instanceof Object) {
+                    // an array of objects
+                    html += generateHead(json[0]);
+
+                    // Set the HTML rows
+                    for (var i = 0; i < json.length; i++) {
+                        html += "<tr>" + jsonToHtml(json[i], true) + "</tr>";
+                    }
+
+                    html += generateFoot(json);
+                } else {
+                    // an array of primitive values
+                    for (var i = 0; i < json.length; i++) {
+                        html += jsonToHtml(json[i], true) + "<br/>";
+                    }
+                }
+
+            } else if (json instanceof Object) {
+                // objects
+                // special handling for $date and $oid
+                if (json["$date"]) {
+                    var date = new Date(Date.parse(json["$date"]));
+                    html += jsonToHtml(date.toLocaleDateString() + " " + date.toLocaleTimeString());
+                } else if (json["$oid"]) {
+                    html += jsonToHtml(json["$oid"]);
+                } else {
+                    if (!noheading) {
+                        html += generateHead(json);
+                    }
+
+                    //lookup for database state translation
+                    var databaseStateTranslation = {};
+                    databaseStateTranslation["0"] = "Sandboxed";
+                    databaseStateTranslation["1"] = "Operational";
+                    databaseStateTranslation["2"] = "Archived";
+                    databaseStateTranslation["3"] = "Deprecated";
+                    for (var key in json) {
+                        if (json.hasOwnProperty(key) && isDisplayField(key)) {
+                                var value;
+                                if (key == "_state") {
+                                    value = databaseStateTranslation[json[key].toString()];
+                                } else {
+                                    value = json[key];
+                                }
+                                html += "<td>";
+                                html += jsonToHtml(value);
+                                html += "</td>";
+                        }
+                    }
+
+                    if (!noheading) {
+                        html += generateFoot(json);
+                    }
+                }
+            } else {
+                // primitive types
+                // special handling for StorageFile
+                var reStorageFile = new RegExp(/StorageFile:\d+/);
+                if (reStorageFile.test(json)) {
+                    var urlDownload = "${urlDownload}";
+                    var href = urlDownload + json;
+                    html += "<a href='" + href + "'>" + json + "</a>";
+                } else {
+                    if (json || json === 0 || json === false || json === ""){
+                        html += json;
+                    } else {
+                        html += "n/a";
+                    }
+                }
+            }
+
+            return html;
+        }
+
+        cris.ready(function() {
+            var storeProjects = new dojo.store.JsonRest({
+                target: "${urlViewpjtds}",
+                idAttribute: "id",
+                value: "",
+                valueJSON: "",
+                htmlColumn: "",
+                htmlRow:"",
+                getIdentity: function(object) {
+                    return object.id;
+                },
+                getLabel: function(object) {
+                    return object.name;
+                },
+                mayHaveChildren: function(object) {
+                    if (object.type === "job") {
+                        return false;
+                    } else {
+                        if ("children" in object) {
+                            return  object.children;
+                        } else {
+                            return  false;
+                        }
+                    }
+                },
+                getRoot: function(onItem, onError) {
+                    this.get("root").then(onItem, onError);
+                },
+                getChildren: function(object, onComplete, onError) {
+                    var url = object.type ? (object.type + "/" + object.id) : "project/" + object.id;
+                    this.get(url).then(function(fullObject){
+                        object.children = fullObject.children;
+                        onComplete(fullObject.children);
+                    }, onError);
+                }
+            });
+
+            var tree = new dijit.Tree({
+                model: storeProjects,
+                showRoot: false,
+                getIconClass: function(item, opened) {
+                    var iconClass;
+                    switch (item.type) {
+                    case "project":
+                        iconClass = "projectIcon";
+                        break;
+                    case "experiment":
+                        iconClass = "experimentIcon";
+                        break;
+                    case "job":
+                        if (item.children) {
+                            iconClass = "jobHasDataIcon";
+                        } else {
+                            iconClass = "jobNoDataIcon";
+                        }
+                        break;
+                    default:
+                        iconClass = "jobIcon";
+                    }
+                    return iconClass;
+                }
+            }, "treeDataset");
+            tree.startup();
+
+            var store = createJsonRestStore("${urlViewpjtds}");
+
+            var layout= [{cells: [
+                { field: 'projectId', name: 'Project ID', hidden: true, width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.projectId === null ? "" : item.projectId;
+                } },
+                { field: 'experimentId', name: 'Experiment ID', hidden: true, width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.experimentId === null ? "" : item.experimentId;
+                } },
+                { field: 'jobId', name: 'Job ID', hidden: true, width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.jobId === null ? "" : item.jobId;
+                } },
+                { field: 'taskId', name: 'Task ID', hidden: true, width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.taskId === null ? "" : item.taskId;
+                } },
+                { field: 'dataId', name: 'Data ID', hidden: true, width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.dataId === null ? "" : item.dataId;
+                } },
+                { field: 'projectName', name: 'Project', width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.projectName === null ? "" : item.projectName;
+                } },
+                { field: 'experimentName', name: 'Experiment', width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.experimentName === null ? "" : item.experimentName;
+                } },
+                { field: 'jobName', name: 'Job', width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.jobName === null ? "" : item.jobName;
+                } },
+                { field: 'taskName', name: 'Task', width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.taskName === null ? "" : item.taskName;
+                } },
+                { field: 'dataTermUuid', name: 'Term UUID', hidden: true, width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.dataTermUuid === null ? "" : item.dataTermUuid;
+                } },
+                { field: 'dataTermVersion', name: 'Term Version', hidden: true, width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.dataTermVersion === null ? "" : item.dataTermVersion;
+                } },
+                { field: 'dataName', name: 'Name', width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+                    return item.dataName === null ? "" : item.dataName;
+                } },
+                { field: 'dataValue', name: 'Value', width: 'auto', get: function(row, item){
+                    if (!item) {
+                        return "Loading...";
+                    }
+
+                    if (item.dataValue === null || item.dataValue === undefined){
+                        this.value = "";
+                    } else if (item.dataValue === "[ ]" || item.dataValue.indexOf(":") === -1){
+                        this.value = "";
+                    } else {
+                        this.value = "Click for Values";
+                    }
+
+                    return this.value;
+                } }
+            ]}];
+
+            var asc = true;
+            var args = {
+                sortFields: [{attribute: "projectName", descending: !asc}]
+            };
+
+            var grid = createGrid(store, layout, "gridDataset", args);
+            grid.setSortIndex(0, asc);
+            if ("${filter}" !== "") {
+                grid.setQuery({filter: "${filter}"});
+            }
+
+            grid.onRowClick = function(e) {
+
+                var item = e.grid.getItem(e.rowIndex);
+                if (item.dataValue !== "[ ]" && item.dataValue !== null && item.dataValue.indexOf(":") !== -1) {
+                    var valueJson = dojo.fromJson(item.dataValue);
+                    var html = jsonToHtml(valueJson);
+
+                    valuesDialog = new dijit.Dialog({
+                        title: "Value(s)",
+                        content: html
+                    });
+                    valuesDialog.show();
+                }
+            };
+
+            dojo.connect(tree, "onClick", function(item) {
+                var filter;
+                if (item.id === "root") {
+                    filter = null;
+                    grid.layout.setColumnVisibility(5, true);
+                    grid.layout.setColumnVisibility(6, true);
+                    grid.layout.setColumnVisibility(7, true);
+                    grid.layout.setColumnVisibility(8, true);
+                } else if (item.type === "project") {
+                    filter = {type: "number", column: 0, condition: "equalTo", value: item.id};
+                    grid.layout.setColumnVisibility(5, false);
+                    grid.layout.setColumnVisibility(6, true);
+                    grid.layout.setColumnVisibility(7, true);
+                    grid.layout.setColumnVisibility(8, true);
+                } else if (item.type === "experiment") {
+                    filter = {type: "number", column: 1, condition: "equalTo", value: item.id};
+                    grid.layout.setColumnVisibility(5, false);
+                    grid.layout.setColumnVisibility(6, false);
+                    grid.layout.setColumnVisibility(7, true);
+                    grid.layout.setColumnVisibility(8, true);
+                } else if (item.type === "job") {
+                    filter = {type: "number", column: 2, condition: "equalTo", value: item.id};
+                    grid.layout.setColumnVisibility(5, false);
+                    grid.layout.setColumnVisibility(6, false);
+                    grid.layout.setColumnVisibility(7, false);
+                    grid.layout.setColumnVisibility(8, true);
+                } else if (item.type === "task") {
+                    filter = {type: "number", column: 3, condition: "equalTo", value: item.id};
+                    grid.layout.setColumnVisibility(5, false);
+                    grid.layout.setColumnVisibility(6, false);
+                    grid.layout.setColumnVisibility(7, false);
+                    grid.layout.setColumnVisibility(8, false);
+                } else {
+                    filter = null;
+                    grid.layout.setColumnVisibility(5, true);
+                    grid.layout.setColumnVisibility(6, true);
+                    grid.layout.setColumnVisibility(7, true);
+                    grid.layout.setColumnVisibility(8, true);
+                }
+                grid.setFilter(filter);
+            });
+
+            // keep this last
+            dijit.byId("idBorderContainer").resize();
+
+        });
+
+        cris.bootstrapAngular("idExplorer", "crisExplorer");
+        //]]>
+    </script>
+
+</jsp:root>

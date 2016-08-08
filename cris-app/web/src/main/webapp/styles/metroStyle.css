@@ -1,0 +1,166 @@
+/*
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+*/
+/*
+    Created on : Feb 25, 2014, 3:02:57 PM
+    Author     : Udayan Umapathi
+*/
+
+
+        .divcontainer{
+            background: #000000;
+            width: 200px;
+            height: 150px;
+        }
+
+        .pagina{
+            width:auto;
+            height:auto;
+            border: 1px solid;
+            border-color: #AAAAAA;
+            margin:10px;
+            padding: 5px 5px 5px 5px;
+        }
+
+        .linha{
+            margin:0px;
+            width:auto;
+            height:auto;
+            display:table;
+            border: 0px solid;
+
+        }
+
+
+        .tile{
+            height:100px;
+            width:100px;
+            float:left;
+            margin:5px 5px 5px 5px;
+            padding:2px;
+        }
+
+        .shadowTile{
+            box-shadow: 10px 10px 5px #888888;
+        }
+
+        .tileLargo{
+            width:215px;
+        }
+
+        .smallSquare{
+            height:100px;
+            width:100px;
+            float:left;
+            margin:5px 5px 5px 5px;
+            padding:2px;
+        }
+
+        .largeSquare{
+            height:200px;
+            width:200px;
+            float:left;
+            margin:5px 5px 5px 5px;
+            padding:2px;
+        }
+
+        .smallRectangle{
+            height:100px;
+            width:215px;
+            float:left;
+            margin:5px 5px 5px 5px;
+            padding:2px;
+        }
+
+        .largeRectbagle{
+            height:200px;
+            width:215px;
+            float:left;
+            margin:5px 5px 5px 5px;
+            padding:2px;
+        }
+
+        .amarelo{
+            background:#DAA520;
+        }
+
+        .vermelho{
+            background:#CD0000;
+        }
+
+        .darkCobalt{
+            background-color: #004e9d;
+        }
+
+        .darkEmerald{
+            background-color: #007100;
+        }
+
+        .darkGreen{
+            background-color: #128023;
+        }
+
+        .darkOrange{
+            background-color: #bf5a15
+        }
+
+        .darkPink{
+            background-color: #9a165a;
+        }
+
+        .lightBlue {
+            background-color: #4390df;
+        }
+
+        .azul{
+            background:#4682B4;
+        }
+
+        .verde{
+            background-color: #2E8B57;
+        }
+
+        .selecionado{
+            background-color: #483D8B;
+        }
+
+        .darkTeal{
+            background-color: #006983;
+        }
+
+        .tileTitle{
+            text-align:center;
+            font-size: 10pt;
+            height:30px;
+            padding:1px;
+        }
+
+        .tileTextBlack{
+            color: black;
+        }
+
+        .tileTextWhite{
+            color: white;
+        }
+
+        .tileImage{
+            height:70%;
+            width:auto;
+            display: block;
+            margin:5px 5px 3px 5px;
+            overflow: hidden;
+            text-wrap: normal;
+        }
+
+        .menuBar{
+            background-color: #4390df;
+            margin-top: 8px;
+            margin-left: 4px;
+            margin-right: 4px;
+            padding-top: 12px;
+            width: auto;
+            height: 38px;
+            text-align: center;
+        }

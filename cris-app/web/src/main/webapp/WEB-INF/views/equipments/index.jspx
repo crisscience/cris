@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+     xmlns:jsp="http://java.sun.com/JSP/Page"
+     xmlns:c="http://java.sun.com/jsp/jstl/core"
+     xmlns:spring="http://www.springframework.org/tags"
+     xmlns:form="http://www.springframework.org/tags/form"
+     >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <script type="text/javascript">
+        cris.ready(function() {
+        });
+    </script>
+
+    <h4>TODO: Each type of equipment is described by a template with some items with fixed values and others need to be filled in when creating an instance of this type of equipment</h4>
+    <hr/>
+
+    <h2>Equipment</h2>
+
+</jsp:root>

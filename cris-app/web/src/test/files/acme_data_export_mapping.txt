@@ -1,0 +1,12 @@
+{
+    "$delimiter" : "','",
+    "$hasHeader" : "true",
+
+    "hplc_id" : "$value['hplc_id']",
+    "hplc_name" : "$value['hplc_name']",
+    "hplc_owner" : "$value['hplc_owner']",
+    "hplc_make" : "$value['hplc_make']",
+    "hplc_model" : "$value['hplc_model']",
+    "hplc_serialnum" : "$value['hplc_serialnum']",
+    "hplc_description" : "$value['hplc_description']",
+}

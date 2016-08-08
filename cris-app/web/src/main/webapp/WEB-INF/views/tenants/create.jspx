@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1"
+          xmlns:jsp="http://java.sun.com/JSP/Page"
+          xmlns:c="http://java.sun.com/jsp/jstl/core"
+          xmlns:spring="http://www.springframework.org/tags"
+          xmlns:form="http://www.springframework.org/tags/form"
+          >
+
+    <jsp:directive.page contentType="text/html;charset=UTF-8"/>
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <script type="text/javascript">
+        cris.require([
+            "dijit/form/ValidationTextBox",
+            "dijit/form/Button"
+        ]);
+
+        cris.ready(function() {
+
+        });
+    </script>
+
+    <h1>Create a Workspace</h1>
+
+    <spring:url value="/tenants/create" var="url"/>
+    <form method="POST" action="${url}">
+        <p>
+            <label>URL Identifier: </label>
+            <input id="idUrlIdentifier" name="urlIdentifier" value="${urlIdentifier}" pattern="[0-9a-z_]+" placeholder="The first part of the URL after the domain name" data-dojo-type="dijit.form.ValidationTextBox"/>
+            <span>&amp;nbsp;The URL identifier cannot be changed after the workspace is created.</span>
+            <c:if test='${not empty errors.urlIdentifier}'>
+                <br/><label>&amp;nbsp;</label>
+                <span class='errors'>${errors.urlIdentifier}</span>
+            </c:if>
+        </p>
+        <p>
+            <label>Name: </label>
+            <input id="idName" name="name" value="${name}" placeholder="A name for the workspace" data-dojo-type="dijit.form.ValidationTextBox"/>
+            <c:if test='${not empty errors.name}'>
+                <br/><label>&amp;nbsp;</label>
+                <span class='errors'>${errors.name}</span>
+            </c:if>
+        </p>
+        <p>
+            <label>Admin Username: </label><span>administrator</span>
+        </p>
+        <p>
+            <label>Admin Password: </label><input id="idPassword1" name="password1" type='password' placeholder="8+ characters" pattern=".{8,}" data-dojo-type="dijit.form.ValidationTextBox"/>
+            <c:if test='${not empty errors.password}'>
+                <br/><label>&amp;nbsp;</label>
+                <span class='errors'>${errors.password}</span>
+            </c:if>
+        </p>
+        <p>
+            <label>Admin Password (confirm): </label><input id="idPassword2" name='password2' type='password' placeholder="repeat the password" data-dojo-type="dijit.form.ValidationTextBox"/>
+        </p>
+        <p>
+            <input type='submit' data-dojo-type='dijit.form.Button' data-dojo-props='label : "Create"'/>
+        </p>
+    </form>
+
+</jsp:root>

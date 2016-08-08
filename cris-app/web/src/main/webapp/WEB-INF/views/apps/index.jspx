@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/tools" var="urlTool"/>
+    <spring:url value="/reports" var="urlReport"/>
+    <spring:url value="/workflows" var="urlWorkflow"/>
+    <spring:url value="/jobs" var="urlJob"/>
+
+    <spring:url value="/images/test/app-icon1.png" var="urlToolImage"/>
+    <spring:url value="/images/test/app-icon1.png" var="urlReportImage"/>
+    <spring:url value="/images/test/app-icon3.jpg" var="urlWorkflowImage"/>
+
+    <c:set value="${jsRoot}/dojo-release-1.10.3/dojox/layout/resources/GridContainer.css" var="url" />
+    <link rel="stylesheet" type="text/css" href="${url}"><!-- required for FF3 and Opera --></link>
+    <c:set value="${jsRoot}/dojo-release-1.10.3/dojox/layout/resources/DndGridContainer.css" var="url" />
+    <link rel="stylesheet" type="text/css" href="${url}"><!-- required for FF3 and Opera --></link>
+
+    <script type="text/javascript">
+        // <![CDATA[
+        cris.require('dijit/layout/ContentPane');
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dojox/layout/GridContainer");
+
+        var contentTemplate = '<a href="{url}"><div style="width: 80px; height: 80px; text-align: center; background-image: url({urlImage})">{name}</div></a>';
+
+        cris.ready(function() {
+            var gridContainer = dijit.byId("idGridContainer");
+            var context = {};
+
+            var store = createJsonRestStore("${urlTool}");
+            store.fetch({onComplete: function(items, request) {
+                dojo.forEach(items, function(item, index) {
+                    context.url = "${urlTool}/run/" + item.id;
+                    context.urlImage = "${urlToolImage}";
+                    context.name = item.name;
+                    var node = new dijit.layout.ContentPane({title: item.name, content: dojo.replace(contentTemplate, context)});
+                    gridContainer.addChild(node, index % 8, 0);
+                });
+            }});
+
+            var store = createJsonRestStore("${urlReport}");
+            store.fetch({onComplete: function(items, request) {
+                dojo.forEach(items, function(item, index) {
+                    context.url = "${urlReport}/run/" + item.id;
+                    context.urlImage = "${urlReportImage}";
+                    context.name = item.name;
+                    var node = new dijit.layout.ContentPane({title: item.name, content: dojo.replace(contentTemplate, context)});
+                    gridContainer.addChild(node, index % 8, 0);
+                });
+            }});
+
+            var store = createJsonRestStore("${urlWorkflow}");
+            store.fetch({onComplete: function(items, request) {
+                dojo.forEach(items, function(item, index) {
+                    context.url = "${urlJob}/run/?workflowId=" + item.id;
+                    context.urlImage = "${urlWorkflowImage}";
+                    context.name = item.name;
+                    var node = new dijit.layout.ContentPane({title: item.name, content: dojo.replace(contentTemplate, context)});
+                    gridContainer.addChild(node, index % 8, 0);
+                });
+            }});
+        });
+
+        angular.module('crisApp', ['angular-dojo']);
+
+        cris.bootstrapAngular("idApp", "crisApp");
+        // ]]>
+    </script>
+
+    <div id="idApp">
+        <div id="idGridContainer" data-dojo-type="dojox/layout/GridContainer" nbZones="8" colWidths="12,12,12,12,12,12,12,12" isAutoOrganized="true">
+            <!--
+            <div data-dojo-type="dijit/layout/ContentPane">Content Pane 1 : Drag Me !</div>
+            <div data-dojo-type="dijit/layout/ContentPane">Content Pane 2 : Drag Me !</div>
+            <div data-dojo-type="dijit/layout/ContentPane">Content Pane 3 : Drag Me !</div>
+            -->
+        </div>
+    </div>
+</jsp:root>

@@ -1,0 +1,1291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+          xmlns:jsp="http://java.sun.com/JSP/Page"
+          xmlns:c="http://java.sun.com/jsp/jstl/core"
+          xmlns:spring="http://www.springframework.org/tags"
+          xmlns:form="http://www.springframework.org/tags/form"
+          >
+
+    <jsp:output omit-xml-declaration="yes"/>
+    
+    <spring:url value="/images/famfamfam_silk_icons_v013/icons/add.png" var="srcAddImg"/>
+    <spring:url value="/images/famfamfam_silk_icons_v013/icons/delete.png" var="srcDeleteImg"/>
+
+    <!-- jsPlumb -->
+    <c:set value="${jsRoot}/jquery-ui.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for Diagram editor using jsPlumb --></script>
+
+    <!-- jsPlumb -->
+    <c:set value="${jsRoot}/jsPlumb.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for Diagram editor using jsPlumb --></script>
+
+    <!-- silverlight.js -->
+    <c:set value="${jsRoot}/Silverlight.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for Diagram editor using jsPlumb --></script>
+
+    <!-- workflow editor -->
+    <c:set value="${stylesRoot}/workflowEditor.css" var="url" />
+    <link rel="stylesheet" type="text/css" media="screen" href="${url}" />
+
+    <c:set value="${jsRoot}/dm/dataset.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for FF3 and Opera --></script>
+
+    <c:set value="${jsRoot}/dm/workflow.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for Diagram editor using jsPlumb --></script>
+
+    <c:set value="${jsRoot}/dm/WorkflowEditorController.js" var="urlWorkflowEditorController" />
+    <script type="text/javascript" src="${urlWorkflowEditorController}">/**/</script>
+
+    <spring:url value="/workflows" var="url"/>
+    <spring:url value="/workflows/import" var="urlImport"/>
+    <spring:url value="/workflows/export" var="urlExport"/>
+    <spring:url value="/workflows/save" var="urlSaveWorkflow"/>
+    <spring:url value="/workflows/load/" var="urlLoadWorkflow"/>
+    <spring:url value="/workflows/versions" var="urlVersions"/>
+    <spring:url value="/templates" var="urlTemplates"/>
+    <spring:url value="/reports" var="urlReports"/>
+
+    <script type="text/javascript">
+        // <![CDATA[
+        cris.require([
+            "dojo/behavior",
+            "dijit/form/Form",
+            "dijit/form/ValidationTextBox",
+            "dijit/form/Button",
+            "dijit/form/RadioButton",
+            "dijit/form/SimpleTextarea",
+            "dijit/form/FilteringSelect",
+            "dijit/layout/TabContainer",
+            "dijit/layout/ContentPane",
+            "dijit/MenuItem",
+            "dijit/Dialog",
+            "dijit/DropDownMenu",
+            "dojox/xml/parser"
+        ]);
+
+        cris.workflow = {};
+        cris.workflow.app = {
+            grid: null,
+            store: null,
+
+            defaultQuery: {showAllStatus: true},
+
+            setGridFilter: function(status) {
+                if (status === 0 || status === 1) {
+                    this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: status}]);
+                } else {
+                    this.grid.setFilter();
+                }
+            },
+
+            updateHtml: function(item) {
+                dojo.byId("detailVersionNumber").innerHTML = item["versionNumber"];
+                dojo.byId("detailKey").innerHTML = item["key"] ? item["key"] : "";
+                dojo.byId("detailName").innerHTML = item["name"] ? item["name"] : "";
+                dojo.byId("detailFileName").innerHTML = item["content"] ? item["content"] : "";
+                dojo.byId("status").innerHTML = convertAssetStatusIdToName(item.statusId);
+                dojo.byId("detailTimeCreated").innerHTML = item.timeCreated && item.timeCreated.$date ? dateIsoToLocale(item.timeCreated.$date) : "";
+                dojo.byId("detailTimeUpdated").innerHTML = item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
+                dojo.byId("detailExportUrl").href = (item ? "${urlExport}/" + this.workflowId : "") + "?version=" + item.version + "&showAllStatus=true";
+                dojo.byId("detailExportUrl").innerHTML = (item && item.content) ? item.content : "";
+                if (item.statusId === 1) {
+                    dijit.byId("buttonDeprecate").set("label", "Deprecate");
+                } else if (item.statusId === 0) {
+                    dijit.byId("buttonDeprecate").set("label", "Restore");
+                } else {
+                    dijit.byId("buttonDeprecate").set("label", "Deprecate");
+                }
+            },
+
+            saveStore: function() {
+                var pd = createProgressDialog();
+                this.store.save({
+                    onComplete: function(data) {
+                        var selectedItem = cris.workflow.app.grid.selection.getSelected("row")[0];
+                        var selectedIndex = cris.workflow.app.grid.selection.selectedIndex;
+                        if (selectedItem) {
+                            cris.workflow.app.grid.updateRow(selectedIndex);
+                            cris.workflow.app.updateHtml(selectedItem);
+                        } else {
+                            cris.workflow.app.updateHtml({});
+                        }
+                        cris.workflow.app.grid.setQuery({showAllStatus: true});
+                        pd.hide();
+                    },
+                    onError: function(error) {
+                        pd.setContent("Failed to save changes. " + error);
+                    }
+                });
+            },
+
+            behavior: {
+                "#idShowOperational": {
+                    onclick: function(evt) {
+                        cris.workflow.app.setGridFilter(1);
+                    }
+                },
+                "#idShowDeprecated": {
+                    onclick: function(evt) {
+                        cris.workflow.app.setGridFilter(0);
+                    }
+                },
+                "#idShowAll": {
+                    onclick: function(evt) {
+                        cris.workflow.app.setGridFilter(null);
+                    }
+                },
+                "#buttonDeprecate": {
+                    onclick: function(evt) {
+                        var item = cris.workflow.app.grid.selection.getSelected("row")[0];
+                        if (!item) {
+                            showMessage("Please select a workflow");
+                            return;
+                        }
+
+                        var status;
+                        if (item.statusId === 1) {
+                            status = 0;
+                        } else {
+                            status = 1;
+                        }
+                        cris.workflow.app.store.setValue(item, "statusId", status);
+                        cris.workflow.app.saveStore();
+                    }
+                },
+                "#idGrid": {
+                    onclick: function(evt) {
+                        dojo.publish("cris/workflow/newSelection", []);
+                    }
+                }
+            },
+
+            init: function() {
+                console.log("++++++++ manager init called");
+                this.store = createJsonRestStore("${url}");
+                var layout = [{cells: [
+                            {field: 'statusId', name: 'Status ID', hidden: true},
+                            {field: 'id', name: 'ID', datatype: "number", width: '50px'},
+                            {field: 'name', name: 'Name', width: 'auto'},
+                            {field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px', get: function(row, item) {
+                                    if (!item) {
+                                        return "Loading...";
+                                    }
+                                    return item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
+                                }}
+                        ]}];
+                var asc = true;
+                var args = {
+                    query: this.defaultQuery,
+                    sortFields: [{attribute: "name", descending: !asc}],
+                    rowsPerPage: 10,
+                    pageSizes: []
+                };
+                this.grid = createGrid(this.store, layout, "idGrid", args);
+                this.grid.setSortIndex(2, asc);
+                this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: 1}]);
+
+                this.updateHtml({});
+                dojo.behavior.add(this.behavior);
+                dojo.behavior.apply();
+
+                var _this = this;
+                dojo.connect(dijit.byId("detailVersionNumber"), "onChange", function(evt) {
+                    var index = dijit.byId("detailVersionNumber").getValue();
+                    var workflow = _this.workflows[index];
+                    _this.updateHtml(workflow);
+                });
+
+                dojo.subscribe("cris/workflow/newSelection", this, function(evt) {
+                    if (this.grid.selection.getSelectedCount("row") >= 1) {
+                        var item = this.grid.selection.getSelected("row")[0];
+                        _this.workflowId = item.id;
+                        // fetch all versions of the workflow
+                        var xhrArgs = {
+                            url: "${urlVersions}/" + item.id,
+                            content: _this.defaultQuery,
+                            handleAs: "json",
+                            load: function(data) {
+                                _this.workflows = data;
+                                // display: version number, value: index to array
+                                var versionIndex = [];
+                                for (var i = 0; i < data.length; i++) {
+                                    versionIndex.push({name: "" + data[i].version, id: "" + i});
+                                }
+                                var storeVersionIndex = new dojo.store.Memory({data: versionIndex});
+                                var widgetVersionNumber = dijit.byId("detailVersionNumber");
+                                widgetVersionNumber.store = storeVersionIndex;
+                                if (data.length > 0) {
+                                    widgetVersionNumber.set("value", "" + 0);
+                                    widgetVersionNumber.onChange();
+                                }
+                            },
+                            error: function(error) {
+                                console.log(error);
+                            }
+                        };
+                        // Call the asynchronous xhrGet
+                        dojo.xhrGet(xhrArgs);
+                    }
+                });
+            }
+        };
+
+        cris.bootstrapAngular("idWorkflow", "crisWorkflow");
+
+        cris.ready(function() {
+            cris.workflow.app.init();
+        });
+        // ]]>
+    </script>
+
+    <script type="text/ng-template" id="view_user_task">
+    <div>
+        <h2>{{emptyMessage}}</h2>
+    </div>
+    </script>
+
+    <script type="text/ng-template" id="view_service_task">
+    <div>
+        <h2>{{emptyMessage}}</h2>
+    </div>
+    </script>
+
+    <script type="text/ng-template" id="view_conditional_branch">
+    <div>
+        <h2>{{emptyMessage}}</h2>
+    </div>
+    </script>
+
+    <script type="text/ng-template" id="view_case_branch">
+    <div>
+        <h2>{{emptyMessage}}</h2>
+    </div>
+    </script>
+    
+    <div id='idWorkflow' style="width: 100%; height: 1000px" data-ng-controller="WorkflowEditorController as weCtrl"  data-ng-keydown="weCtrl.keyDown($event)" tabindex="0">
+        <div id="idWorkflowEditorController" data-dojo-type="dijit/layout/TabContainer" style="width: 100%; height: 100%;">
+
+            <div data-dojo-type="dijit/layout/ContentPane" title="Editor" data-dojo-props='selected: "true"' style="overflow: hidden">
+
+                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "New..."' data-ng-click="weCtrl.newWorkflow()"/>
+                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Open..."' data-ng-click="weCtrl.openWorkflow()"/>
+                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Import..."' data-ng-click="weCtrl.importWorkflow()"/>
+
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+
+                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Save As...", disabled: {{weCtrl.workflow === null}}' data-ng-click="weCtrl.saveAsWorkflow()"/>
+                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Save", disabled: {{weCtrl.workflow === null}}' data-ng-click="weCtrl.saveWorkflow()"/>
+
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+
+                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Edit Metadata...", disabled: {{weCtrl.workflow === null}}' data-ng-click="weCtrl.editWorkflowMetadata()"/>
+
+                <div class='floatRight'>
+                    <div id="newTask" data-dojo-widget="dijit/form/DropDownButton" data-dojo-props='disabled: {{weCtrl.workflow === null}}'>
+                        <span>New Task...</span>
+                        <div data-dojo-widget="dijit/DropDownMenu">
+                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newUserTask()">User Task</div>
+                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newServiceTask()">Service Task</div>
+                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newReportTask()">Report Task</div>
+                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newConditionBranch()">Condition Branch</div>
+                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newMultiConditionBranch()">Multi-condition Branch</div>
+                        </div>
+                    </div>
+                </div>
+
+                <br class="clearBoth"/>
+
+                <h3 style="text-align: center;">{{weCtrl.workflow ? (weCtrl.workflow.name ? weCtrl.workflow.name : "(Please use \"Edit Metadata\" to enter workflow info)") : "(No workflow)"}}</h3>
+
+                <span class="errors">{{weCtrl.errorMessage}}&amp;nbsp;</span>
+
+                <div id="container" style="display: block; overflow-y: scroll; position: relative; width: 100%; height: 89%;">
+                    <!-- workflow diagram area-->
+                </div>
+
+                <div data-dojo-type="dijit/Dialog" data-dojo-id="openWorkflowDialog" title="Open Workflow">
+                    <div>
+                        Workflow: <input data-dojo-widget="dijit/form/FilteringSelect" data-dojo-props='placeholder: "select a workflow...", fetchProperties: {sort: [{attribute:"name",ascending: true}]}' data-dojo-store="weCtrl.storeWorkflows" data-ng-model="weCtrl.workflowIdToOpen"/>
+                    </div>
+
+                    <br/>
+
+                    <div class="floatRight">
+                        <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Open'" data-ng-click="weCtrl.fetchAndInitWorkflow(weCtrl.workflowIdToOpen)"/>
+                        <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Cancel', onClick:function(){openWorkflowDialog.hide();}"/>
+                    </div>
+
+                    <br class="clearBoth"/>
+                </div>
+
+                <div data-dojo-type="dijit/Dialog" data-dojo-id="importWorkflowDialog" title="Import Workflow" style="width: 33%;">
+                    <div>
+                        <form id="idFormImportWorkflow" method="POST" enctype="multipart/form-data" data-dojo-type="dijit/form/Form">
+                            <input id="idFile" name="file" data-dojo-type="dojox/form/Uploader" data-dojo-props='multiple : false, label : "Browse..."' style="width: 75px;"/>
+                            <div id="idFileList" data-dojo-type="dojox/form/uploader/FileList" data-dojo-props='uploaderId: "idFile"'><!-- --></div>
+                        </form>
+                    </div>
+
+                    <br/>
+
+                    <div class='floatRight'>
+                        <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Upload"' data-ng-click='weCtrl.saveWorkflowArchive()'/>
+                        <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Cancel', onClick:function(){importWorkflowDialog.hide();}"/>
+                    </div>
+
+                    <br class="clearBoth"/>
+                </div>
+
+                <div data-dojo-type="dijit/Dialog" data-dojo-id="saveAsWorkflowDialog" title="Save as Workflow" style="width: 50%;">
+                    <h3>Please provide a name and description for the new workflow</h3>
+
+                    <br/>
+
+                    <table class="form" style="width: 100%;">
+                        <tr>
+                            <td style="width: 25%">Name:</td>
+                            <td><input id="nameWorkflowSaveAs" type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.name"/></td>
+                        </tr>
+                        <tr>
+                            <td>Description:</td>
+                            <td>
+                                <input id="descWorkflowSaveAs" type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.description"/>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <br/>
+
+                    <div class="floatRight" id ="saveAsWorkflowActionBar">
+                        <input id="createSaveAsWorkflow" type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Save'" data-ng-click='weCtrl.renameAndSaveWorkflow(weCtrl.name, weCtrl.description)'/>
+                        <input id="cancelsaveAsWorkflow" type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Cancel', onClick:function(){saveAsWorkflowDialog.hide();}"/>
+                    </div>
+
+                    <br class="clearBoth"/>
+                </div>
+
+                <div data-dojo-type="dijit/Dialog" data-dojo-id="OnSaveWorkflowDialog" title="Success!">
+                    <div class="dijitDialogPaneContentArea">
+                        The workflow has been successfully saved!
+                    </div>
+                </div>
+
+                <form id="idFormEditor" method="POST" enctype="multipart/form-data" data-dojo-type="dijit/form/Form">
+                    <div id="idUploaderFiles" style="display: none;"><!-- --></div>
+
+                    <div data-dojo-type="dijit/Dialog" data-dojo-id="workflowMetadataDialog" title="Workflow Metadata" style="width: 50%;">
+                        <!-- new/update workflow metadata -->
+                        <div id="createNewWorkflowDialog">
+                            <table class="form" style="width: 100%;">
+                                <tr>
+                                    <td style="width: 20%;">ID:</td><td>{{weCtrl.workflow.id}}</td>
+                                </tr>
+                                <tr>
+                                    <td>UUID:</td><td>{{weCtrl.workflow.uuid}}</td>
+                                </tr>
+                                <tr>
+                                    <td>Name:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.workflow.name" style='width: 100%;'/></td>
+                                </tr>
+                                <tr>
+                                    <td>Description:</td><td><input type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props="rows: 4" data-ng-model="weCtrl.workflow.documentation" style='width: 100%;'/></td>
+                                </tr>
+                            </table>
+
+                            <br/>
+
+                            <div>
+                                <table class="form" style="width: 100%">
+                                    <tr>
+                                        <td colspan="2">Default Dataset State when a Job is Running:</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 20%"><!-- --></td>
+                                        <td>
+                                            <cris-radio-button name="initialDatasetState" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3}" data-ng-model="weCtrl.workflow.initialDatasetState"><!-- --></cris-radio-button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2">Final Dataset State(s) Available for User to Choose:</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 20%"><!-- --></td>
+                                        <td>
+                                            <cris-check-box name="initialDatasetState" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3}" data-ng-model="weCtrl.workflow.finalDatasetStates"><!-- --></cris-check-box>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <br/>
+
+                            <div>
+                                <table class="form" style="width: 100%">
+                                    <tr>
+                                        <td style="width: 20%">
+                                            "the_end.html" in Archive:
+                                        </td>
+                                        <td>
+                                            <cris-check-box name="endOfJobFile" orientation="vertical" items="{{weCtrl.workflow.theEndFileInArchive}}" data-ng-model="weCtrl.workflow.theEndFileToInclude"><!-- --></cris-check-box>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            "the_end.html" to Include:<br/>
+                                            (File must be named "the_end.html")
+                                        </td>
+                                        <td>
+                                            <div id="idTheEndPageFile"><!-- --></div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <div class='floatRight'>
+                                <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Ok', onClick: function() { workflowMetadataDialog.hide(); }" />
+                            </div>
+
+                            <br class='clearBoth'/>
+                        </div>
+                    </div>
+
+                    <div id="userTaskDetails" class="overlayDiv">
+                        <table style="width: 100%;">
+                            <tr>
+                                <td>
+                                    <h4 id="userTaskLabel"></h4>
+                                </td>
+                                <td style="text-align: right;">
+                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Cancel'" data-ng-click='weCtrl.cancelTaskDetails("userTaskDetails")'/>
+                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditUT)'/>
+                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeUserTaskDetails(weCtrl.currentEditUT)'/>
+                                </td>
+                            </tr>
+                        </table>
+                        
+                        <br />
+                        
+                        <div data-dojo-type="dijit/layout/TabContainer" data-dojo-props="doLayout: false, controllerWidget: 'dijit.layout.TabController'" style="width: 100%; height: 100%;">
+                            <div data-dojo-type="dijit/layout/ContentPane" title="General" style="overflow: hidden;">
+                                <table class="form" style="width: 100%">
+                                    <tr>
+                                        <td style="width: 25%">Name:</td><td><input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditUT.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Description:</td><td><input type="text" name="description" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEditUT.documentation"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Page from:</td>
+                                        <td colspan="2">
+                                            <cris-radio-button name="pageType" orientation="horizontal" items="{'Template': 'template', 'Custom HTML': 'custom'}" data-ng-model="weCtrl.currentEditUT.pageType"><!-- --></cris-radio-button>
+                                        </td>
+                                    </tr>
+                                    <tr  data-ng-show="weCtrl.currentEditUT.pageType == 'template'">
+                                        <td><!-- --></td>
+                                        <td>
+                                            <div style="width: 20%; float: left;">Template:</div>
+                                            <div style="width: 80%; float: right;">
+                                                <input data-dojo-widget="dijit/form/FilteringSelect" data-dojo-props='placeholder: "select a template...", fetchProperties: {sort: [{attribute:"name",ascending: true}]}' data-dojo-store="weCtrl.storeTemplates" data-ng-model="weCtrl.currentEditUT.templateId"/>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr data-ng-show="weCtrl.currentEditUT.pageType == 'custom'">
+                                        <td><!-- --></td>
+                                        <td>
+                                            <div style="width: 20%; float: left;">HTML File:</div>
+                                            <div style="width: 80%; float: right;">
+                                                <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: true" data-ng-model="weCtrl.currentEditUT.ui_page"/>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr  data-ng-show="weCtrl.currentEditUT.pageType == 'custom'">
+                                        <td><!-- --></td>
+                                        <td>
+                                            <div style="width: 20%; float: left;">Select a new HTML</div>
+                                            <div style="width: 80%; float: right;">
+                                                <div id="idUserTaskCustomHtmlFile"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">User(s) Permitted:</td>
+                                        <td>
+                                            <input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditUT.csvUsers"/>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">Group(s) Permitted:</td>
+                                        <td>
+                                            <input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditUT.csvGroups"/>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">Dataset State:</td>
+                                        <td>
+                                            <cris-radio-button name="datasetStateUT" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditUT.datasetState"><!-- --></cris-radio-button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">UI Orientation:</td>
+                                        <td>
+                                            <cris-radio-button name="orientationUT" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditUT.orientation"><!-- --></cris-radio-button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">File(s) in Archive:<br/>
+                                            (To remove a file, uncheck it)
+                                        </td>
+                                        <td>
+                                            <cris-check-box name="filesToIncludeUT" orientation="vertical" items="{{weCtrl.currentEditUT.filesInArchive}}" data-ng-model="weCtrl.currentEditUT.filesToInclude"><!-- --></cris-check-box>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>File(s) to Include:</td>
+                                        <td>
+                                            <div id="idUserTaskFiles"><!-- --></div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div data-dojo-type="dijit/layout/ContentPane" title="Json In" style="overflow: hidden;">
+                                <cris-workflow-json-builder task="weCtrl.currentEditUT" type="jsonIn" queries="weCtrl.currentEditUT.jsonInQueries"></cris-workflow-json-builder>
+                            </div>
+                        </div>       
+                    </div>
+                    
+                    <div id="serviceTaskDetails" class="overlayDiv">
+                        <table style="width: 100%;">
+                            <tr>
+                                <td>
+                                    <h4 id="serviceTaskLabel"></h4>
+                                </td>
+                                <td style="text-align: right;">
+                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Cancel'" data-ng-click='weCtrl.cancelTaskDetails("serviceTaskDetails")'/>
+                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditST)'/>
+                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeServiceTaskDetails(weCtrl.currentEditST)'/>
+                                </td>
+                            </tr>
+                        </table>
+                        
+                        <br />
+                        
+                        <div data-dojo-type="dijit/layout/TabContainer" data-dojo-props="doLayout: false, controllerWidget: 'dijit.layout.TabController'" style="width: 100%; height: 100%;">
+                            <div data-dojo-type="dijit/layout/ContentPane" title="General" style="overflow: hidden;">
+                                <table class="form" style="width: 100%">
+                                    <tr>
+                                        <td style="width: 25%">Name:</td><td><input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditST.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Description:</td><td><input type="text" name="description" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEditST.documentation"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">File(s) in Archive:<br/>
+                                            (To remove a file, uncheck it)
+                                        </td>
+                                        <td>
+                                            <cris-check-box name="filesToIncludeST" orientation="vertical" items="{{weCtrl.currentEditST.filesInArchive}}" data-ng-model="weCtrl.currentEditST.filesToInclude"><!-- --></cris-check-box>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>File(s) to Include:</td>
+                                        <td>
+                                            <div id="idServiceTaskFiles"><!-- --></div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">Dataset State:</td>
+                                        <td>
+                                            <cris-radio-button name="datasetStateST" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditST.datasetState"><!-- --></cris-radio-button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">UI Orientation:</td>
+                                        <td>
+                                            <cris-radio-button name="orientationST" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditST.orientation"><!-- --></cris-radio-button>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div data-dojo-type="dijit/layout/ContentPane" title="Service" style="overflow: hidden;">
+                                <table class="form" style="width: 100%">
+                                    <tr>
+                                        <td style="width: 25%">Prefilter:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.prefilter"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Commandline:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.commandline"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Postfilter:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.postfilter"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="width: 25%">File(s) to place:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.filesToPlace"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>File(s) to collect:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.filesToCollect"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Wait for service task to complete:</td><td><input type="checkbox" data-dojo-widget="dijit/form/CheckBox" data-ng-model="weCtrl.currentEditST.syncTask"/></td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div data-dojo-type="dijit/layout/ContentPane" title="Json In" style="overflow: hidden;">
+                                <cris-workflow-json-builder task="weCtrl.currentEditST" type="jsonIn" queries="weCtrl.currentEditST.jsonInQueries"></cris-workflow-json-builder>
+                            </div>
+                            <div data-dojo-type="dijit/layout/ContentPane" title="Json Out" style="overflow: hidden;">
+                                <cris-workflow-json-builder task="weCtrl.currentEditST" type="jsonOut" queries="weCtrl.currentEditST.jsonOutQueries"></cris-workflow-json-builder>
+                            </div>
+                        </div>
+                        
+                        <br class="clearBoth"/>
+                    </div>
+                    
+                    <div data-dojo-type="dijit/Dialog" data-dojo-id="reportTaskDialog" title=" New Report Task" style="width: 50%;">
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Name:</td><td><input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditRT.name"/></td>
+                            </tr>
+                            <tr>
+                                <td>Description:</td><td><input type="text" name="description" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEditRT.documentation"/></td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Command:</td><td><cris-select items="[{id: 'GetParameters', name: 'GetParameters'}, {id: 'GenerateReport', name: 'GenerateReport'}]" item='weCtrl.currentEditRT.command' value="{{weCtrl.currentEditRT.command}}"/></td>
+                            </tr>
+                            <tr>
+                                <td>Report:</td><td><cris-rest-select url="${urlReports}" value="weCtrl.currentEditRT.reportId"/></td>
+                            </tr>
+                            <tr>
+                                <td>Template:</td><td><cris-rest-select url="${urlTemplates}" value="weCtrl.currentEditRT.templateId"/></td>
+                            </tr>
+                            <tr>
+                                <td>Parameters:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditRT.parameters"/></td>
+                            </tr>
+                            <tr>
+                                <td>Output Type:</td><td><cris-select items="[{id: 'html', name: 'html'}, {id: 'pdf', name: 'pdf'}, {id: 'rtf', name: 'rtf'}, {id: 'xls', name: 'xls'}, {id: 'xlsx', name: 'xlsx'}]" item='weCtrl.currentEditRT.outputType' value="{{weCtrl.currentEditRT.outputType}}"/></td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Dataset State:</td>
+                                <td>
+                                    <cris-radio-button name="datasetStateRT" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditRT.datasetState"><!-- --></cris-radio-button>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">UI Orientation:</td>
+                                <td>
+                                    <cris-radio-button name="orientationRT" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditRT.orientation"><!-- --></cris-radio-button>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <div class="floatRight">
+                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditRT)'/>
+                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeReportTaskDialog(weCtrl.currentEditRT)'/>
+                        </div>
+
+                        <br class="clearBoth"/>
+                    </div>
+
+                    <div data-dojo-type="dijit/Dialog" data-dojo-id="conditionBranchDialog" title=" New Condition Branch" style="width: 50%;">
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Name:</td>
+                                <td>
+                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditCF.name"/>
+                                </td>
+                            </tr>
+                            <!--
+                            <tr>
+                                <td>Description:</td><td><input type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEdit.documentation"/></td>
+                            </tr>
+                            -->
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Condition Expression:</td>
+                                <td>
+                                    <input type="text" name='conditionExpression' data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: false" data-ng-model="weCtrl.currentEditCF.conditionExpression"/>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">UI Orientation:</td>
+                                <td>
+                                    <cris-radio-button name="orientationCF" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditCF.orientation"><!-- --></cris-radio-button>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <div class="floatRight">
+                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditCF)'/>
+                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeConditionBranchDialog(weCtrl.currentEditCF)'/>
+                        </div>
+
+                        <br class="clearBoth"/>
+                    </div>
+                       
+                    <div data-dojo-type="dijit/Dialog" data-dojo-id="multiConditionBranchDialog" title=" New Multi Condition Branch" style="width: 50%;">
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Name:</td>
+                                <td>
+                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditCF.name"/>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+                        
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Num of Expressions:</td>
+                                <td>
+                                    <cris-select items="[{id: 1, name: 1}, {id: 2, name: 2}, {id: 3, name: 3}, {id: 4, name: 4}, {id: 5, name: 5}, {id: 6, name: 6}]" item="weCtrl.currentEditCF.expressionCount" value='{{weCtrl.currentEditCF.expressionCount}}'></cris-select>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr data-ng-repeat="n in weCtrl.currentEditCF.numExpressions track by $index">
+                                <td style="width: 16%">Expression {{$index + 1}}:</td>
+                                <td>
+                                    <input type="text" name='conditionExpression{{$index + 1}}' data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: false" data-ng-model="weCtrl.currentEditCF.conditionExpressions[$index].expression"/>
+                                </td>
+                                <td style="width: 10%">Label {{$index + 1}}:</td>
+                                <td style="width: 24%">
+                                    <input type="text" name='label{{$index + 1}}' data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: false" data-ng-model="weCtrl.currentEditCF.conditionExpressions[$index].label"/>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+                        
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">UI Orientation:</td>
+                                <td>
+                                    <cris-radio-button name="orientationMCF" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditCF.orientation"><!-- --></cris-radio-button>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <div class="floatRight">
+                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteMultiConditionTask(weCtrl.currentEditCF)'/>
+                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeMultiConditionBranchDialog(weCtrl.currentEditCF)'/>
+                        </div>
+
+                        <br class="clearBoth"/>
+                    </div>
+                            
+                    <div data-dojo-type="dijit/Dialog" data-dojo-id="caseBranchDialog" title=" New Case Branch">
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Name:</td>
+                                <td>
+                                    <input type="text" name="name" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Description:</td><td><input type="text" name="description" data-dojo-type="dijit/form/SimpleTextarea" data-dojo-props='rows: 5'/></td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">Case Expression:</td>
+                                <td colspan="2">
+                                    <input type="text" name="caseExpression" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td style="width: 15%">Value 1:</td>
+                                <td>
+                                    <input type="text" name="caseValue1" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 2:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 3:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 4:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 5:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 6:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 7:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 8:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 9:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><!-- --></td>
+                                <td>Value 10:</td>
+                                <td>
+                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 25%">UI Orientation:</td>
+                                <td>
+                                    <input type="radio" data-dojo-type="dijit/form/RadioButton"/> Normal
+                                    <input type="radio" data-dojo-type="dijit/form/RadioButton"/> Flipped
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br/>
+
+                        <div class="floatRight">
+                            <input type="button" data-dojo-type="dijit/form/Button"  data-dojo-props="label: 'OK', onClick:function(){cris.workflow.app.createNewTask();}"/>
+                            <input type="button" data-dojo-type="dijit/form/Button"  data-dojo-props="label: 'Delete', onClick:function(){}"/>
+                            <input type="button" data-dojo-type="dijit/form/Button"  data-dojo-props="label: 'Cancel', onClick:function(){caseBranchDialog.hide();}"/>
+                        </div>
+
+                        <br class="clearBoth"/>
+                    </div>
+                </form>
+            </div>
+
+            <div data-dojo-type="dijit/layout/ContentPane" title="Manager">
+                <div>
+                    <div class="halfMinus floatLeft">
+                        <h2>Workflows</h2>
+                        <span>
+                            <input id="buttonDeprecate" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Deprecate', style: {width: '100px;'}"/>
+                        </span>
+                        <span class="floatRightToButton">
+                            Show:
+                            <input id="idShowOperational" type="radio" name="showStatus" value="1" checked="checked" data-dojo-type="dijit/form/RadioButton"/><span>Operational</span>
+                            &amp;nbsp
+                            <input id="idShowDeprecated" type="radio" name="showStatus" value="0" data-dojo-type="dijit/form/RadioButton"/><span>Deprecated</span>
+                            &amp;nbsp
+                            <input id="idShowAll" type="radio" name="showStatus" value="" data-dojo-type="dijit/form/RadioButton"/><span>All</span>
+                            &amp;nbsp
+                        </span>
+                        <br/>
+                        <div id="idGrid"><!-- --></div>
+                    </div>
+
+                    <div class="half floatRight">
+                        <h2>Details</h2>
+
+                        <form id="formDetail" method="POST" data-dojo-type="dijit.form.Form">
+                            <table class="form" style="width: 100%">
+                                <tr>
+                                    <td style="width: 40%">Version:</td>
+                                    <td><input id="detailVersionNumber" data-dojo-type="dijit.form.FilteringSelect" data-dojo-props=""/></td>
+                                </tr>
+                                <tr>
+                                    <td>Key:</td>
+                                    <td><span id="detailKey"><!-- --></span></td>
+                                </tr>
+                                <tr>
+                                    <td>Name:</td>
+                                    <td><span id="detailName"><!-- --></span></td>
+                                </tr>
+                                <tr>
+                                    <td>Workflow File Name:</td>
+                                    <td><span id="detailFileName"><!-- --></span></td>
+                                </tr>
+                                <tr>
+                                    <td>Status:</td><td id="status"><!-- fix ff problem --></td>
+                                </tr>
+                                <tr>
+                                    <td>Time Created:</td><td id="detailTimeCreated"><!-- --></td>
+                                </tr>
+                                <tr>
+                                    <td>Time Updated:</td><td id="detailTimeUpdated"><!-- --></td>
+                                </tr>
+                                <tr>
+                                    <td>Export Link:</td>
+                                    <td>
+                                        <a id="detailExportUrl" href="uninitialized"></a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/ng-template" id="view_builder_json">
+        <table class="form" style="width: 100%">
+            <tr ng-hide="error">
+                <td style="width: 8%">Queries:</td>
+                <td>
+                    <cris-workflow-query queries="queries" task-id="{{task.id}}"></cris-workflow-query>
+                </td>
+            </tr>
+            <tr>
+                <td style="width: 8%">Builder:</td>
+                <td>
+                    <table style="width: 100%;">
+                        <tr>
+                            <td colspan="3" style="width:100%">
+                                <div class="floatLeft twoTenths">
+                                    <div ng-hide="error">
+                                        <span>Template <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addJsonVariable('template')" /></span>
+                                        &amp;nbsp;&amp;nbsp;&amp;nbsp;
+                                        <span>Variable <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addJsonVariable('variable')" /></span>
+                                    </div>
+                                    &amp;nbsp;
+                                </div>
+                                <div class="floatLeft sevenTenths">
+                                    <span ng-bind="error" class="error"></span>
+                                </div>
+                                <div class="floatRight oneTenths right">
+                                    <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Preview", disabled: {{!item || item.length === 0}}' data-ng-click="previewJson()" />
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th style="width:25%">Name</th>
+                            <th>Value</th>
+                            <th style="width:3%"></th>
+                        </tr>
+                        <tr data-ng-repeat="n in item track by $index">
+                            <td>
+                                <div ng-switch="item[$index].variableType">
+                                    <div ng-switch-when="template">
+                                        <cris-select items="{{getTemplates($index)}}" item="item[$index].variable" value="{{item[$index].variable}}" ng-blur="onJsonBuilderEdit($index)"/>
+                                    </div>
+                                    <div ng-switch-when="variable">
+                                        <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item[$index].variable" ng-blur="onJsonBuilderEdit($index)"/>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div ng-show="item[$index].variableType=='template'">
+                                    <div>
+                                        <div>
+                                            <div style="float: left;">
+                                                Query:&amp;nbsp;
+                                            </div>
+                                            <div style="float: left;">
+                                                <cris-select items="{{queryAliases}}" item="item[$index].value" value="{{item[$index].value}}" ng-blur="onJsonBuilderEdit()"/>
+                                            </div>
+                                        </div>
+                                        &amp;nbsp;
+                                    </div>
+                                    <div ng-show="item[$index].variable">
+                                        &amp;nbsp;
+                                        <table style="margin-bottom:1px;">
+                                            <tr>
+                                                <td colspan="3">
+                                                    Term&amp;nbsp;<img class="inlineIcon" src="${srcAddImg}" data-ng-click="addTermToMerge($index)" />
+                                                </td>
+                                            </tr>
+                                            <tr ng-show="item[$index].termsToMerge.length > 0">
+                                                <th style="width:3%"></th>
+                                                <th style="width:22%">Name</th>
+                                                <th>Value</th>
+                                            </tr>
+                                            <tr data-ng-repeat="term in item[$index].termsToMerge track by $index">
+                                                <td>
+                                                    <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeTermToMerge($parent.$index, $index)" />
+                                                </td>
+                                                <td>
+                                                    <cris-select items="{{getTermNames(item[$parent.$index].variable)}}" item="term.variable" value="{{term.variable}}" ng-blur="onJsonBuilderEdit()"/>
+                                                </td>
+                                                <td>
+                                                    <cris-workflow-variable-types item="term" queries="{{queryAliases}}"></cris-workflow-variable-types>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div ng-show="item[$index].variableType=='variable'">
+                                    <cris-workflow-variable-types item="item[$index]" queries="{{queryAliases}}"></cris-workflow-variable-types>
+                                </div>
+                            <!--
+                                <cris-workflow-variable-types item="item[$index]" queries="{{queryAliases}}"></cris-workflow-variable-types>
+                            -->
+                            </td>
+                            <td>
+                                <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeItem($index)" />
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr>
+                <td style="width: 8%">Advanced:</td>
+                <td colspan="2"><input type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 15' data-ng-model="task[type]" ng-blur="onJsonTextEdit(task[type])"/></td>
+            </tr>
+        </table>
+        </script>
+        
+        <script type="text/ng-template" id="view_builder_variable_types">
+        <div style="display: table; width: 100%;">
+            <div style="display: table-row;">
+                <div style="display: table-cell; width:22%;">
+                    <div ng-switch="item.valueType">
+                        <div ng-switch-when="object">
+                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.valueType" dojo-props="disabled: true" />
+                        </div>
+                        <div ng-switch-default="">
+                            <cris-select items="[{id: 'localVariable', name: 'Local Variable'}, {id: 'static', name: 'Static Value'}, {id: 'systemVariable', name: 'System Variable'}, {id: 'query', name: 'Query'}]" item="item.valueType" value="{{item.valueType}}" ng-blur="onJsonBuilderEdit('valueType')"/>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: table-cell; padding-left: 4px; width: 38%;">
+                    <div ng-switch="item.valueType">
+                        <div ng-switch-when="localVariable">
+                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()"/>
+                        </div>
+                        <div ng-switch-when="query">
+                            <cris-select items="{{queries}}" item="item.value" value="{{item.value}}" ng-blur="onJsonBuilderEdit('value')"/>
+                        </div>
+                        <div ng-switch-when="static">
+                            <cris-select items="[{id: 'Boolean', name: 'Boolean'},
+                                                {id: 'Date', name: 'Date'},
+                                                {id: 'Numeric', name: 'Numeric'},
+                                                {id: 'Text', name: 'Text'},
+                                                {id: 'Null', name: 'Null'}]" item="item.staticDataType" value="{{item.staticDataType}}" placeholder="static data type" ng-blur="onJsonBuilderEdit('staticDataType')"/>
+                        </div>
+                        <div ng-switch-when="systemVariable">
+                            <cris-select items="{{systemVariables}}" item="item.value" value="{{item.value}}" ng-blur="onJsonBuilderEdit()"/>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: table-cell; padding-left: 4px; width: 40%;">
+                    <div ng-switch="item.valueType">
+                        <div ng-switch-when="query">
+                            <div ng-show="item.value">
+                                <cris-select items="{{termNames()}}" item="item.subValue" value="{{item.subValue}}" placeholder="sub-value (optional)" ng-blur="onJsonBuilderEdit()"/>
+                            </div>
+                        </div>
+                        <div ng-switch-when="static">
+                            <div ng-switch="item.staticDataType">
+                                <div ng-switch-when="Boolean">
+                                    <cris-select items="[{id: 'false', name: 'false'}, {id: 'true', name: 'true'}]" item="item.value" value="{{item.value}}" ng-blur="onJsonBuilderEdit()"/>
+                                </div>
+                                <div ng-switch-when="Date">
+                                    <input type="text" data-dojo-widget="dijit/form/DateTextBox" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()"/>
+                                </div>
+                                <div ng-switch-when="Numeric">
+                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.value" dojo-props="placeHolder: 'static value', regExp:'[\\d]+', invalidMessage:'Only numbers allowed!'" ng-blur="onJsonBuilderEdit()"/>
+                                </div>
+                                <div ng-switch-when="Text">
+                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.value" dojo-props="placeHolder: 'static value', regExp:'[\\w\\s]+', invalidMessage:'Invalid value!'" ng-blur="onJsonBuilderEdit()"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </script>
+        
+        <script type="text/ng-template" id="view_builder_query">
+            <table style="width: 100%;">
+                <tr>
+                    <td valign="top" style="width: 12%; background-color: #FFF;">
+                        Queries <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addQuery()" />
+                        <hr />
+                        <table style="table-layout: fixed; width: 100%; margin-top: 2px; margin-bottom: 2px;" class="form">
+                            <tr data-ng-repeat="query in queries track by $index">
+                                <td style="height:25px; cursor: pointer; overflow: hidden; white-space: nowrap;" data-ng-click="querySelected($index, $event)">{{query.key}}</td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td valign="top" style="background-color: #FFF;">
+                        <div ng-show="isQuerySelected" style="margin-top: 5px; margin-bottom: 5px;">
+                            <div style="text-align: right;">
+                                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Preview', disabled: {{selectedQuery.templateUUID.length === 0}}" data-ng-click="previewQuery()" style="float: right"/>
+                            </div>
+                            
+                            <div style="float:left; width:50%;">
+                                Source Template:
+                                <cris-select items="{{templates}}" item="selectedQuery.templateUUID" value="{{selectedQuery.templateUUID}}" ng-blur="onQueryEdit()"/>
+                            </div>
+                            <div style="float:right; vertical-align:bottom; text-align:right; width:50%;">
+                                <br />
+                                Expecting Multiple Records?
+                                &amp;nbsp;<cris-one-check-box items="[false, true]" item="selectedQuery.multipleRecords" ng-blur="onQueryEdit()"></cris-one-check-box>
+                            </div>
+                            <br /><br /><br />
+                            
+                            <div ng-show="selectedQuery.templateUUID">
+                                <table class="form" style="width:100%; margin-top: 2px; margin-bottom: 2px;">
+                                    <tr>
+                                        <td colspan="4">
+                                            Where <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addQueryWhere()" />&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+                                            <span>Current Job: <cris-one-check-box items="[false, true]" item="selectedQuery.addCurrentJobFilter"></cris-one-check-box></span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th style="width:20%;">Term</th>
+                                        <th style="width:18%;">Query Operator</th>
+                                        <th>Value</th>
+                                        <th style="width:3%;"></th>
+                                    </tr>
+                                    <tr data-ng-repeat="whereItem in selectedQuery.where track by $index"> <!-- ng-controller="WhereItemController" -->
+                                        <td style="padding-right: 2px;">
+                                            <cris-select items="{{getTermNames($index)}}" item="whereItem.term" value="{{whereItem.term}}" ng-blur="onQueryEdit($index)"/>
+                                        </td>
+                                        <td style="padding-right: 2px;">
+                                            <cris-select items="[{id: '$eq', name: 'Equal To'},{id: '$gt', name: 'Greater Than'},
+                                                                 {id: '$gte', name: 'Greater Than or Equal To'},
+                                                                 {id: '$lt', name: 'Less Than'},
+                                                                 {id: '$lte', name: 'Less Than or Equal To'},
+                                                                 {id: '$ne', name: 'Not Equal To'},
+                                                                 {id: '$in', name: 'In'},
+                                                                 {id: '$nin', name: 'Not In'}]" 
+                                                                item="whereItem.queryOperator" value="{{whereItem.queryOperator}}" ng-blur="onQueryEdit($index)"/>
+                                        </td>
+                                        <td style="padding-right: 2px;">
+                                            <cris-workflow-variable-types item="whereItem" queries="{{getQueryAliases()}}"></cris-workflow-variable-types>
+                                        </td>
+                                        <td style="padding-right: 2px;">
+                                            <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeWhereItem($index)" />
+                                        </td>
+                                    </tr>
+                                </table>
+                                <br />
+                                <br />
+                                <table style="width: 100%;">
+                                    <tr>
+                                        <td style="border-style: none; padding-right: 2px;">
+                                            Limit:
+                                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="selectedQuery['$limit']" ng-blur="onQueryEdit()"/>
+                                        </td>
+                                        <td style="border-style: none; padding-right: 2px;">
+                                            Skip:
+                                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="selectedQuery['$skip']" ng-blur="onQueryEdit()"/>
+                                        </td>
+                                        <td style="border-style: none; padding-right: 2px;">
+                                            Order by:
+                                            <cris-select items="{{selectedQuery.termNames}}" item="selectedQuery['$orderby']" value="{{selectedQuery['$orderby']}}" ng-blur="onQueryEdit()"/>
+                                        </td>
+                                        <td style="border-style: none; padding-right: 2px;">
+                                            <br />
+                                            <cris-select items="[{id: 1, name: 'Ascending'}, {id: -1, name: 'Descending'}]" item="selectedQuery['orderbyOrder']" value="{{selectedQuery['orderbyOrder']}}" ng-blur="onQueryEdit()"/>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <br />
+                                <div style="text-align: right;">
+                                    <!--
+                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click="deleteQuery(selectedQuery)"/>
+                                    -->
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </script>
+        
+        <script type="text/ng-template" id="view_json_preview">
+        <div style="height:680px;width:100%;">
+            <div ng-show="previewVariables.length > 0">
+                <span style="font-weight:bold;">
+                    Please enter test values for the required parameters
+                </span>
+                <div style="max-height:150px;overflow:auto;">
+                    <table class="form" style="width:100%;">
+                        <tr ng-repeat="previewVariable in previewVariables" ng-hide="!previewVariable.variable">
+                            <td style="width:35%">
+                                <span>{{previewVariable.variable}}</span>
+                            </td>
+                            <td>
+                                <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="previewVariable.value" />
+                            </td>
+                        </tr>
+                    </table>
+                    <br />
+                </div>
+            </div>
+            <div style="height:530px;width:100%">
+                <span style="font-weight:bold;">
+                    Fully evaluated JSON
+                </span>
+                <div>
+                    <input type="text" name="jsonIn" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 32, style: "width:99%", readOnly: true' data-ng-model="jsonToPreview"/>
+                </div>
+            </div>
+        </div>
+        </script>
+        
+    </div>
+    
+</jsp:root>

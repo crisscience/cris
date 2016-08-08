@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<term uuid="9eaeb52e-6804-4b04-afc4-7624281e3983"
+      xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd">
+
+    <name>exampleTemplate</name>
+    <description>This is an example template</description>
+    <term uuid="85ea8b47-336d-45a6-89ff-39ebc4e4e461" alias="elementName" required="true"/>
+</term>

@@ -1,0 +1,84 @@
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <spring:url value="/vocabularys/export" var="urlExportVocabulary"/>
+    <spring:url value="/templates/export" var="urlExportTemplate"/>
+
+    <div>
+        <script type="text/ng-template" id="view_empty">
+        <div>
+            <h2>{{emptyMessage}}</h2>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_vocabulary">
+        <div>
+            <div>
+                Last Updated: <span>{{vocabulary.timeCreated.$date | date: "medium"}}</span>
+            </div>
+            <div style="padding-top:2px;">
+                Export Link: <a href="${urlExportVocabulary}/{{vocabulary.id}}" target="_self">{{vocabulary.key}}</a>
+            </div>
+
+            <!--
+            <div class="floatLeft half">
+                Time Created: <span>{{vocabulary.timeUpdated.$date | date: "medium"}}</span>
+            </div>
+            <div class="floatLeft half">
+            </div>
+
+            <br class="clearBoth"/>
+            -->
+            <p/>
+            <div class="fourTenths floatLeft">
+                <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="" style="height: 680px; overflow: hidden;">
+                    <cris-tree data-ng-model="vocabulary.definition" selected-term="vocabulary.selectedTerm" errors="errors" show-root="true"><!-- --></cris-tree>
+                </div>
+            </div>
+            <div class="sixTenths floatRight">
+                <cris-term data-ng-model="vocabulary.selectedTerm" empty-message="{{vocabulary.definition ? 'Select an item on the left to edit' : 'Select a vocabulary to edit'}}"><!-- --></cris-term>
+            </div>
+
+            <br class="clearBoth"/>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_template">
+        <div>
+            <div>
+                Last Updated: <span>{{template.timeCreated.$date | date: "medium"}}</span>
+            </div>
+            <div style="padding-top:2px;">
+                Export Link: <a href="${urlExportTemplate}/{{template.id}}" target="_self">{{template.key}}</a>
+            </div>
+
+            <!--
+            <div class="floatLeft half">
+                Time Created: <span>{{template.timeUpdated.$date | date: "medium"}}</span>
+            </div>
+            <div class="floatLeft half">
+            </div>
+
+            <br class="clearBoth"/>
+            -->
+            <p/>
+            <div class="fourTenths floatLeft">
+                <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="" style="height: 680px; overflow: hidden;">
+                    <cris-tree data-ng-model="template.definition" selected-term="template.selectedTerm" errors="errors" show-root="true"><!-- --></cris-tree>
+                </div>
+            </div>
+            <div class="sixTenths floatRight">
+                <cris-term data-ng-model="template.selectedTerm" empty-message="{{template.definition ? 'Select an item on the left to edit' : 'Select a template to edit'}}"><!-- --></cris-term>
+            </div>
+
+            <br class="clearBoth"/>
+        </div>
+        </script>
+
+        <div>
+            <div ng-include="view" errors="errors" empty-message="{{emptyMessage}}"><!-- --></div>
+        </div>
+    </div>
+
+</jsp:root>

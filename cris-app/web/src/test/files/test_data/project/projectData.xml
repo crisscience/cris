@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<dataset>
+    <project id="20001" name="test1" status_id="1"/>
+    <project id="20002" name="test2" status_id="1"/>
+    <project id="20003" name="test3" status_id="1"/>
+    <project id="20004" name="test4" status_id="1"/>
+    <project id="20005" name="test5" status_id="1"/>
+
+    <storage_file id="20001" asset_type_id="3" storage_id="1" source="files/dummy_project_test_file.csv" name="file" file_name="" location="" status_id="1" tenant_id="1"/>
+</dataset>

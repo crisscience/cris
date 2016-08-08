@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC "-//Apache Software Foundation//DTD Tiles Configuration 2.1//EN" "http://tiles.apache.org/dtds/tiles-config_2_1.dtd">
+
+<tiles-definitions>
+    <definition name="index" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/index.jspx" />
+    </definition>
+
+    <definition name="home" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/home.jspx" />
+    </definition>
+
+    <definition name="index_admin" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/index_admin.jspx" />
+    </definition>
+
+    <definition name="index_user" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/index_user.jspx" />
+    </definition>
+
+    <definition name="help" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/help.jspx" />
+    </definition>
+
+    <definition name="uncaughtException" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/uncaughtException.jspx" />
+    </definition>
+
+    <definition name="dataAccessFailure" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/dataAccessFailure.jspx" />
+    </definition>
+
+    <definition name="workspaceNotFound" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/workspaceNotFound.jspx" />
+    </definition>
+
+    <definition name="resourceNotFound" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/resourceNotFound.jspx" />
+    </definition>
+
+    <definition name="internalServerError" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/internalServerError.jspx" />
+    </definition>
+
+    <definition name="generalException" extends="default">
+        <put-attribute name="body" value="/WEB-INF/views/generalException.jspx" />
+    </definition>
+</tiles-definitions>

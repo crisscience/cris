@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vocabulary
+    xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd"
+    uuid="9bd8a745-3a47-4532-8ef5-7f1d53fa45f5"
+    version="b80b9afa-ae66-48f0-a5a1-5b05614627e6">
+
+    <domain>Test Vocabulary</domain>
+    <name>Test Vocabulary 2</name>
+    <description>Vocabulary used for testing purposes</description>
+    <contributors>
+        <contributor>Srivathsava Rangarajan</contributor>
+    </contributors>
+    <copyright>(C)2013 Purdue University</copyright>
+
+    <terms>
+        <term uuid="d09619b8-c126-49d5-93a0-f204ad1eb2ff">
+            <name>element_weight</name>
+            <description>Weight of an element</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, +infinity]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+    </terms>
+</vocabulary>

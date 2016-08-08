@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <script type="text/javascript">
+        cris.require("dijit/TitlePane");
+    </script>
+
+    <div id="debug" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Debug", openPane: "true"'>
+        <c:if test="${not empty exception}">
+            <h4>
+                <spring:message code="exception_details" />
+            </h4>
+            <spring:message var="message" code="exception_message" />
+            <div id="_message" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "${message}",  openPane: "false"'>
+                <c:out value="${exception.localizedMessage}" />
+            </div>
+            <spring:message var="stacktrace" code="exception_stacktrace" />
+            <div id="_exception" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "${stacktrace}", openPane: "false"'>
+                <c:forEach items="${exception.stackTrace}" var="trace">
+                    <c:out value="${trace}" />
+                    <br />
+                </c:forEach>
+            </div>
+        </c:if>
+
+        <c:if test="${not empty localVariables and not empty localVariables}">
+        <div id="localVariables" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Job Local Variables", openPane:"true"'>
+            <ul>
+                <c:forEach var="item" items="${localVariables}">
+                    <li>
+                        <c:out value="${item.key}"/> =
+                        <c:out value="${item.value}"/><br/>
+                    </li>
+                </c:forEach>
+            </ul>
+        </div>
+        </c:if>
+
+        <c:if test="${not empty jobFiles and not empty job}">
+        <spring:url value="/download/JobFile:${job.id}" var="urlJobFiles" />
+        <div id="files" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Job Files", openPane:"true"'>
+            <ul>
+                <c:forEach var="item" items="${jobFiles}">
+                    <li>
+                        <a href="${urlJobFiles}/${item}">${item}</a>
+                    </li>
+                </c:forEach>
+            </ul>
+        </div>
+        </c:if>
+
+        <div id="headers" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Request Headers", openPane: "false"'>
+            <ul>
+                <c:forEach var="item" items="${header}">
+                    <li>
+                        <c:out value="${item.key}"/> =
+                        <c:out value="${item.value}"/><br/>
+                    </li>
+                </c:forEach>
+            </ul>
+        </div>
+
+        <div id="parameters" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Request Parameters", openPane: "true"'>
+            <ul>
+                <c:forEach var="item" items="${param}">
+                    <li>
+                        <c:out value="${item.key}"/> =
+                        <c:out value="${item.value}"/><br/>
+                    </li>
+                </c:forEach>
+            </ul>
+        </div>
+
+        <div id="body" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Request Body", openPane: "true"'>
+            <c:out value="${body}"/>
+        </div>
+
+        <div id="session" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Session", openPane: "false"'>
+            <ul>
+                <c:forEach var="item" items="${sessionScope}">
+                    <c:choose>
+                        <c:when test="${item.key eq 'SPRING_SECURITY_CONTEXT'}">
+                        </c:when>
+                        <c:otherwise>
+                            <li>
+                                <c:out value="${item.key}"/> =
+                                <c:out value="${item.value}"/><br/>
+                            </li>
+                        </c:otherwise>
+                    </c:choose>
+                </c:forEach>
+            </ul>
+        </div>
+
+        <div id="application" data-dojo-type="dijit/TitlePane" data-dojo-props='title: "Application", openPane: "false"'>
+            <ul>
+                <c:forEach var="item" items="${applicationScope}">
+                    <c:choose>
+                        <c:when test="${item.key eq 'productBuildInfo'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.springframework.web.servlet.FrameworkServlet.CONTEXT.cris'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.springframework.web.context.support.ServletContextScope'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.springframework.web.context.WebApplicationContext.ROOT'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.tomcat.util.scan.MergedWebXml'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.tomcat.JarScanner'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.tomcat.InstanceManager'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.catalina.jsp_classpath'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.catalina.resources'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.jasper.runtime.JspApplicationContextImpl'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.jasper.compiler.TldLocationsCache'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.jasper.compiler.ELInterpreter'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'org.apache.tiles.CONTAINER'}">
+                        </c:when>
+                        <c:when test="${item.key eq 'javax.servlet.context.tempdir'}">
+                        </c:when>
+                        <c:otherwise>
+                            <li>
+                                <c:out value="${item.key}"/> =
+                                <c:out value="${item.value}"/><br/>
+                            </li>
+                        </c:otherwise>
+                    </c:choose>
+                </c:forEach>
+            </ul>
+        </div>
+    </div>
+
+</jsp:root>

@@ -1,0 +1,23 @@
+<script type="text/javascript">
+    // <![CDATA[
+    cris.workflow = {};
+
+    cris.workflow.app = {
+        init: function() {
+            dojo.byId("idFile").href = cris.job.task.app.urlDownload + '${c4d6a240-cded-11e2-8b8b-0800200c9a66.acme_data_export_file({_job_id : #{current_job_id}})}';
+            dojo.byId("idFile").innerHTML = 'Download File';
+        }
+    };
+
+    cris.ready(function() {
+        cris.workflow.app.init();
+    });
+    // ]]>
+</script>
+<div>
+    <h1>Download Exported Data File</h1>
+
+    <div>
+        <a id="idFile" href="uninitialized"></a>
+    </div>
+</div>

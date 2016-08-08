@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<vocabulary
+    xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    uuid="2afb90b0-c6b7-11e1-9b21-0800200c9a66"
+    version="b2f3bbc1-d938-499d-904a-fbb8b2ea0f50"
+    xsi:schemaLocation="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd">
+    <domain>Test Vocabulary</domain>
+    <name>Test Vocabulary</name>
+    <description>Vocabulary used for testing purposes</description>
+    <contributors>
+        <contributor>Srivathsava Rangarajan</contributor>
+    </contributors>
+    <copyright>(C)2013 Purdue University</copyright>
+    <terms>
+        <term uuid="85ea8b47-336d-45a6-89ff-39ebc4e4e461" version="8aca9190-cbb4-11e3-9c1a-0800200c9a66">
+            <name>element_name</name>
+            <description>Name of an element</description>
+            <validation>
+                <validator type="text">
+                    <property name="type">alpha</property>
+                    <property name="length">30</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="9bff1559-ecad-4c76-ba8e-e046bce41dc9">
+            <name>element_mass</name>
+            <description>Mass of an element</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">(0,+infinity)</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+    </terms>
+</vocabulary>

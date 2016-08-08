@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/users" var="url"/>
+
+    <script type="text/javascript">
+
+        cris.require('dijit/form/FilteringSelect');
+        cris.require('dijit/form/Form');
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/RadioButton");
+        cris.require("dijit/form/DateTextBox");
+        cris.require("dijit/form/TextBox");
+        cris.require("dojox/data/JsonRestStore");
+
+        var AdminUsername = "administrator";
+
+        function updateUserDetail(item) {
+            dojo.byId("externalSource").innerHTML = item.externalSource || "";
+            dojo.byId("externalId").innerHTML = item.externalId || "";
+            dojo.byId("userId").innerHTML = item.id || "";
+            dijit.byId("username").setValue(item.username || "");
+            dijit.byId("username").set('readonly', true);
+            dojo.byId("firstName").innerHTML = item.firstName || "";
+            dojo.byId("middleName").innerHTML = item.middleName || "";
+            dojo.byId("lastName").innerHTML = item.lastName || "";
+            dojo.byId("email").innerHTML = item.email || "";
+            dijit.byId("enabled").setValue(item.enabled || false);
+            dojo.byId("timeCreated").innerHTML = item.timeCreated ? dateIsoToLocale(item.timeCreated.$date) : "";
+            dojo.byId("lastUpdated").innerHTML = item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
+
+            var enabled = dijit.byId("enabled");
+            var buttonSave = dijit.byId("buttonSave");
+            var buttonReset = dijit.byId("buttonReset");
+            if (item.username === AdminUsername) {
+                enabled.set("disabled", true);
+                buttonSave.set("disabled", true);
+                buttonReset.set("disabled", true);
+            } else {
+                enabled.set("disabled", false);
+                buttonSave.set("disabled", false);
+                buttonReset.set("disabled", false);
+            }
+        }
+
+        function isShowEnabled() {
+            var showEnabled = dijit.byId("idShowEnabled");
+            if (showEnabled.checked) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        function updateUser(item) {
+            store.setValue(item, "enabled", dijit.byId("enabled").getValue() === "on");
+        }
+
+        cris.ready(function() {
+            dojo.style("idDetails", {
+                "display": "none"
+            });
+
+            showEnabled = true;
+            isNewUser = false;
+
+            store = createJsonRestStore("${url}");
+
+            var layoutUsers= [{cells: [
+                        { field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true },
+                        { field: 'lastName', name: 'Last Name', width: 'auto' },
+                        { field: 'firstName', name: 'First Name', width: 'auto' },
+                        { field: 'username', name: 'User Name', width: 'auto' }
+                    ]}];
+
+            var asc = true;
+            var args = {
+                query: {enabled: true},
+                sortFields: [{attribute: "lastName", descending: !asc}]
+            };
+
+            grid = createGrid(store, layoutUsers, "users", args);
+            grid.setSortIndex(1, asc);
+            if ("${filter}" !== "") {
+                grid.setQuery({filter: "${filter}"});
+            } else {
+                if (showEnabled === true) {
+                    grid.setQuery({enabled: true});
+                } else if (showEnabled === false) {
+                    grid.setQuery({enabled: false});
+                } else {
+                    grid.setQuery();
+                }
+            }
+
+            dojo.connect(grid, "onSelected", function(index){
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    isNewUser = false;
+                    dojo.style("idDetails", {
+                        "display": "block"
+                    });
+                    var item = grid.getItem(index);
+                    updateUserDetail(item);
+                } else {
+                    dojo.style("idDetails", {
+                        "display": "none"
+                    });
+                }
+            });
+
+            dojo.connect(dijit.byId("buttonReset"), "onClick", function(evt){
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    var item = grid.selection.getSelected("row")[0];
+                    updateUserDetail(item);
+                } else {
+                    updateUserDetail({});
+                }
+            });
+
+            var buttonSave = dijit.byId("buttonSave");
+            dojo.connect(buttonSave, "onClick", function(evt){
+                var modified = false;
+
+                if (isNewUser) {
+                    store.newItem({"username": dijit.byId("username").getValue(), "enabled": dijit.byId("enabled").getValue() === "on"});
+                    modified = true;
+                } else {
+                    if (grid.selection.getSelectedCount("row") >= 1) {
+                        modified = false;
+                        var item = grid.selection.getSelected("row")[0];
+
+                        var enabled = dijit.byId("enabled");
+                        if ((item.enabled || false) !== (enabled.getValue() === "on")) {
+                            modified = true;
+                            updateUser(item);
+                        }
+                    }
+                }
+
+                if (modified) {
+                    var pd = createProgressDialog();
+                    store.save({
+                        onComplete: function(data) {
+                            var xhr = data[0].deferred.ioArgs.xhr.response;
+                            var object = JSON.parse(xhr);
+                            if (object.error) {
+                                if (dijit.byId("enabled").getValue() === "on") {
+                                    dijit.byId("enabled").setValue(false);
+                                    store.setValue(item, "enabled",false);
+                                } else {
+                                    dijit.byId("enabled").setValue("on");
+                                    store.setValue(item, "enabled",true);
+                                }
+                                if (showEnabled === true) {
+                                    grid.setQuery({enabled: true});
+                                } else if (showEnabled === false) {
+                                    grid.setQuery({enabled: false});
+                                } else {
+                                    grid.setQuery();
+                                }
+
+                                pd.setContent("Failed to save changes. " + object["error"].message + ": " +object["error"].status);
+                            } else {
+                                updateUserDetail({});
+
+                                var query = {};
+                                if(isShowEnabled()){
+                                    query.enabled = true;
+                                }
+                                grid.setQuery(query);
+                                grid.selection.clear();
+
+                                pd.hide();
+                            }
+                        },
+                        onError: function(error) {
+                            var message;
+                            if (error.responseText) {
+                                var data = dojo.fromJson(error.responseText);
+                                message = data.exception.message;
+                            } else {
+                                message = error;
+                            }
+                            pd.setContent("Failed to save changes: " + message);
+                        }
+                    });
+                } else {
+                    showMessage("No change is made");
+                    return;
+                }
+            });
+
+            var buttonNew = dijit.byId("buttonNew");
+            dojo.connect(buttonNew, "onClick", function(evt) {
+                isNewUser = true;
+                dojo.style(dojo.byId('idDetails'), 'display', 'block');
+                grid.selection.clear();
+
+                updateUserDetail({"enabled": true});
+                dijit.byId("username").set('readonly', false);
+
+            });
+
+            dojo.connect(dijit.byId("idShowEnabled"), "onClick", function(evt){
+                console.log("enabled");
+                grid.setQuery({enabled: true});
+            });
+
+            dojo.connect(dijit.byId("idShowAll"), "onClick", function(evt){
+                console.log("all");
+                grid.setQuery({});
+            });
+        });
+
+    </script>
+
+    <div class="halfMinus floatLeft">
+        <h2>Users</h2>
+            <div class="floatLeft">
+                <input id="buttonNew" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "New"'/>
+            </div>
+
+            <div class="floatRightToButton">
+                <input id="idShowEnabled" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton" checked="checked"/><span>Show Enabled</span>
+                &amp;nbsp
+                <input id="idShowAll" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton"/><span>Show All</span>
+            </div>
+        <br class="clearBoth"/>
+
+        <div id="users"><!-- fix ff problem --></div>
+    </div>
+
+    <div id="idDetails" class="half floatRight">
+        <h2>Details</h2>
+        <div>
+            <form id="userForm" data-dojo-type="dijit.form.Form">
+                <div>
+                    <table class="form" style="width: 100%">
+                        <tr>
+                            <td style="width: 30%">ID:</td><td id="userId" style="width: 70%"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>External Source:</td><td id="externalSource"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>External ID:</td><td id="externalId"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Username:</td><td><input id="username" data-dojo-type="dijit/form/TextBox" readonly="true"/></td>
+                        </tr>
+                        <tr>
+                            <td>First Name:</td><td id="firstName"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Middle Name:</td><td id="middleName"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Last Name:</td><td id="lastName"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Email:</td><td id="email"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Enabled?</td><td class="center"><input id="enabled" data-dojo-type="dijit.form.CheckBox"/></td>
+                        </tr>
+                    </table>
+                </div>
+                <p></p>
+                <div style="float: right">
+                    <button id="buttonSave" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Save"' type="button"><!-- fix ff problem --></button>
+                    <button id="buttonReset" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Reset"' type="button"><!-- fix ff problem --></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <br style="clear: both"/>
+
+</jsp:root>

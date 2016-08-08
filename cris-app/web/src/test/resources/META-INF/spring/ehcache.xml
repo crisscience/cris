@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ehcache>
+    <diskStore path="java.io.tmpdir"/>
+
+    <cache name="vocabulary"
+           timeToLiveSeconds="2000000"
+           maxElementsInMemory="100"
+           eternal="false"
+           overflowToDisk="false"
+           maxElementsOnDisk="10000000"
+           diskPersistent="false"
+           diskExpiryThreadIntervalSeconds="1"
+           memoryStoreEvictionPolicy="LRU"/>
+
+</ehcache>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:spring="http://www.springframework.org/tags" version="2.1">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/filestorages" var="urlFileStorages"/>
+
+    <script type="text/javascript">
+        cris.require("dojox/grid/EnhancedGrid");
+        cris.require("dojox/grid/enhanced/plugins/Selector");
+        cris.require("dojox/grid/enhanced/plugins/Pagination");
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dijit/form/RadioButton");
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/ComboBox");
+        cris.require("dijit/form/TextBox");
+        cris.require("dijit/form/SimpleTextarea");
+        cris.require("dijit/form/FilteringSelect");
+        cris.require("dojox/grid/enhanced/plugins/Filter");
+        cris.require("dijit/layout/ContentPane");
+        cris.require("dijit/layout/TabContainer");
+
+        cris.ready(function () {
+        });
+    </script>
+
+    <div style="width: 100%; height: 600px">
+    </div>
+</jsp:root>

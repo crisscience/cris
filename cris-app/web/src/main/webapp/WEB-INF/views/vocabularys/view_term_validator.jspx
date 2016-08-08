@@ -1,0 +1,134 @@
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <div>
+        <script type="text/ng-template" id="view_term_validator_boolean">
+        <div>
+            <!-- -->
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_validator_numeric">
+        <div>
+            Properties:
+            <table>
+                <tr>
+                    <td>Name</td>
+                    <td>Value</td>
+                </tr>
+                <tr ng-repeat="prop in ngModel.property | filter:{name: 'range'}">
+                    <td>Range:</td>
+                    <td><input data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props='regExp: "^((\\[|\\()\\-?\\+?(([0-9]+\\.)?[0-9]+|infinity),\\s*\\-?\\+?(([0-9]+\\.)?[0-9]+|infinity)((\\]|\\))(\\,(?!$))?))*$", invalidMessage:"Expected format: [NUM,NUM] or (NUM,NUM) — Multiple comma separated ranges allowed. NUM is any numeric or infinity"' data-ng-model="prop.value" /></td>
+                </tr>
+            </table>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_validator_text">
+        <div>
+            Properties:
+            <table>
+                <tr>
+                    <td>Name</td>
+                    <td>Value</td>
+                </tr>
+                <tr ng-repeat="prop in ngModel.property | filter:{name: 'type'}">
+                    <td>Type of Text:</td>
+                    <td><cris-select items='[{id: "alpha", name: "alpha"}, {id: "numeric", name: "numeric"}, {id: "alphanumeric", name: "alphanumeric"}, {id: "printable", name: "printable"}]' item='prop.value' value="{{prop.value}}" read-only="false"><!-- --></cris-select></td>
+                </tr>
+                <tr ng-repeat="prop in ngModel.property | filter:{name: 'length'}">
+                    <td>Max. Length:</td>
+                    <td><input data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props='regExp: "^[0-9]*$", invalidMessage:"Only numeric values allowed."' data-ng-model="prop.value" /></td>
+                </tr>
+                <tr ng-repeat="prop in ngModel.property | filter:{name: 'ui-vertical-lines'}">
+                    <td>Lines:</td>
+                    <td><input data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props='regExp: "^[0-9]*$", invalidMessage:"Only numeric values allowed."' data-ng-model="prop.value" /></td>
+                </tr>
+            </table>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_validator_date">
+        <div>
+            <div ng-repeat="prop in ngModel.property | filter:{name: 'format'}">
+                Format of Date/Time<br/>
+                <cris-select items='[{id: "date", name: "date"}, {id: "time", name: "time"}, {id: "date-time", name: "date-time"}]' item='prop.value' value="{{prop.value}}" read-only="false"><!-- --></cris-select>
+            </div>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_validator_list">
+        <div>
+            <div ng-repeat="prop in ngModel.property | filter:{name: 'isMultiSelect'}">
+                <cris-one-check-box items="['false', 'true']" item="prop.value" read-only="false"><!-- --></cris-one-check-box>
+                Is Multi-select<br/>
+            </div>
+
+            Available Values:
+            <cris-add-button items="ngModel.property" item-template='{name: "item", id: "", value: ""}'><!-- --></cris-add-button>
+            <table>
+                <tr>
+                    <td>ID</td>
+                    <td>Value</td>
+                    <td><!-- --></td>
+                </tr>
+                <tr data-ng-repeat="prop in ngModel.property | filter:{name: 'item'}">
+                    <td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="" data-ng-model="prop.id"/></td>
+                    <td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="" data-ng-model="prop.value"/></td>
+                    <td><cris-remove_button items="ngModel.property" item="prop"><!-- --></cris-remove_button></td>
+                </tr>
+            </table>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_validator_file">
+        <div>
+            <div ng-repeat="prop in ngModel.property | filter:{name: 'multiple'}">
+                <cris-one-check-box items="['false', 'true']" item="prop.value" read-only="false"><!-- --></cris-one-check-box>
+                Allow multiple files?<br/>
+            </div>
+            <div ng-repeat="prop in ngModel.property | filter:{name: 'globus'}">
+                <cris-one-check-box items="['false', 'true']" item="prop.value" read-only="false"><!-- --></cris-one-check-box>
+                Use Globus file Transfer?<br/>
+            </div>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_validator_advanced">
+        <div>
+            <div ng-repeat="prop in ngModel.property | filter:{name: 'regexp'}">
+                Regular Expression:<br/>
+                <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="prop.value"/><br/>
+            </div>
+        </div>
+        </script>
+        
+        <script type="text/ng-template" id="view_term_validator_composite">
+        <div>
+            <!-- -->
+        </div>
+        </script>
+
+        <div>
+            <table class="form">
+                <tr>
+                    <td>Type:</td>
+                    <td>
+                        <div ng-if="ngModel.type != 'composite'">
+                            <cris-select items='[{id: "boolean", name: "boolean"}, {id: "numeric", name: "numeric"}, {id: "text", name: "text"}, {id: "date-time", name: "date-time"}, {id: "list", name: "list"}, {id: "file", name: "file"}, {id: "advanced", name: "advanced"}]' item='ngModel.type' value="{{ngModel.type}}" read-only="{{isNew === 'true' ? 'false' : 'true'}}"><!-- --></cris-select>
+                        </div>
+                        <div ng-if="ngModel.type == 'composite'">
+                            <cris-select items='[{id: "composite", name: "composite"}]' item='ngModel.type' value="{{ngModel.type}}" read-only="{{isNew === 'true' ? 'false' : 'true'}}"><!-- --></cris-select>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <p/>
+
+            <div ng-include="viewType"><!-- --></div>
+        </div>
+
+    </div>
+</jsp:root>

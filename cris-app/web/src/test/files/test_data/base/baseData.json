@@ -1,0 +1,31 @@
+{
+    "85833b40-73d3-11e2-bcfd-0800200c9a66" : [
+        {
+            "_id": {"$oid" : "512660295d032b861cb64b06"},
+
+            "_template_version" : {"$uuid" : "f4c72d70-c173-11e2-8b8b-0800200c9a66"},
+
+            "_tenant_uuid" : {"$uuid" : "f47ac10b-58cc-4372-a567-0e02b2c3d479"},
+            "_tenant_id" : 1,
+            "_time_created" : {"$date" : "2015-06-06T14:13:47.567Z"},
+            "_time_updated" : {"$date" : "2015-06-06T14:13:47.567Z"},
+            "_creator_id" : 1,
+            "_updater_id" : 2,
+            "_state" : 1,
+
+            "_context_id" : 1,
+            "_project_id": 5001,
+            "_experiment_id": 7001,
+            "_job_id": 8001,
+            "_task_id": "task1",
+
+            "hplc_id": "1234",
+            "hplc_name": "1234",
+            "hplc_owner": "1234",
+            "hplc_make": "1234",
+            "hplc_model": "1234",
+            "hplc_serialnum": "1234",
+            "hplc_description": "1234"
+        }
+    ]
+}

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+    xmlns:jsp="http://java.sun.com/JSP/Page"
+    xmlns:c="http://java.sun.com/jsp/jstl/core"
+    xmlns:spring="http://www.springframework.org/tags"
+    >
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <c:choose>
+        <c:when test="${param.selected == 'home'}">
+            <c:set value="true" var="selectedHome"/>
+        </c:when>
+        <c:when test="${param.selected == 'jobs'}">
+            <c:set value="true" var="selectedJobs"/>
+        </c:when>
+        <c:when test="${param.selected == 'apps'}">
+            <c:set value="true" var="selectedApps"/>
+        </c:when>
+        <c:when test="${param.selected == 'explorer'}">
+            <c:set value="true" var="selectedExplorer"/>
+        </c:when>
+        <c:when test="${param.selected == 'search'}">
+            <c:set value="true" var="selectedSearch"/>
+        </c:when>
+    </c:choose>
+
+    <script type="text/javascript">
+        cris.require([
+            "dijit/MenuBar",
+            "dijit/MenuBarItem",
+            "dijit/PopupMenuBarItem",
+            "dijit/Menu",
+            "dijit/MenuItem"
+        ]);
+
+        cris.ready(function() {
+        });
+    </script>
+
+    <c:set value="${imagesRoot}/famfamfam_silk_icons_v013/icons/color_swatch.png" var="urlHomeIcon"/>
+    <c:set value="${imagesRoot}/famfamfam_silk_icons_v013/icons/cog_add.png" var="urlAddToHomeIcon"/>
+
+    <div id="menu" data-dojo-type="dijit.MenuBar">
+        <spring:url value="/home" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedHome}'" onClick="window.location.href='${url}?selected=home'">
+            <img src="${urlHomeIcon}" title="Display tiles"/>
+        </div>
+        <spring:url value="/jobs/index" var="url"/>
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedJobs}'" onClick="window.location.href='${url}?selected=jobs'">
+            <span>
+                Job
+            </span>
+        </div>
+            <!--
+        <spring:url value="/apps/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedApps}'" onClick="window.location.href='${url}?selected=apps'">
+            <span>
+                App
+            </span>
+        </div>
+            -->
+        <spring:url value="/explorer/index" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedExplorer}'" onClick="window.location.href='${url}?selected=explorer'">
+            <span>
+                Explorer
+            </span>
+        </div>
+        <spring:url value="/search/index" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedSearch}'" onClick="window.location.href='${url}?selected=search'">
+            <span>
+                Search
+            </span>
+        </div>
+            <!--
+        <spring:url value="/reports/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" onClick="window.location.href='${url}'">
+            <span>
+                Report
+            </span>
+        </div>
+            -->
+        <!--
+        <spring:url value="/resources/index/" var="url" />
+        <div data-dojo-type="dijit.MenuBarItem" onClick="window.location.href='${url}'">
+            <span>
+                Resource
+            </span>
+        </div>
+        -->
+
+        <div style="float: right;" data-dojo-type="dijit.MenuBarItem" data-dojo-props="selected : '${selectedConfigurations}'" onClick="showCreateTileDialog">
+            <img src="${urlAddToHomeIcon}" title="Create a tile for the current page"/>
+        </div>
+    </div>
+
+</jsp:root>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.0"
+    xmlns:jsp="http://java.sun.com/JSP/Page"
+    xmlns:spring="http://www.springframework.org/tags"
+    >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/" var="url"/>
+
+    <script type="text/javascript">
+        cris.ready(function() {
+
+        });
+    </script>
+
+    <h1>Workspace Created successfully</h1>
+
+    <h4>Workspace: <a href="${url}${urlIdentifier}">${name}</a></h4>
+    <h4>Administrator Username: administrator</h4>
+
+</jsp:root>

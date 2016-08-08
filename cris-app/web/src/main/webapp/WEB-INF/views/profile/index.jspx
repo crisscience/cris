@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1"
+     xmlns:c="http://java.sun.com/jsp/jstl/core"
+     xmlns:jsp="http://java.sun.com/JSP/Page"
+     xmlns:spring="http://www.springframework.org/tags"
+     xmlns:form="http://www.springframework.org/tags/form"
+     >
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <script type="text/javascript">
+        cris.require([
+            "dijit/form/Button",
+            "dijit/form/Form",
+            "dijit/form/ValidationTextBox",
+            "dijit/layout/ContentPane",
+            "dijit/layout/TabContainer"
+        ]);
+
+        cris.ready(function() {
+        });
+    </script>
+
+    <div>
+        <div id="tabContainer" data-dojo-type="dijit.layout.TabContainer" data-dojo-props='doLayout: false, useMenu: false, useSlider: false'>
+            <div id="tabIdentity" data-dojo-type="dijit.layout.ContentPane" data-dojo-props='title: "Identify", selected: "true"'>
+                <div style="filter:alpha(opacity=90); padding: 10px; background-color: #FFFFFF; width:45%; float: left">
+                    <h2>Change your Identity</h2>
+                    <div class="instruction">
+                        Your Name
+                        <c:if test="${empty user.externalSource}">
+                        , username and email
+                        </c:if>
+                    </div>
+                    <p></p>
+
+                    <spring:url value="/profile/password" var="url"/>
+                    <div data-dojo-type="dijit.form.Form" data-dojo-props="action: '${url}', method: 'POST' ">
+                        <label for="firstName">First Name*:</label>
+                        <input id="firstName" type="text" name="firstName" data-dojo-type="dijit.form.ValidationTextBox" value="${user.firstName}" data-dojo-props='required: "true"' placeholder="Your first name"/>
+                        <p></p>
+                        <label for="middleName">Middle Name:</label>
+                        <input id="middleName" type="text" name="middleName" data-dojo-type="dijit.form.ValidationTextBox"  value="${user.middleName}" placeholder="Your middle name"/>
+                        <p></p>
+                        <label for="lastName">Last Name*:</label>
+                        <input id="lastName" type="text" name="lastName" data-dojo-type="dijit.form.ValidationTextBox" value="${user.lastName}" data-dojo-props='required: "true"' placeholder="Your last name"/>
+                        <p></p>
+                        <c:choose>
+                        <c:when test="${empty user.externalSource}">
+                            <label for="username">Username*:</label>
+                            <input id="username" type="text" name="username" data-dojo-type="dijit.form.ValidationTextBox" value="${user.username}" data-dojo-props='required: "true"' placeholder="Your username"/>
+                            <p></p>
+                            <label for="email">Email*:</label>
+                            <input id="email" type="text" name="email" value="${user.email}" data-dojo-type="dijit.form.ValidationTextBox" data-dojo-props='required: "true", regExp: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,4}", promptMessage: "Enter an email address", invalidMessage: "Invalid email address"' placeholder="Your email address"/>
+                            <p></p>
+                            <hr/>
+                            <div class="instruction">
+                                Please enter your current password. Then enter a new password twice. If you don't want to change your password, leave the passwords empty.
+                            </div>
+                            <p></p>
+                            <label for="password0">Current Password:</label>
+                            <input id="password0" type="password" name="password0" data-dojo-type="dijit.form.ValidationTextBox"/>
+                            <p></p>
+                            <label for="password1">New Password:</label>
+                            <input id="password1" type="password" name="password1" data-dojo-type="dijit.form.ValidationTextBox"/>
+                            <p></p>
+                            <label for="password2">Retype Password:</label>
+                            <input id="password2" type="password" name="password2" data-dojo-type="dijit.form.ValidationTextBox"/>
+                            <p></p>
+                        </c:when>
+                        </c:choose>
+                        <form:errors cssClass="errors" path="user"/>
+                        <div>
+                            <input type="submit" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Submit"'/>&amp;nbsp;
+                        </div>
+                    </div>
+                </div>
+
+                <div style="float: right; width: 50%">
+                    <br/>
+                </div>
+            </div>
+
+            <div id="tabPreference" data-dojo-type="dijit.layout.ContentPane" data-dojo-props='title: "Preference"' style="border: 0px; padding: 0px">
+                <div style="padding: 10px">
+                    <h2>Preference</h2>
+                    To be implemented
+                </div>
+            </div>
+        </div>
+    </div>
+
+</jsp:root>

@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Document   : home
+    Created on : Feb 10, 2014, 4:00:55 PM
+    Author     : Udayan Umapathi
+-->
+<jsp:root xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:fn="http://java.sun.com/jsp/jstl/functions" xmlns:spring="http://www.springframework.org/tags" version="2.0">
+
+    <c:set value="${stylesRoot}/metroStyle.css" var="url" />
+    <link rel="stylesheet" type="text/css" media="screen" href="${url}" />
+
+    <c:set value="${imagesRoot}/${wsBannerImage}" var="bannerUrl"/>
+    <c:set value="${baseUrl}tiles" var="urlTiles"/>
+
+    <div id="idTile" data-ng-controller="TileController">
+        <div id="idTileContainer" data-dojo-id="tileContainer" class="linha" data-dojo-type="dojo/dnd/Source" data-cris-dndsourceover="setSource(source)" data-cris-dnddrop="handleDrop(source, nodes, copy, target)" data-cris-contextmenu="enterEditMode(evt)">
+            <!-- -->
+        </div>
+
+        <div class="menuBar" data-ng-show="selectedTile">
+            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Edit Selected Tile...", icon: "pencil", disabled: {{selectedTile === null}}' data-ng-click="showEditTileDialog()" />
+            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Delete Selected Tile...", disabled: {{selectedTile === null}}' data-ng-click="deleteTile()"/>
+            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Close"' data-ng-click="exitEditMode()"/>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    // <![CDATA[
+        cris.require([
+            "dijit/form/Button",
+            "dijit/Tooltip"
+        ]);
+
+        function launchLink(tileId) {
+            window.location.href = "${urlTiles}/click/" + tileId;
+        }
+
+        function enterEditMode(source) {
+            // identify the selected tile
+            var selectedNode = null;
+            var nodes = source.getAllNodes();
+            for (var i = 0; i < nodes.length; i++) {
+                var node = nodes[i];
+                if (node.className === "dojoDndItem dojoDndItemOver") {
+                    dojo.addClass(node, "shadowTile");
+                    selectedNode = node;
+                } else {
+                    dojo.removeClass(node, "shadowTile");
+                }
+            }
+            return selectedNode;
+        }
+
+        function exitEditMode(source) {
+            var nodes = source.getAllNodes();
+            for (var i = 0; i < nodes.length; i++) {
+                dojo.removeClass(nodes[i], "shadowTile");
+            }
+        }
+
+        function showEditTileDialog(tile, saveSuccessHandler, saveErrorHandler) {
+            var scope = getAngularElementScope("idTileDialogScope");
+
+            scope.url = tile.shortcutId.url;
+            scope.name = tile.name;
+            scope.description = tile.description;
+
+            var style = dojo.fromJson(tile.style);
+            if (style) {
+                if (style.width === "120px") {
+                    scope.size = "square";
+                } else {
+                    scope.size = "rectangle";
+                }
+                scope.color = style["background-color"];
+            } else {
+                scope.size = "square";
+                scope.color = "#0000FF";
+            }
+
+            scope.tileId = tile.id;
+            var params = {};
+            if (tile.shortcutId) {
+                var a = tile.shortcutId.$ref.split("/");
+                scope.shortcutId = +a[2];
+
+                var url = tile.shortcutId.url;
+                var idx = url.indexOf("?");
+                scope.url = getBaseUrl() + url.substring(0, idx);
+
+                var paramString = url.substring(idx + 1);
+                var paramArray = paramString.split("&");
+                dojo.forEach(paramArray, function(item, idx) {
+                    var i = item.indexOf("=");
+                    if (i === -1) {
+                        params[item] = null;
+                    } else {
+                        params[item.substring(0, i)] = item.substring(i + 1);
+                    }
+                });
+            }
+            scope.jobInfo = {
+                projectId: params.projectId,
+                experimentId: params.experimentId,
+                workflowId: params.workflowId,
+                name: params.name,
+                description: params.description,
+                initParams: params.initParams,
+                endUri: params.endUri
+            };
+
+            scope.isNewJobPage = (scope.url.indexOf("jobs/run") !== -1);
+            if (saveSuccessHandler) {
+                scope.saveSuccessHandler = saveSuccessHandler;
+            }
+            if (saveErrorHandler) {
+                scope.saveErrorHandler = saveErrorHandler;
+            }
+
+            scope.$apply();
+
+            scope.showDialog();
+        }
+
+        function closeEditTileDialog() {
+            var scope = getAngularElementScope("idTileDialogScope");
+            scope.closeDialog();
+        }
+
+        function populateTiles(tiles) {
+            for (var i = 0; i < tiles.length; i++) {
+                var tile = tiles[i];
+
+                var tileHtml = tile.html;
+                tileHtml = tileHtml.replace("tileId", tile.id);
+                tileHtml = tileHtml.replace("tileName", tile.name);
+                tileHtml = tileHtml.replace("tileDescription", tile.description);
+                tileHtml = tileHtml.replace("dummyUrl", "${bannerUrl}");
+
+                var resStyle = tile.style.replace(/(["'{}\\])/g, "");
+                resStyle = resStyle.replace(/,/g, ";");
+                tileHtml = tileHtml.replace("resStyle", resStyle);
+
+                var jsonStyle = dojo.fromJson(tile.style);
+                var backgroundColor = jsonStyle["background-color"];
+                if (backgroundColor === "#ffffff" || backgroundColor === "#c0c0c0" || backgroundColor === "#00ff00" || backgroundColor === "#ffff00") {
+                    tileHtml = tileHtml.replace("tileTitle", "tileTitle tileTextBlack");
+                } else {
+                    tileHtml = tileHtml.replace("tileTitle", "tileTitle tileTextWhite");
+                }
+
+                var tileNode = dojo.place(tileHtml, "idTileContainer", "last");
+                dojo.connect(tileNode, "onclick", function(event) {
+                    var tileId;
+                    if (event.target.parentNode.id !== "idTileContainer") {
+                        tileId = event.target.parentNode.id;
+                    } else {
+                        tileId = event.target.id;
+                    }
+                    launchLink(tileId);
+                });
+
+                new dijit.Tooltip({
+                    connectId: [tileNode.id],
+                    label: tile.description
+                });
+
+                tileContainer.insertNodes(false, [tileNode]);
+            }
+        };
+
+        function clearTiles() {
+            //tileContainer.selectAll().deleteSelectedNodes();
+            //dojo.query(".dojoDndItem").forEach(dojo.destroy);
+            dojo.empty("idTileContainer");
+        }
+
+        function confirmDeleteTile(tile) {
+            return showConfirm("Do you want to delete the tile: " + tile.name + "?");
+        }
+
+        angular.module('crisTile', ['angular-dojo', 'crisDialogTileInfo']);
+        angular.module('crisTile').controller('TileController', ['$scope', 'tileService', function($scope, tileService){
+            $scope.editMode = false;
+            $scope.source = null;
+            $scope.setSource = function(source) {
+                if (!$scope.source) {
+                    // just need to be done once
+                    $scope.source = source;
+                }
+            };
+            $scope.handleDrop = function(source, nodes, copy, target) {
+                console.log("==== drop:", source, nodes, copy, target);
+                var layout = [];
+                dojo.forEach($scope.source.getAllNodes(), function(item, index) {
+                    layout.push({id: +item.id, location: "" + index});
+                });
+                tileService.saveLayout(layout).success(
+                    function (data) {
+                        $scope.tiles = data.sort(function(a, b) {
+                            return parseInt(a.location) - parseInt(b.location);
+                        });
+                        clearTiles();
+                        populateTiles($scope.tiles);
+                    }
+                ).error(saveFailureHandler);
+            };
+            $scope.enterEditMode = function() {
+                $scope.selectedTile = enterEditMode($scope.source);
+                $scope.editMode = true;
+            };
+            $scope.exitEditMode = function() {
+                $scope.editMode = false;
+                $scope.selectedTile = null;
+                exitEditMode($scope.source);
+            };
+            $scope.toggleEditMode = function(evt) {
+                if ($scope.editMode) {
+                    $scope.exitEditMode();
+                } else {
+                    $scope.enterEditMode();
+                }
+            };
+            $scope.showEditTileDialog = function() {
+                // get the current tile
+                if ($scope.selectedTile && $scope.selectedTile.id) {
+                    var tileId = +$scope.selectedTile.id;
+                    var tile = null;
+                    dojo.forEach($scope.tiles, function (item, index) {
+                        if (item.id === tileId) {
+                            tile = item;
+                        }
+                    });
+                    showEditTileDialog(tile, function() {
+                            $scope.closeEditTileDialog();
+                            $scope.saveSuccessHandler();
+                        }
+                    );
+                }
+            };
+            $scope.closeEditTileDialog = function() {
+                closeEditTileDialog();
+            };
+
+            $scope.saveSuccessHandler = function() {
+                clearTiles();
+                $scope.getAllTiles();
+                $scope.selectedTile = null;
+            };
+            $scope.saveErrorHandler = function() {
+            };
+
+            $scope.deleteTile = function() {
+                if ($scope.selectedTile && $scope.selectedTile.id) {
+                    var tileId = +$scope.selectedTile.id;
+                    var tile = null;
+                    dojo.forEach($scope.tiles, function (item, index) {
+                        if (item.id === tileId) {
+                            tile = item;
+                        }
+                    });
+                    if (tile) {
+                        var ok = confirmDeleteTile(tile);
+                        if (ok) {
+                            tileService.delete($scope.selectedTile.id).success($scope.saveSuccessHandler).error($scope.saveErrorHandler);
+                        }
+                    };
+                }
+            };
+
+            $scope.tiles = null;
+            $scope.getAllTiles = function() {
+                tileService.getAll().success(
+                    function (data) {
+                        $scope.tiles = data.sort(function(a, b) {
+                            return parseInt(a.location) - parseInt(b.location);
+                        });
+                        populateTiles($scope.tiles);
+                    }
+                ).error();
+            };
+
+            // get tiles from backend
+            $scope.getAllTiles();
+        }]);
+
+        cris.ready(function() {
+            cris.bootstrapAngular("idTile", "crisTile");
+        });
+    // ]]>
+    </script>
+
+</jsp:root>

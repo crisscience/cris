@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+     xmlns:jsp="http://java.sun.com/JSP/Page"
+     xmlns:c="http://java.sun.com/jsp/jstl/core"
+     xmlns:spring="http://www.springframework.org/tags"
+     xmlns:form="http://www.springframework.org/tags/form"
+     >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <script type="text/javascript">
+        // <![CDATA[
+        cris.require("dojox/gfx");
+        cris.require("dijit/form/Form");
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/ValidationTextBox");
+        cris.require("dijit/form/DateTextBox");
+        cris.require("dijit/form/TimeTextBox");
+        cris.require("dijit/Menu");
+        cris.require("dijit/MenuItem");
+        cris.require("dijit/Dialog");
+        cris.require("dijit/form/FilteringSelect");
+        cris.require("dijit/Editor");
+
+        function initTray(surface, traySize) {
+            var dim = surface.getDimensions();
+            var width = dim.width / traySize.columns;
+            var height = dim.height / traySize.rows;
+            var tray = new Array(traySize.rows);
+            var trayGroup = surface.createGroup();
+            for (var x = 0; x < traySize.rows; x++) {
+                tray[x] = new Array(traySize.columns);
+                for (var y = 0; y < traySize.columns; y++) {
+                    tray[x][y] = surface.createRect({x: y * width, y: x * height, width: width, height: height})
+                        .setFill({type: "radial", cx: y * width + width * 0.5, cy: x * height + height * 0.5, r: width, colors: [{offset: 0, color: "green"}, {offset: 1, color: "white"}]})
+                        .setStroke({color: "green", join: "round"});
+                    trayGroup.add(tray[x][y]);
+                }
+            }
+
+            dojo.connect(trayGroup.getEventSource(), "onmouseup", function(e){
+                //alert(e);
+            });
+
+            return tray;
+        }
+
+        cris.ready(function() {
+            //TODO: Begin: These information comes from template
+            var traySize = {rows: 16, columns: 16};
+            var name;
+            var description;
+            var tray;
+            // End
+
+            var surface = dojox.gfx.createSurface("idTray", 800, 400);
+
+            var contextMenu = new dijit.Menu({targetNodeIds: ["idTray"]});
+            var menuPlant = new dijit.MenuItem({label: "Plant seeds..."});
+            var menuApply = new dijit.MenuItem({label: "Apply fertilizer..."});
+            var menuHarvest = new dijit.MenuItem({label: "Harvest..."});
+            var menuImport = new dijit.MenuItem({label: "Import data..."});
+            var menuNotes = new dijit.MenuItem({label: "Add notes..."});
+            contextMenu.addChild(menuPlant);
+            contextMenu.addChild(menuApply);
+            contextMenu.addChild(menuHarvest);
+            contextMenu.addChild(menuImport);
+            contextMenu.addChild(new dijit.MenuSeparator());
+            contextMenu.addChild(menuNotes);
+            contextMenu.startup();
+
+            dojo.connect(menuPlant, "onClick", function(e){
+                var dialog = dijit.byId("idDialogPlant");
+                dialog.show();
+                var dim = surface.getDimensions();
+                var width = dim.width / traySize.columns;
+                var height = dim.height / traySize.rows;
+                for (var x = 0; x < tray.length; x++) {
+                    for (var y = 0; y < tray[x].length; y++) {
+                        tray[x][y].setFill({type: "radial", cx: y * width + width * 0.5, cy: x * height + height * 0.5, r: width, colors: [{offset: 0, color: "green"}, {offset: 1, color: "white"}]})
+                            .setStroke({color: "green", join: "round"});
+                    }
+                }
+            });
+
+            dojo.connect(menuApply, "onClick", function(e){
+                var dialog = dijit.byId("idDialogApply");
+                dialog.show();
+            });
+
+            dojo.connect(menuHarvest, "onClick", function(e){
+                var dialog = dijit.byId("idDialogHarvest");
+                dialog.show();
+                var dim = surface.getDimensions();
+                var width = dim.width / traySize.columns;
+                var height = dim.height / traySize.rows;
+                for (var x = 0; x < tray.length; x++) {
+                    for (var y = 0; y < tray[x].length; y++) {
+                        tray[x][y].setFill({type: "radial", cx: y * width + width * 0.5, cy: x * height + height * 0.5, r: width, colors: [{offset: 0, color: "#D8B600"}, {offset: 1, color: "white"}]})
+                            .setStroke({color: "#D8B600", join: "round"});
+                    }
+                }
+            });
+
+            dojo.connect(menuImport, "onClick", function(e){
+                var dialog = dijit.byId("idDialogImport");
+                dialog.show();
+            });
+
+            dojo.connect(menuNotes, "onClick", function(e){
+                new dijit.Editor({}, "idDialogEditor");
+                var dialog = dijit.byId("idDialogNotes");
+                dialog.show();
+            });
+
+            dijit.byId("idRows").setValue(traySize.rows);
+            dijit.byId("idColumns").setValue(traySize.columns);
+            dojo.byId("idNumOfCells").innerHTML = traySize.rows * traySize.columns;
+            tray = initTray(surface, traySize);
+
+            dojo.connect(dijit.byId("idSet"), "onClick", function(e){
+                var rows = dijit.byId("idRows").getValue();
+                var columns = dijit.byId("idColumns").getValue();
+                var form = dijit.byId("idTraySize");
+                if (!form.validate()) {
+                    alter("invalid enteries");
+                    return;
+                }
+                dojo.byId("idNumOfCells").innerHTML = rows * columns;
+                tray = initTray(surface, {rows: rows, columns: columns});
+            });
+        });
+        // ]]>
+    </script>
+
+    <!--
+    <h4>TODO: Each type of subject is described by a template with some items with fixed values and others need to be filled in when creating an instance of this type of subject</h4>
+    <h4>TODO: Handle time-variable parameters, e.g. the temperature during the growing period of the plants: either auto (with temperature sensor connected to the system) or manual entry</h4>
+    <h4>TODO: all the activities related to the subject such as partitioning the grid, planting, applying fertilizer, harvesting, import data and etc.</h4>
+    <hr/>
+    -->
+    <h4>TODO: Provide navigation and search for subjects</h4>
+    <hr/>
+
+    <h2>Subject (Create new and update existing)</h2>
+
+    <label for="idId">ID:</label><input id="idId" dojoType="dijit.form.TextBox" placeholder="id"/>
+    <p/>
+    <label for="idName">Name:</label><input id="idName" dojoType="dijit.form.TextBox" placeholder="name"/>
+    <p/>
+    <label for="idDescription">Description:</label><input id="idDescription" dojoType="dijit.form.TextBox" placeholder="description"/>
+    <p/>
+    <form id="idTraySize" dojoType="dijit.form.Form">
+        <label for="idRows">Tray Size:</label>
+        <input id="idRows" dojoType="dijit.form.ValidationTextBox" placeholder="rows" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number" style="width: 50px;"/> rows
+        &amp;times;
+        <input id="idColumns" dojoType="dijit.form.ValidationTextBox" placeholder="columns" regExp="[0-9]+" required="true" promptMessage="Enter the number of columns" invalidMessage="Must be a number" style="width: 50px;"/> columns
+        &amp;equals;
+        <span id="idNumOfCells">?</span> Cells
+        &amp;nbsp;
+        <input id="idSet" dojoType="dijit.form.Button" label="Set"/>
+    </form>
+    <p/>
+
+    <div id="idTray" style="text-align: center"><!-- --></div>
+
+    <p class="clearBoth"/>
+
+    <div style="float: right">
+        <input id="idSave" dojoType="dijit.form.Button" label="Save"/>
+        <input id="idReset" dojoType="dijit.form.Button" label="Reset"/>
+        <input id="idClear" dojoType="dijit.form.Button" label="Clear"/>
+    </div>
+
+    <!-- Dialogs -->
+    <div id="idDialogPlant" dojoType="dijit.Dialog" title="Select the type of seed to plant" style="width: 600px; height: 400px; background-color: #FFFFFF">
+        <label>Plant Type: </label>
+        <select dojoType="dijit.form.FilteringSelect">
+            <option selected="">Arabidopsis</option>
+            <option>Rice</option>
+            <option>Yeast</option>
+        </select>
+        <p/>
+        <form dojoType="dijit.form.Form">
+            <label>Property 1:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 1" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 2:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 2" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 3:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 3" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 4:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 4" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 5:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 5" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 6:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 6" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 7:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 7" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 8:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 8" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <div style="float: right">
+                <input id="idSelect" dojoType="dijit.form.Button" label="Select"/>
+                <input id="idCancel" dojoType="dijit.form.Button" label="Cancel"/>
+            </div>
+        </form>
+    </div>
+    <div id="idDialogApply" dojoType="dijit.Dialog" title="Select fertilizer to apply" style="width: 600px; height: 400px; background-color: #FFFFFF">
+        <label>Fertilizer Type: </label>
+        <select dojoType="dijit.form.FilteringSelect">
+            <option selected="">Fertilizer Type 1</option>
+            <option>Fertilizer Type 2</option>
+            <option>Fertilizer Type 3</option>
+        </select>
+        <p/>
+        <form dojoType="dijit.form.Form">
+            <label>Property 1:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 1" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 2:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 2" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 3:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 3" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 4:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 4" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 5:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 5" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 6:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 6" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 7:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 7" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <label>Property 8:</label><input dojoType="dijit.form.ValidationTextBox" placeholder="property 8" regExp="[0-9]+" required="true" promptMessage="Enter the number of rows" invalidMessage="Must be a number"/>
+            <p/>
+            <div style="float: right">
+                <input id="idFSelect" dojoType="dijit.form.Button" label="Select"/>
+                <input id="idFCancel" dojoType="dijit.form.Button" label="Cancel"/>
+            </div>
+        </form>
+    </div>
+    <div id="idDialogHarvest" dojoType="dijit.Dialog" title="Harvest" style="width: 600px; height: 400px; background-color: #FFFFFF">
+        <label>Date/Time:</label>
+        <input type="text" value="2012-01-25" dojoType="dijit.form.DateTextBox" required="true"/>
+        &amp;nbsp;
+        <input type="text" value="12:00:00" dojoType="dijit.form.TimeTextBox" required="true"/>
+        <p/>
+        All the plants in the selected area will be marked harvested at the date/time above.
+    </div>
+    <div id="idDialogImport" dojoType="dijit.Dialog" title="Import HPLC Data" style="width: 600px; height: 420px; background-color: #FFFFFF">
+        TODO
+    </div>
+    <div id="idDialogNotes" dojoType="dijit.Dialog" title="Notes" style="width: 600px; height: 420px; background-color: #FFFFFF">
+        <div id="idDialogEditor"><!-- --> </div>
+        <p/>
+        <div style="float: right">
+            <input id="idNSave" dojoType="dijit.form.Button" label="Save"/>
+            <input id="idNCancel" dojoType="dijit.form.Button" label="Cancel"/>
+        </div>
+    </div>
+</jsp:root>

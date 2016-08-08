@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE tiles-definitions PUBLIC "-//Apache Software Foundation//DTD Tiles Configuration 2.1//EN" "http://tiles.apache.org/dtds/tiles-config_2_1.dtd">
+<tiles-definitions>
+    <definition extends="default" name="jobs/index">
+        <put-attribute name="body" value="/WEB-INF/views/jobs/index.jspx"/>
+    </definition>
+    <definition extends="default" name="jobs/show">
+        <put-attribute name="body" value="/WEB-INF/views/jobs/show.jspx"/>
+    </definition>
+    <definition extends="default" name="jobs/create">
+        <put-attribute name="body" value="/WEB-INF/views/jobs/create.jspx"/>
+    </definition>
+    <definition extends="default" name="jobs/task">
+        <put-attribute name="body" value="/WEB-INF/views/jobs/task.jspx"/>
+    </definition>
+    <definition extends="default" name="jobs/end">
+        <put-attribute name="body" value="/WEB-INF/views/jobs/end.jspx"/>
+    </definition>
+</tiles-definitions>

@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:fn="http://java.sun.com/jsp/jstl/functions" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/rest/objectus/" var="urlRestObjectus"/>
+    <spring:url value="/projects/json/names" var="urlProjects"/>
+    <spring:url value="/experiments/json/names" var="urlExp"/>
+    <spring:url value="/jobs/json/names" var="urlJobs"/>
+    <spring:url value="/templates/json/names" var="urlTempNames"/>
+    <spring:url value="/templates/json/dataset" var="urlDataSet"/>
+    <spring:url value="/templates/json/layout" var="urlLayout"/>
+    <spring:url value="/templates/xml" var="urlTemplateXml"/>
+
+    <c:set value="${jsRoot}/dm/dataset.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for FF3 and Opera --></script>
+
+    <c:set value="${jsRoot}/dm/DatasetControllor.js" var="url" />
+    <script type="text/javascript" src="${url}"><!----></script>
+
+    <script type="text/javascript">
+    //<![CDATA[
+        cris.require("dijit/form/FilteringSelect");
+        cris.require("dijit/form/Form");
+        cris.require("dijit/form/Button");
+        cris.require("dojo/store/JsonRest");
+        cris.require("dojox/grid/EnhancedGrid");
+        cris.require("dojox/grid/enhanced/plugins/Pagination");
+        cris.require("dojox/grid/enhanced/plugins/Selector");
+        cris.require("dojox/grid/enhanced/plugins/Filter");
+        cris.require("dojo/_base/xhr");
+        cris.require("dojo/json");
+        cris.require("dojo/request");
+        cris.require("dojo/io/iframe");
+        cris.require("dojox/xml/parser");
+
+        cris.objectus = {};
+        cris.objectus.index = {};
+        cris.objectus.index.app = {
+            /* The filtering select for projects. */
+            /* The store for projectList. */
+            projectList: null,
+            storeProjects: null,
+
+            /* The filtering select for experiments. */
+            /* The store for experimentList. */
+            experimentList: null,
+            storeExperiments: null,
+
+            /* The filtering select for jobs. */
+            /* The store for jobList. */
+            jobList: null,
+            storeJobs: null,
+
+            /* The filtering select for templates. */
+            /* The store for the templateList. */
+            templateList: null,
+            storeTemplates: null,
+
+            /* The grid view. */
+            /* The store for the grid view. */
+            datasetGrid: null,
+            storeDataset: null,
+
+            /* For updating existing entry or generating new entry. */
+            storeObjectus: null,
+
+            updateProjectList: function () {
+                this.projectList.query = {};
+                this.projectList.reset();
+            },
+
+            updateExperimentList: function () {
+                this.experimentList.query.projectId = dijit.byId("idSelectProject").getValue();
+                this.experimentList.reset();
+            },
+
+            updateJobList: function () {
+                this.jobList.query.projectId = dijit.byId("idSelectProject").getValue();
+                this.jobList.query.experimentId = dijit.byId("idSelectExperiment").getValue();
+                this.jobList.reset();
+            },
+
+            updateTemplateList: function (showAll) {
+                this.templateList.query.projectId = dijit.byId("idSelectProject").getValue();
+                this.templateList.query.experimentId = dijit.byId("idSelectExperiment").getValue();
+                this.templateList.query.jobId = dijit.byId("idSelectJob").getValue();
+                if (this.templateList.query.jobId === "") {
+                    this.templateList.query.jobId = "0";
+                }
+                if (showAll) {
+                    this.templateList.query.showAll = "true";
+                } else {
+                    this.templateList.query.showAll = "false";
+                }
+                this.templateList.reset();
+            },
+
+            setLayout: function (response, ioArgs) {
+                var this_ = cris.objectus.index.app;
+                dojo.forEach(response[0]["cells"], function (cell) {
+                    if (response[0]["cells"].length > 10) {
+                        cell["width"] = "75px";
+                    }
+
+                    cell["name"] = prettyPrint(cell["name"], "_");
+
+                    cell["get"] = function (inRowIndex) {
+                        var orig = this_.datasetGrid.getItem(inRowIndex)[this.field];
+
+                        if (this.field === MetaField_ProjectId) {
+                            var projects = dijit.byId("idSelectProject").item.__parent;
+                            for (var i = 0; i < projects.length; ++i) {
+                                if (projects[i]["id"] === orig) {
+                                    return orig + " - " + projects[i]["name"];
+                                }
+                            }
+                        }
+
+                        if (this.field === MetaField_ExperimentId) {
+                            var experiments = dijit.byId("idSelectExperiment").item.__parent;
+                            for (var i = 0; i < experiments.length; ++i) {
+                                if (experiments[i].id === orig) {
+                                    return orig + " - " + experiments[i].name;
+                                }
+                            }
+                        }
+
+                        if (this.field === MetaField_JobId) {
+                            var jobs = dijit.byId("idSelectJob").item.__parent;
+                            for (var i = 0; i < jobs.length; ++i) {
+                                if (jobs[i].id === orig) {
+                                    return orig + " - " + jobs[i].name;
+                                }
+                            }
+                        }
+
+                        if (orig === undefined) {
+                            /* To prevent of displaying "...". */
+                            return "";
+                        } else if (orig instanceof Array || orig instanceof Object) {
+                            return "+";
+                        } else {
+                            return orig;
+                        }
+                    };
+                });
+
+                this_.datasetGrid.setStructure(response);
+                this_.datasetGrid.render();
+            },
+
+            updateDatasetGrid: function () {
+                /* When there is nothing on the template list, */
+                if (dijit.byId("idSelectTemplate").item === null) {
+                    this.datasetGrid.setQuery({});
+                    this.datasetGrid.setStructure({});
+                    return;
+                }
+
+                this.query = {};
+                this.query.projectId = dijit.byId("idSelectProject").getValue();
+                this.query.experimentId = dijit.byId("idSelectExperiment").getValue();
+                this.query.jobId = dijit.byId("idSelectJob").getValue();
+                this.query.templateUuid = dijit.byId("idSelectTemplate").getValue();
+                this.query.version = dijit.byId("idSelectTemplate").item.version;
+
+                /* Update the schema of the grid. */
+                objectusGet("${urlLayout}", this.query, this.setLayout, null, null, false);
+
+                /* Update the dataset of the grid. */
+                this.datasetGrid.setQuery(this.query);
+            },
+
+            /* Initiate stores. */
+            initStores: function () {
+                this.storeProjects = new dojox.data.JsonRestStore({
+                    target: "${urlProjects}",
+                    idAttribute: "id",
+                    syncMode: false
+                });
+                this.storeExperiments = new dojox.data.JsonRestStore({
+                    target: "${urlExp}",
+                    idAttribute: "id",
+                    syncMode: false
+                });
+                this.storeJobs = new dojox.data.JsonRestStore({
+                    target: "${urlJobs}",
+                    idAttribute: "id",
+                    syncMode: false
+                });
+                this.storeTemplates = new dojox.data.JsonRestStore({
+                    target: "${urlTempNames}",
+                    idAttribute: "id",
+                    syncMode: false
+                });
+                this.storeDataset = new dojox.data.JsonRestStore({
+                    target: "${urlDataSet}",
+                    idAttribute: "id",
+                    syncMode: false
+                });
+                this.storeObjectus = new dojo.store.JsonRest({
+                    target: "${urlRestObjectus}",
+                    idProperty: "id",
+                    syncMode: false
+                });
+            },
+
+            initSelection: function () {
+                var this_ = this;
+                var app = cris.objectus.index.app;
+
+                /* For the combobox of project. */
+                this.projectList = new dijit.form.FilteringSelect({
+                    name: "projectId",
+                    value: 0,
+                    placeHolder: "Select an Project",
+                    store: this.storeProjects,
+                    fetchProperties: {
+                        sort: [{
+                                attribute: "name"
+                            }]
+                    },
+                    autoComplete: true,
+                    onChange: function (value) {
+                        this_.updateExperimentList();
+
+                        this_.storeProjects.get(value).then(function (item) {
+                            var scope = getAngularElementScope("idDatasetController");
+                            if (value !== 0) {
+                                scope.currentProject = item;
+                            } else {
+                                scope.currentProject = null;
+                            }
+                            scope.$apply();
+                        });
+                    }
+                }, "idSelectProject");
+                this.projectList.startup();
+
+                /* For the combobox of Experiment. */
+                this.experimentList = new dijit.form.FilteringSelect({
+                    name: "experimentId",
+                    placeHolder: "Select an Experiment",
+                    store: this.storeExperiments,
+                    fetchProperties: {
+                        sort: [{
+                                attribute: "name"
+                            }]
+                    },
+                    autoComplete: true,
+                    onChange: function (value) {
+                        this_.updateJobList();
+
+                        this_.storeExperiments.get(value).then(function(item) {
+                            var scope = getAngularElementScope("idDatasetController");
+                            if (value !== null && value !== "0") {
+                                scope.currentExperiment = item;
+                            } else {
+                                scope.currentExperiment = null;
+                            }
+                            scope.$apply();
+                        });
+                    }
+                }, "idSelectExperiment");
+                this.experimentList.startup();
+
+                /* For the combobox of Job. */
+                this.jobList = new dijit.form.FilteringSelect({
+                    name: "jobId",
+                    store: this.storeJobs,
+                    fetchProperties: {
+                        sort: [{
+                                attribute: "name"
+                            }]
+                    },
+                    autoComplete: true,
+                    onChange: function (value) {
+                        this_.updateTemplateList();
+
+                        this_.storeJobs.get(value).then(function(item) {
+                            var scope = getAngularElementScope("idDatasetController");
+                            if (value !== null && value !== "0") {
+                                scope.currentJob = item;
+                            } else {
+                                scope.currentJob = null;
+                            }
+                            scope.$apply();
+                        });
+                    }
+                }, "idSelectJob");
+                this.jobList.startup();
+
+                /* For the combobox of Template. */
+                this.templateList = new dijit.form.FilteringSelect({
+                    name: "templateId",
+                    store: this.storeTemplates,
+                    fetchProperties: {
+                        sort: [{
+                                attribute: "name"
+                            }]
+                    },
+                    autoComplete: true,
+                    onChange: function (value) {
+                        this_.updateDatasetGrid();
+
+                        this_.storeTemplates.get(value).then(function(item) {
+                        var scope = getAngularElementScope("idDatasetController");
+                            if (value) {
+                                //scope.latestTemplateVersion = item["_template_version"]["$uuid"];
+                                scope.currentTemplate = item;
+                            } else {
+                                //scope.latestTemplateVersion = null;
+                                scope.currentTemplate = null;
+                            }
+                            scope.showDetailedView = false;
+                            scope.$apply();
+                        });
+                    }
+                }, "idSelectTemplate");
+                this.templateList.startup();
+
+                this.showAll = new dijit.form.CheckBox({
+                    name: "showAll",
+                    value: "show all",
+                    checked: false,
+                    onChange: function (b) {
+                        this_.updateTemplateList(b);
+                    }
+                }, "idShowAll");
+
+                // set initial value
+                var widgetProject = dijit.byId("idSelectProject");
+                var value = widgetProject.get('value');
+                this.storeProjects.get(value).then(function (item) {
+                    var scope = getAngularElementScope("idDatasetController");
+                    if (value !== null && value !== "") {
+                        scope.currentProject = item;
+                    } else {
+                        scope.currentProject = null;
+                    }
+                    this_.updateExperimentList();
+                });
+            },
+
+            initDatasetGrid: function () {
+                /* For the grid. */
+                var args = {
+                    sortFields: {attribute: "timeCreated", descending: false},
+                    plugins: {
+                        pagination: {
+                            pageSizes: ["25", "50", "100", "All"],
+                            gotoButton: true,
+                            maxPageStep: 4,
+                            position: "bottom"
+                        }
+                    }
+                };
+                this.datasetGrid = createGrid(this.storeDataset, null, "idDatasetGrid", args);
+
+                this_ = this;
+
+                this.datasetGrid.sort = function () {
+                    this_.updateDatasetGrid();
+                };
+                this.datasetGrid.startup();
+
+                /* When a user clicks a cell of the grid, it displays the detailed information of the selected row. */
+                this.datasetGrid.onRowClick = function (e) {
+                    var item = this_.datasetGrid.getItem(e.rowIndex);
+                    var scope = getAngularElementScope("idDatasetController");
+                    scope.openDocument(item);
+                };
+            },
+
+            /* Initialization. */
+            init: function () {
+                this.initStores();
+                this.initDatasetGrid();
+                this.initSelection();
+            }
+        };
+
+        cris.ready(function () {
+            cris.objectus.index.app.init();
+        });
+
+        cris.bootstrapAngular("idDataset", "crisDataset");
+    //]]>
+    </script>
+
+    <div id="idDataset">
+        <div id="idDatasetController" data-ng-controller="DatasetController">
+
+            <h1 style="text-align: center">Dataset</h1>
+
+            <!-- Selection -->
+            <table style="width: 100%;">
+                <tr>
+                    <td >Project:</td>
+                    <td class="tdTextBox" >
+                        <input id="idSelectProject" />
+                    </td>
+
+                    <td >&amp;nbsp;Experiment:</td>
+                    <td class="tdTextBox" >
+                        <input id="idSelectExperiment"/>
+                    </td>
+
+                    <td >&amp;nbsp;Job:</td>
+                    <td class="tdTextBox" >
+                        <input id="idSelectJob"/>
+                    </td>
+
+                    <td >&amp;nbsp;Template:</td>
+                    <td class="tdTextBox" >
+                        <input id="idSelectTemplate"/>
+                    </td>
+                    <td class="tdTextBox" style='width: 70px;'>
+                        &amp;nbsp;<input id="idShowAll" type="checkbox"/>Show all
+                    </td>
+                    <td class="tdTextBox">
+                        <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'New'" data-ng-click="newDocument()"/>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Master view -->
+            <div>
+                <div id="idDatasetGrid"><!----></div>
+            </div>
+
+            <!-- Detailed view -->
+            <div data-ng-show="showDetailedView">
+                <p/>
+                Project: {{currentProject != null ? currentProject : ("N/A")}} | Experiment: {{currentExperiment != null ? currentExperiment : ("N/A")}} | Job: {{currentJob != null ? currentJob : ("N/A")}} | Last Updated: {{timeUpdated != null ? timeUpdated : ("N/A")}}
+                <br/>
+                Template: {{currentTemplate != null ? currentTemplate.name : ("N/A")}} UUID: {{currentTemplate != null ? currentTemplate.id : ("N/A")}}, Version: {{currentTemplate != null ? currentTemplate.version : ("N/A")}}
+                <form id="idDatasetForm" data-dojo-type="dijit/form/Form" method="post" enctype="multipart/form-data">
+                    <cris-dataset term="term" dataset="data" context="context" message="message" readOnly="false"><!----></cris-dataset>
+                </form>
+
+                <!-- Save and delete buttons -->
+                <div>
+                    <p class="errors">{{errors}}</p>
+                    <div class="floatLeft">
+                        <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Save'" data-ng-click="saveDocument()"/>
+                    </div>
+                    <div class="floatRight" data-ng-hide="isNew === null || isNew">
+                        <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Delete'" data-ng-click="deleteDocument()"/>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+</jsp:root>

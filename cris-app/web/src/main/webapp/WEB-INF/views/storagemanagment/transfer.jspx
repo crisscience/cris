@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1"
+          xmlns:c="http://java.sun.com/jsp/jstl/core"
+          xmlns:jsp="http://java.sun.com/JSP/Page"
+          xmlns:spring="http://www.springframework.org/tags"
+          xmlns:form="http://www.springframework.org/tags/form"
+          >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <style>
+        .browseButton {
+            width: 120px;
+            height: 30px;
+            margin:10px 0 2px 0;
+            display: block;
+        }
+
+        .dojoxUploaderFileListHeader th{
+            color: #666666;
+        }
+
+        .dojoxUploaderFileListTable {
+            border: 0px;
+            margin: 0px;
+            padding: 0px;
+        }
+    </style>
+
+    <script type="text/javascript">
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/FilteringSelect");
+        cris.require("dijit/form/Form");
+        cris.require("dojox/form/Uploader");
+        cris.require("dojox/form/uploader/FileList");
+        cris.require("dojox/form/uploader/plugins/IFrame");
+        cris.require("dojox/data/JsonRestStore");
+
+        cris.ready(function(){
+            <spring:url value="/filestorages" var="url"/>
+            <spring:url value="/ifupload" var="urlUpload"/>
+
+            storeFileStorages = createJsonRestStore("${url}");
+
+            var path="sz";
+            var gridFileStorages ;
+            var options;
+            var loc;
+            var data2;
+
+            // <![CDATA[
+            function listDirs(){
+            }
+
+            function initTransfer(){
+                var destId = dijit.byId("dest_storage_id").attr('value');
+                var sourceId = dijit.byId("source_storage_id").attr('value');
+                var item = gridFileStorages.selection.getSelected("row")[0];
+
+                if (!item) {
+                    showMessage("Please select a file");
+                } else if (sourceId == destId){
+                    showMessage("Source and destination cannot be the same");
+                } else {
+                    var yes = showConfirm("Do you want to move the file: " + item.location + " ?");
+                    if (yes) {
+                        var pd = createProgressDialog();
+                        var queryString = "destId=" + destId + "&fileId=" + item.id;
+                        dojo.xhrGet({
+                            url: "transfer/initiateTransfer?"  + queryString,
+                            handleAs: "json",
+                            load: function(data) {
+                                if (data.succeeded) {
+                                    pd.setContent("File transferred.");
+                                } else {
+                                    pd.setContent("Error:\n" + data.message);
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+
+            dojo.connect(dijit.byId("buttonTransfer"), "onClick", initTransfer);
+
+            dojo.connect(dijit.byId("uploader"), "onChange", function(evt) {
+                dojo.byId("id_message").innerHTML = "";
+            });
+
+            dojo.connect(dijit.byId("id_button_upload"), "onClick", function(evt){
+                var request = {};
+
+                dojo.io.iframe.send({
+                    url: "${urlUpload}",
+                    method: "POST",
+                    form: "id_form_file_upload",
+                    content: request,
+                    handleAs: "json",
+                    load: function(response) {
+                        dojo.byId("id_message").innerHTML = "File(s) saved successfully.";
+                    },
+                    error: function(err, ioArgs) {
+                        dojo.byId("id_message").innerHTML = "Failed to save file(s).";
+                    }
+                });
+            });
+
+            var fileStoragesLayout = [{cells: [
+                    { field: 'id', name: 'ID', datatype: "number", width: '50px' },
+                    { field: 'source', name: 'Source', width: 'auto' },
+                    { field: 'location', name: 'Location', datatype: "number", width: 'auto' },
+                ]}];
+            var asc = true;
+            var args = {
+                rowsPerPage: 10,
+                pageSizes: []
+            };
+            args.sortFields = [{attribute: "location", descending: !asc}];
+            gridFileStorages = createGrid(storeFileStorages, fileStoragesLayout, "directoriesDiv", args);
+
+            var sourceStorage = dijit.byId("source_storage_id");
+            dojo.connect(sourceStorage, "onChange", function(value) {
+                gridFileStorages.setQuery({storageId: value});
+            });
+
+        });
+
+    // ]]>
+    </script>
+
+    <div style="width:45%; float: left">
+
+        <form data-dojo-type="dijit.form.Form">
+            <p>Source Storage:</p>
+            <select id="source_storage_id" data-dojo-type="dijit.form.FilteringSelect">
+                <c:forEach items="${storages}" var="item">
+                    <option value="${item.id}">${item.name}</option>
+                </c:forEach>
+            </select>
+
+            <p>Destination Storage:</p>
+            <select id="dest_storage_id" data-dojo-type="dijit.form.FilteringSelect">
+                <c:forEach items="${storages}" var="item">
+                    <option value="${item.id}">${item.name}</option>
+                </c:forEach>
+            </select>
+
+            <p><!-- --></p>
+
+            <input id="buttonTransfer" type="button" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Transfer'"/>
+        </form>
+        <br/>
+
+        <hr/>
+
+        <table style="width: 100%;">
+            <tr>
+                <td>
+                    <form id="id_form_file_upload" method="POST" enctype="multipart/form-data" data-dojo-type="dijit.form.Form">
+                        <fieldset style="width: 95%;">
+                            <legend>Upload Files into Storage</legend>
+                            <input class="browseButton" id="uploader" name="uploadedfile" type="file" data-dojo-type="dojox.form.Uploader" data-dojo-props='label: "Browse for File(s)", multiple: "true" '/>
+                            <div id="files" data-dojo-type="dojox.form.uploader.FileList" data-dojo-props='uploaderId: "uploader"'><!-- --></div>
+
+                            <p><!-- --></p>
+                            <div class="errors" id="id_message"><!-- --></div>
+                            <p><!-- --></p>
+
+                            <input id="id_button_upload" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Upload"'/>
+                        </fieldset>
+                    </form>
+                </td>
+            </tr>
+        </table>
+
+    </div>
+
+    <div style="width:45%; float: right">
+        <div id="directoriesDiv">
+            <!-- ff problem  -->
+        </div>
+    </div>
+
+</jsp:root>

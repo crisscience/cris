@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE tiles-definitions PUBLIC "-//Apache Software Foundation//DTD Tiles Configuration 2.1//EN" "http://tiles.apache.org/dtds/tiles-config_2_1.dtd">
+<tiles-definitions>
+    <definition extends="default" name="vocabularys/index">
+        <put-attribute name="body" value="/WEB-INF/views/vocabularys/index.jspx"/>
+    </definition>
+     <definition extends="default" name="vocabularys/index_old">
+        <put-attribute name="body" value="/WEB-INF/views/vocabularys/index_old.jspx"/>
+    </definition>
+     <definition extends="default" name="vocabularys/index_new">
+        <put-attribute name="body" value="/WEB-INF/views/vocabularys/index_new.jspx"/>
+    </definition>
+
+    <!-- partials -->
+    <definition extends="partial" name="vocabularys/partials/view">
+        <put-attribute name="body" value="/WEB-INF/views/vocabularys/view.jspx"/>
+    </definition>
+    <definition extends="partial" name="vocabularys/partials/view_term">
+        <put-attribute name="body" value="/WEB-INF/views/vocabularys/view_term.jspx"/>
+    </definition>
+    <definition extends="partial" name="vocabularys/partials/view_term_validator">
+        <put-attribute name="body" value="/WEB-INF/views/vocabularys/view_term_validator.jspx"/>
+    </definition>
+</tiles-definitions>

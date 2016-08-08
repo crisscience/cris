@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:fn="http://java.sun.com/jsp/jstl/functions" xmlns:tiles="http://tiles.apache.org/tags-tiles" xmlns:spring="http://www.springframework.org/tags">
+    <html>
+        <jsp:output doctype-root-element="HTML" doctype-system="about:legacy-compat" />
+
+        <jsp:directive.page contentType="text/html;charset=UTF-8" />
+
+        <spring:url value="/" var="baseUrl" scope="request" />
+        <c:set value="${baseUrl}static/${productBuildInfo.revision}" var="resourceRoot" scope="request" />
+
+        <c:set value="${resourceRoot}/js" var="jsRoot" scope="request" />
+        <c:set value="${resourceRoot}/styles" var="stylesRoot" scope="request" />
+        <c:set value="${resourceRoot}/images" var="imagesRoot" scope="request" />
+
+        <c:set value="${jsRoot}/dojo-release-1.10.3" var="dojoRoot" scope="request" />
+
+        <spring:theme code="styleSheet" var="roo_css" />
+
+        <!-- Get the user locale from the page context (it was set by Spring MVC's locale resolver) -->
+        <c:set var="locale">
+            <c:out value="${fn:replace(pageContext.response.locale.toString(), '_', '-')}" default="en" />
+        </c:set>
+
+        <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+            <!-- page title -->
+            <title>
+                <c:choose>
+                    <c:when test="${not empty page.title}">
+                        ${title}
+                    </c:when>
+                    <c:otherwise>
+                        <spring:message code="welcome_h3" arguments="CRIS" />
+                    </c:otherwise>
+                </c:choose>
+            </title>
+
+            <!-- page.favicon -->
+            <c:choose>
+                <c:when test="${not empty page.favicon}">
+                    <c:set value="${page.favicon}" var="favicon"/>
+                </c:when>
+                <c:otherwise>
+                    <c:set value="favicon.ico" var="favicon"/>
+                </c:otherwise>
+            </c:choose>
+            <c:set value="${imagesRoot}/${favicon}" var="urlFavicon" />
+            <link type="image/x-icon" rel="SHORTCUT ICON" href="${urlFavicon}"/>
+
+            <script type="text/javascript">
+                var jsver = 1.0;
+            </script>
+            <script language="Javascript1.1">
+                jsver = 1.1;
+            </script>
+            <script language="Javascript1.2">
+                jsver = 1.2;
+            </script>
+            <script language="Javascript1.3">
+                jsver = 1.3;
+            </script>
+            <script language="Javascript1.4">
+                jsver = 1.4;
+            </script>
+            <script language="Javascript1.5">
+                jsver = 1.5;
+            </script>
+            <script language="Javascript1.6">
+                jsver = 1.6;
+            </script>
+            <script language="Javascript1.7">
+                jsver = 1.7;
+            </script>
+            <script language="Javascript1.8">
+                jsver = 1.8;
+            </script>
+            <script language="Javascript1.9">
+                jsver = 1.9;
+            </script>
+            <script language="Javascript2.0">
+                jsver = 2.0;
+            </script>
+
+            <!-- Get the theme from the page context (it was set by Spring MVC's theme resolver) -->
+            <!-- TODO -->
+
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojo/resources/dojo.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojo/resources/dnd.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dijit/themes/dijit.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dijit/themes/claro/claro.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dijit/themes/claro/document.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dijit/themes/claro/Common.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dijit/themes/claro/form/Common.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dijit/themes/claro/form/Button.css"><!-- required for FF3 and Opera --></link>
+
+            <!-- dojo Grid -->
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/Common.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/EnhancedGrid.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/Pagination.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/Sorter.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/Filter.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/claro/Common.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/claro/EnhancedGrid.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/grid/enhanced/resources/claro/Filter.css"><!-- required for FF3 and Opera --></link>
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/gridx/resources/claro/Gridx.css"><!-- required for FF3 and Opera --></link>
+
+            <!-- dojo calendar -->
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/widget/Calendar/Calendar.css"><!-- required for FF3 and Opera --></link>
+
+            <!-- dojo expando -->
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/layout/resources/ExpandoPane.css"><!-- required for FF3 and Opera --></link>
+
+            <!-- dojo CheckedMultiSelect -->
+            <link rel="stylesheet" type="text/css" href="${dojoRoot}/dojox/form/resources/CheckedMultiSelect.css"><!-- required for FF3 and Opera --></link>
+
+            <style type="text/css">
+                .dojoxGrid table {
+                    margin: 0;
+                }
+
+                #borderContainer {
+                    width: 100%;
+                    height: 100%;
+                }
+            </style>
+
+            <!-- cris style sheets -->
+            <link rel="stylesheet" type="text/css" media="screen" href="${stylesRoot}/${roo_css}" />
+
+            <!-- dojo -->
+            <script type="text/javascript">
+                dojoConfig = {
+                    baseUrl: "${dojoRoot}/dojo/", // works now: set this causes problem on first page load
+                    gfxRenderer: "canvas,svg,silverlight,vml",
+                    async: true,
+                    parseOnLoad: false,
+                    locale: "${locale}",
+                    isDebug: false,
+                    popup: false
+                };
+            </script>
+            <script src="${dojoRoot}/dojo/dojo.js" type="text/javascript"><!-- required for FF3 and Opera --></script>
+
+            <!-- jquery -->
+            <script src="${jsRoot}/jquery.js" type="text/javascript"><!-- required by angular and Diagram editor using jsPlumb --></script>
+
+            <!-- AngularJS -->
+            <script src="${jsRoot}/angular.min.js" type="text/javascript"><!-- required for FF3 and Opera --></script>
+            <script src="${jsRoot}/angular-route.min.js" type="text/javascript"><!-- required for FF3 and Opera --></script>
+
+            <!-- angular-dojo.js -->
+            <script src="${jsRoot}/angular-dojo.js" type="text/javascript"><!-- required for FF3 and Opera --></script>
+
+            <!-- cris js -->
+            <!-- define base URL of cris -->
+            <script type="text/javascript">
+                cris = {
+                    baseUrl: "${baseUrl}",
+                    resourceRoot: "${resourceRoot}",
+                    jsRoot: "${jsRoot}",
+                    dojoRoot: "${dojoRoot}/dojo/",
+                    stylesRoot: "${stylesRoot}",
+                    imagesRoot: "${imagesRoot}",
+
+                    locale: "${locale}",
+
+                    modules: [
+                        "dojo/ready",
+                        "dojo/parser"
+                    ],
+
+                    require: function (module) {
+                        if (typeof(module) === "string") {
+                            cris.modules.push(module);
+                        } else if (module instanceof Array) {
+                            cris.modules = cris.modules.concat(module);
+                        }
+                    },
+
+                    ready: function (f) {
+                        require(cris.modules, function (ready) {
+                            ready(3000, function () {
+                                console.log("**** ready 3000: cris.ready");
+                                if (f instanceof Function) {
+                                    f();
+                                }
+                            });
+                        });
+                    },
+
+                    bootstrapAngular: function(elmId, moduleName) {
+                        require(["dojo/ready"], function(ready) {
+                            ready(function () {
+                                console.log("**** ready 1000: bootstrap angular app: " + moduleName + " on " + elmId);
+                                angular.bootstrap(dojo.byId(elmId), [moduleName]);
+                            });
+                        });
+                    }
+                };
+            </script>
+
+            <!--[if lt IE 9]>
+            <script src="${jsRoot}/html5shiv.js" type="text/javascript"><jsp:text/></script>
+            <![endif]-->
+
+            <script src="${jsRoot}/dm/util.js" type="text/javascript"><!-- required for FF3 and Opera --></script>
+        </head>
+
+        <body class="claro">
+            <noscript>
+            <div style="width: 600px; text-align: left; margin: auto; margin-top: 10px; padding: 10px; background-color: #ffffff;">
+                <h2 style="text-align: center">Your browser's support of Javascript is disabled</h2>
+                This application needs Javascript to run. Your browser has Javascript
+                disabled. To enable Javascript in your browser do the following:
+                <h3>Internet Explorer (IE)</h3>
+                <ol>
+                    <li>
+                        On the <span style="font-weight: bold">Tools</span> menu, click <span style="font-weight: bold">Internet Options</span>, and then click the <span style="font-weight: bold">Security</span> tab.
+                    </li>
+                    <li>
+                        Click the <span style="font-weight: bold">Internet</span> zone.
+                    </li>
+                    <li>
+                        If you do not have to customize your Internet security settings, click <span style="font-weight: bold">Default Level</span>. Then do step 4
+                        <p/>
+                        If you have to customize your Internet security settings, follow these steps:
+                        <ul>
+                            <li>
+                                Click <span style="font-weight: bold">Custom Level</span>.
+                            </li>
+                            <li>
+                                In the <span style="font-weight: bold">Security Settings</span> – <span style="font-weight: bold">Internet Zone</span> dialog box, click <span style="font-weight: bold">Enable</span> for <span style="font-weight: bold">Active Scripting</span> in the <span style="font-weight: bold">Scripting</span> section.
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        Click the <span style="font-weight: bold">Back</span> button to return to the previous page, and then click the <span style="font-weight: bold">Refresh</span> button to run scripts.
+                    </li>
+                </ol>
+
+                <h3>Firefox (FF)</h3>
+                <ol>
+                    <li>On the <span style="font-weight: bold">Tools</span> menu, click <span style="font-weight: bold">Options</span>.</li>
+                    <li>On the <span style="font-weight: bold">Content</span> tab, click to select the <span style="font-weight: bold">Enable JavaScript</span> check box.</li>
+                    <li>Click the <span style="font-weight: bold">Go back one page</span> button to return to the previous page, and then click the <span style="font-weight: bold">Reload current page</span> button to run scripts.</li>
+                </ol>
+            </div>
+            </noscript>
+
+            <div id="wrapper" style="visibility: hidden">
+                <c:if test="${not empty debug and debug eq true}">
+                    <div id="debug">
+                        <tiles:insertAttribute name="debug" ignore="true"/>
+                    </div>
+                </c:if>
+
+                <c:if test="${empty headless or headless eq false}">
+                    <div id="auth">
+                        <tiles:insertAttribute name="auth" ignore="true" />
+                    </div>
+                </c:if>
+                <div id="header">
+                    <tiles:insertAttribute name="header" ignore="true" />
+                </div>
+                <c:if test="${empty headless or headless eq false}">
+                    <div id="menu">
+                        <tiles:insertAttribute name="menu" ignore="true" />
+                    </div>
+                </c:if>
+
+                <div id="main">
+                    <tiles:insertAttribute name="body"/>
+                </div>
+
+                <div id="footer">
+                    <tiles:insertAttribute name="footer" ignore="true"/>
+                </div>
+                <div id="copyright">
+                    <tiles:insertAttribute name="copyright" ignore="true"/>
+                </div>
+
+                <div id="tile">
+                    <tiles:insertAttribute name="tile" ignore="false"/>
+                </div>
+            </div>
+
+            <script type="text/javascript">
+                // <![CDATA[
+                require(cris.modules, function(ready, parser) {
+                    ready(2000, function() {
+                        // bootstrap dojo
+                        console.log("**** ready 2000: bootstrap dojo");
+                        parser.parse().then(function(instances) {
+                            // at this point, parsing is finished
+                        });
+
+                        // at this point, parsing may not be finished
+                    });
+                });
+
+                require(cris.modules, function(ready) {
+                    ready(5000, function () {
+                        console.log("**** ready 5000: make the page visible");
+                        dojo.byId("wrapper").style.visibility = "visible";
+
+                        if (dojo.isIE < 6 || dojo.isFF < 3.6 || dojo.isSafari < 4 || dojo.isOpera < 10.50 || dojo.isChrome < 8) {
+                            var message = '';
+                            if (dojo.isIE) {
+                                message += 'Internet Explorer ' + dojo.isIE;
+                            } else if (dojo.isFF) {
+                                message += 'Firefox ' + dojo.isFF;
+                            } else if (dojo.isSafari) {
+                                message += 'Safari ' + dojo.isSafari;
+                            } else if (dojo.isOpera) {
+                                message += 'Opera ' + dojo.isOpera;
+                            } else if (dojo.isChrome) {
+                                message += 'Chrome ' + dojo.isChrome;
+                            }
+                            message += ' is not supported. You may have problem using the application.';
+                            message += '\nJavascript version: ' + jsver;
+
+                            alert(message);
+                        }
+                    });
+                });
+                // ]]>
+            </script>
+
+        </body>
+    </html>
+</jsp:root>

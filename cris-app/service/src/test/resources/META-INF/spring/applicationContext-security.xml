@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:security="http://www.springframework.org/schema/security"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+                        http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.2.xsd
+                        ">
+
+
+    <security:ldap-server id="ldapSource" url="${ldap.server.url}"/>
+
+    <bean class="org.springframework.ldap.core.LdapTemplate" id="ldapTemplate">
+        <constructor-arg ref="ldapSource"/>
+    </bean>
+
+    <bean class="edu.purdue.cybercenter.dm.security.UserDetailsServiceImpl" id="userDetailsService"/>
+
+    <bean id="aclCache" class="org.springframework.security.acls.domain.EhCacheBasedAclCache">
+        <constructor-arg>
+            <bean class="org.springframework.cache.ehcache.EhCacheFactoryBean">
+                <property name="cacheManager" ref="ehcache"/>
+                <property name="cacheName" value="aclCache"/>
+            </bean>
+        </constructor-arg>
+        <constructor-arg ref="permissionGrantingStrategy"/>
+        <constructor-arg ref="aclAuthorizationStrategy"/>
+    </bean>
+
+    <bean id="lookupStrategy" class="org.springframework.security.acls.jdbc.BasicLookupStrategy">
+        <constructor-arg ref="dataSource"/>
+        <constructor-arg ref="aclCache"/>
+        <constructor-arg ref="aclAuthorizationStrategy"/>
+        <constructor-arg ref="permissionGrantingStrategy"/>
+        <property name="permissionFactory" ref="permissionFactory"/>
+    </bean>
+
+    <bean id="permissionFactory" class="edu.purdue.cybercenter.dm.security.CustomPermissionFactory"/>
+
+    <bean id="permissionGrantingStrategy" class="edu.purdue.cybercenter.dm.security.CustomPermissionGrantingStrategy">
+        <constructor-arg>
+            <bean class="org.springframework.security.acls.domain.ConsoleAuditLogger"/>
+        </constructor-arg>
+    </bean>
+
+    <bean id="aclAuthorizationStrategy" class="edu.purdue.cybercenter.dm.security.CustomAclAuthorizationStrategyImpl">
+        <constructor-arg>
+            <list>
+                <bean class="org.springframework.security.core.authority.SimpleGrantedAuthority">
+                    <constructor-arg value="ROLE_ADMINISTRATOR"/>
+                </bean>
+                <bean class="org.springframework.security.core.authority.SimpleGrantedAuthority">
+                    <constructor-arg value="ROLE_ADMINISTRATOR"/>
+                </bean>
+                <bean class="org.springframework.security.core.authority.SimpleGrantedAuthority">
+                    <constructor-arg value="ROLE_ADMINISTRATOR"/>
+                </bean>
+            </list>
+        </constructor-arg>
+
+    </bean>
+
+    <bean id="aclService" class="org.springframework.security.acls.jdbc.JdbcMutableAclService">
+        <constructor-arg ref="dataSource"/>
+        <constructor-arg ref="lookupStrategy"/>
+        <constructor-arg ref="aclCache"/>
+        <property name="classIdentityQuery" value="select currval(pg_get_serial_sequence('acl_class','id'))"/>
+        <property name="sidIdentityQuery" value="select currval(pg_get_serial_sequence('acl_sid','id'))"/>
+    </bean>
+
+    <security:global-method-security pre-post-annotations="enabled" proxy-target-class="true">
+        <security:expression-handler ref="expressionHandler"/>
+    </security:global-method-security>
+
+    <bean id="expressionHandler" class="edu.purdue.cybercenter.dm.security.CustomMethodSecurityExpressionHandler">
+        <property name="permissionEvaluator" ref="permissionEvaluator"/>
+    </bean>
+
+    <bean id="permissionEvaluator" class="edu.purdue.cybercenter.dm.security.CustomAclPermissionEvaluator">
+        <constructor-arg ref="aclService"/>
+        <property name="permissionFactory" ref="permissionFactory"/>
+    </bean>
+
+    <security:authentication-manager alias="authenticationManager">
+        <security:authentication-provider user-service-ref="userDetailsService">
+            <security:password-encoder hash="sha-256">
+                <security:salt-source user-property="salt"/>
+            </security:password-encoder>
+        </security:authentication-provider>
+
+        <!-- used with the local test server -->
+        <!--
+        <security:ldap-authentication-provider server-ref="ldapSource" user-dn-pattern="uid={0},ou=people" user-search-base="ou=people" user-search-filter="uid={0}" group-search-base="ou=groups" group-search-filter="member={0}" user-context-mapper-ref="userDetailsService">
+        </security:ldap-authentication-provider>
+        -->
+        <security:ldap-authentication-provider server-ref="ldapSource" user-dn-pattern="uid={0},ou=authenticate,dc=purdue,dc=edu" user-search-filter="uid={1}" user-search-base="ou=authenticate,dc=purdue,dc=edu" group-search-filter="uid={1}" group-search-base="ou=authorize,dc=purdue,dc=edu" user-context-mapper-ref="userDetailsService">
+        </security:ldap-authentication-provider>
+    </security:authentication-manager>
+
+</beans>

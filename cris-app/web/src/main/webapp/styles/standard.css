@@ -1,0 +1,577 @@
+/* main elements */
+body, div, td {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    color: #555555;
+}
+
+body {
+    background-color: #777777;
+    text-align: center;
+    margin: 0px;
+}
+
+#wrapper {
+    width: 980px;
+    min-width: 980px;
+    max-width: 980px;
+    margin-right: auto;
+    margin-left: auto;
+    background-color: #ffffff;
+
+    overflow: hidden;
+    display: block;
+}
+
+#debug {
+}
+
+#auth {
+    margin: 4px;
+    margin-left: 1em;
+    margin-right: 1em;
+}
+
+#header {
+}
+
+#menu {
+}
+
+#main {
+    overflow: hidden;
+    display: block;
+    margin: 1em;
+}
+
+#footer {
+    background-color: #D8B600;
+    height: 5em;
+}
+
+#copyright {
+    margin: 4px;
+    margin-left: 1em;
+    margin-right: 1em;
+}
+
+.floatLeft {
+    float: left;
+}
+
+.floatRight {
+    float: right;
+}
+
+.floatRightToButton {
+    display: inline;
+    float: right;
+    padding-top: 10px;
+}
+
+.halfMinus {
+    width: 49%
+}
+
+.halfPlus {
+    width: 51%
+}
+
+.half {
+    width: 50%
+}
+
+.third {
+    width: 32%
+}
+
+.twoThirds {
+    width: 66%
+}
+
+.oneTenth {
+    width: 9%
+}
+
+.twoTenths {
+    width: 19%
+}
+
+.threeTenths {
+    width: 29%
+}
+
+.fourTenths {
+    width: 39%
+}
+
+.fiveTenths {
+    width: 49%
+}
+
+.sixTenths {
+    width: 59%
+}
+
+.sevenTenths {
+    width: 69%
+}
+
+.eightTenths {
+    width: 79%
+}
+
+.nineTenths {
+    width: 89%
+}
+
+.clearBoth {
+    clear: both;
+}
+
+.instruction {
+    background-color: #D8B600;
+    padding: 10px;
+    color: #333333;
+}
+
+.quicklinks {
+    clear:both;
+    padding-bottom: 15px
+}
+.quicklinks span {
+    float: right;
+}
+
+table.navigation {
+    border: 0px;
+}
+
+table.borderless {
+    border: 0px;
+    /*
+    background: #FFFFFF;
+    */
+    margin: 0 0 0 0;
+    width: 100%
+}
+
+table.borderless tr, table.borderless td {
+    border: 0px;
+}
+
+label {
+    width:120px;
+    float:left;
+}
+
+input, textarea, select {
+    border:1px solid #B3B3B3;
+    resize: none;
+}
+
+input.image {
+    border: none;
+    height: auto;
+}
+
+div {
+    text-align: left;
+}
+
+div .box {
+    display:block;
+    margin-left:105px;
+}
+
+/* menu elements*/
+
+/*a.menu, a.menu:link, a.menu:visited {display:block; width:150px; height:25px;}*/
+
+/* text styles */
+
+.claro h1,h2,h3,h4,h5,h6 {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #D8B600;
+}
+
+.claro h1 {
+    font-size: 22px;
+}
+
+.claro h2 {
+    font-size: 20px;
+}
+
+.claro h3 {
+    font-size: 18px;
+}
+
+.claro h4 {
+    font-size: 16px;
+}
+
+.claro h5 {
+    font-size: 14px;
+}
+
+.claro h6 {
+}
+
+.errors {
+    color: red;
+    font-weight: bold;
+    display: block;
+}
+
+.error {
+    color: red;
+    font-weight: bold;
+}
+
+.warn {
+    background-color: #D8B600;
+    color: #333333;
+}
+
+.info {
+    background-color: #D8B600;
+    color: #333333;
+}
+
+a {
+    text-decoration: underline;
+}
+
+a img {
+    border: 0 none;
+    vertical-align: middle;
+}
+
+a:link {
+    color: #D8B600;
+}
+
+a:hover {
+}
+
+a:active {
+    color: #D8B600;
+}
+
+a:visited {
+    color: #777777;
+}
+
+li {
+    padding-top: 5px;
+    text-align: left;
+}
+
+ul li {
+    margin:0 0 0.25em 0;
+    padding:0;
+}
+
+/* table elements */
+.form table {
+    width: 100%;
+    background: #EEEEEE;
+    margin: 2px 0 0 0;
+    border: 1px solid #BBBBBB;
+    border-collapse: collapse;
+}
+
+.form table table {
+    width: 100%;
+    margin: -5px 0;
+    border: 0px solid #e0e7d3;
+    width: 100%;
+}
+
+.form table td, .form table th {
+    padding: 2px;
+    border: 1px solid #CCCCCC;
+}
+
+.form table td form {
+    text-align:center;
+    vertical-align: middle;
+    margin: 0px;
+}
+
+.form table th {
+    font-size: 0.9em;
+    text-align: left;
+    font-weight: bold;
+    color: #FFF;
+    background: #999;
+}
+
+.form table thead {
+    font-weight: bold;
+    font-style: italic;
+    background-color: #BBBBBB;
+}
+
+.form tr:nth-child(odd) {
+    background-color: #EFEFEF;
+}
+
+.form tr:nth-child(even) {
+    background-color: #FFFFFF;
+}
+
+/*
+table a:link {color: #303030;}
+*/
+caption {
+    caption-side: top;
+    width: auto;
+    text-align: left;
+    color: #848f73;
+    padding-bottom: 4px;
+}
+
+fieldset {
+    background: #e0e7d3;
+    padding: 8px;
+    padding-bottom: 12px;
+    border: none;
+    width: 560px;
+}
+
+legend {
+    font-size: 14px;
+    text-align: left;
+    color: #D8B600;
+    font-weight: bold;
+}
+
+/*
+fieldset label {
+    width: 70px;
+    float: left;
+    margin-top: 1.7em;
+    margin-left: 20px;
+}
+
+fieldset textfield {
+    margin: 3px;
+    height: 20px;
+    background: #e0e7d3;
+}
+
+fieldset textarea {
+    margin: 3px;
+    height: 165px;
+    background: #e0e7d3;
+}
+
+fieldset input {
+    margin: 3px;
+    height: 20px;
+    background: #e0e7d3;
+}
+
+fieldset table {
+    width: 100%;
+}
+
+fieldset th {
+    padding-left: 25px;
+}
+*/
+
+.table-buttons {
+    background-color:#fff;
+    border:none;
+}
+
+.table-buttons td {
+    border:none;
+}
+
+.submit input {
+    border: 1px solid #BBBBBB;
+    color:#777777;
+    padding:2px 7px;
+    font-size:11px;
+    /*
+        text-transform:uppercase;
+    */
+    font-weight:bold;
+    height:24px;
+}
+
+.updated {
+    background:#ecf1e5;
+    font-size:11px;
+    margin-left:2px;
+    border:4px solid #ecf1e5;
+}
+
+.updated td {
+    padding:2px 8px;
+    font-size:11px;
+    color:#888888;
+}
+
+/*
+.dijitTextArea{
+    min-height:5.5em !important;
+    max-height:22em !important;
+    overflow-y: auto !important;
+}
+
+.RichTextEditable{
+    min-height:18em !important;
+    max-height:18em !important;
+}
+*/
+
+.flag {
+    width: 16px;
+}
+
+/* Customization
+.tundra .dijitCalendarMonthMenu .dijitCalendarMonthLabelHover {
+    background-color: #D8B600;
+    color: #FFFFFF;
+}
+
+.tundra .dijitMenuPassive .dijitMenuItemHover, .tundra .dijitMenuItemSelected {
+    background-color: #D8B600;
+    color: #FFFFFF;
+}
+
+.claro .dijitMenuPassive .dijitMenuItemHover, .claro .dijitMenuItemSelected {
+    background-color: #D8B600;
+    color: #FFFFFF;
+}
+*/
+.claro .dijitSelectMenu .dijitMenuItemHover td, .claro .dijitSelectMenu .dijitMenuItemSelected td, .claro .dijitMenuItemHover, .claro .dijitMenuItemSelected {
+    background-color: #D8B600;
+}
+
+.claro .dijitTextBox {
+    width: 240px;
+}
+
+.claro .dijitTextArea {
+    width: 236px;
+}
+
+.claro .dojoxCheckedMultiSelectWrapper {
+    width: 223px;
+}
+
+.claro table td .dijitTextBox {
+    width: 100%;
+}
+
+.claro table td .dijitTextArea {
+    width: 99%;
+}
+
+.claro table td .dijitEditor {
+    width: 100%;
+}
+
+/*
+.claro .dojoxGridFDTitlePane .dijitTextBox {
+    width: 130px;
+}
+*/
+
+.claro select {
+    width: 240px;
+}
+
+.browseButton {
+    width: 300px;
+    height: 30px;
+    margin: 1px 0 1px 0;
+    display: block;
+}
+
+.left {
+    text-align: left;
+}
+
+.center {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
+}
+
+.inlineIcon {
+    vertical-align: middle;
+}
+
+.termNameLabel {
+    display: inline-block;
+    width: 150px;
+}
+
+.termIndexLabel {
+    display: inline-block;
+    width: 50px;
+}
+
+.selectedSearchHit table tbody tr th {
+    background-color: #0000ff;
+}
+
+.searchform > .searchsubmit {
+    width: 14%;
+    height: 25px;
+    background: transparent url(images/icon_magnify.png) 0 0 no-repeat;
+    margin: -2px 0 0 0;
+}
+
+.projectIcon {
+    background-image: url("../images/famfamfam_silk_icons_v013/icons/application_cascade.png");
+    width: 16px;
+    height: 16px;
+}
+
+.experimentIcon {
+    background-image: url("../images/famfamfam_silk_icons_v013/icons/application_double.png");
+    width: 16px;
+    height: 16px;
+}
+
+.jobIcon {
+    background-image: url("../images/famfamfam_silk_icons_v013/icons/table.png");
+    width: 16px;
+    height: 16px;
+}
+
+.jobHasDataIcon {
+    background-image: url("../images/famfamfam_silk_icons_v013/icons/table.png");
+    width: 16px;
+    height: 16px;
+}
+
+.jobNoDataIcon {
+    background-image: url("../images/famfamfam_silk_icons_v013/icons/bullet_white.png");
+    width: 16px;
+    height: 16px;
+}
+
+.overlayDiv {
+    width: 99%;
+    height: 99%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    background-color: white;
+    display: none;
+    margin: 4px;
+    border: 1px solid lightgray;
+}

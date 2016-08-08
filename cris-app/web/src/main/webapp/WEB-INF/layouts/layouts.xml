@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC "-//Apache Software Foundation//DTD Tiles Configuration 2.1//EN" "http://tiles.apache.org/dtds/tiles-config_2_1.dtd">
+
+<tiles-definitions>
+    <definition name="default" template="/WEB-INF/layouts/default.jspx">
+        <put-attribute name="debug" value="/WEB-INF/views/debug.jspx" />
+        <put-attribute name="auth" value="/WEB-INF/views/auth.jspx" />
+        <put-attribute name="header" value="/WEB-INF/views/header.jspx" />
+        <put-attribute name="body" value="/WEB-INF/views/index.jspx" />
+        <put-attribute name="footer" value="/WEB-INF/views/footer.jspx" />
+        <put-attribute name="copyright" value="/WEB-INF/views/copyright.jspx" />
+        <put-attribute name="tile" value="/WEB-INF/views/tile.jspx" />
+    </definition>
+
+    <definition name="partial" template="/WEB-INF/layouts/partial.jspx">
+        <put-attribute name="body" />
+    </definition>
+</tiles-definitions>

@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vocabulary
+    xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd"
+    uuid="51c5ddd0-09a2-11e2-892e-0800200c9a66">
+
+    <domain>Acme</domain>
+    <name>Acme HPLC Vocabulary</name>
+    <description>Acme Vocabulary for HPLC</description>
+    <contributors>
+        <contributor>John Doe</contributor>
+        <contributor>Jane Doe</contributor>
+    </contributors>
+    <copyright>(C)2011 Purdue University</copyright>
+
+    <terms>
+        <term uuid="516186c0-cdef-11e2-8b8b-0800200c9a66">
+            <name>Boolean</name>
+            <description>A Boolean</description>
+            <validation>
+                <validator type="boolean">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="885ab520-cdef-11e2-8b8b-0800200c9a66">
+            <name>Number</name>
+            <description>A Number</description>
+            <validation>
+                <validator type="numeric">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="c3f83e40-cdef-11e2-8b8b-0800200c9a66">
+            <name>String</name>
+            <description>A String</description>
+            <validation>
+                <validator type="text">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="ef4737c0-ce00-11e2-8b8b-0800200c9a66">
+            <name>Date</name>
+            <description>A Date</description>
+            <validation>
+                <validator type="date-time">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="01059b50-ce01-11e2-8b8b-0800200c9a66">
+            <name>Time</name>
+            <description>A Time</description>
+            <validation>
+                <validator type="date-time">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="0ecfba40-ce01-11e2-8b8b-0800200c9a66">
+            <name>DateTime</name>
+            <description>A DateTime</description>
+            <validation>
+                <validator type="date-time">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="f3b15fc0-cdec-11e2-8b8b-0800200c9a66">
+            <name>File</name>
+            <description>A File</description>
+            <validation>
+                <validator type="file">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="137ac8a0-cfaa-11e2-8b8b-0800200c9a66">
+            <name>Fruits</name>
+            <description>A List</description>
+            <validation>
+                <validator type="list">
+                    <property name="item" id="1">Apple</property>
+                    <property name="item" id="2">Banana</property>
+                    <property name="item" id="3">Cantaloupe</property>
+                    <property name="item" id="4">Grape</property>
+                    <property name="item" id="5">Honeydew</property>
+                    <property name="item" id="6">Orange</property>
+                    <property name="item" id="7">Pear</property>
+                    <property name="item" id="8">Watermelon</property>
+                    <property name="isMultiSelect">true</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="ef8955b0-723e-11e2-bcfd-0800200c9a66">
+            <name>hplc_id</name>
+            <description>HPLC ID</description>
+            <validation>
+                <validator type="text" >
+                </validator>
+            </validation>
+        </term>
+        <term uuid="f3585f10-723e-11e2-bcfd-0800200c9a66">
+            <name>hplc_name</name>
+            <description>HPLC Name</description>
+            <validation>
+                <validator type="text" >
+                </validator>
+            </validation>
+        </term>
+        <term uuid="f8171950-6f01-11e2-bcfd-0800200c9a66">
+            <name>hplc_owner</name>
+            <description>HPLC Owner</description>
+            <validation>
+                <validator type="text" >
+                </validator>
+            </validation>
+        </term>
+        <term uuid="ff9c73f0-6f01-11e2-bcfd-0800200c9a66">
+            <name>make</name>
+            <description>Make</description>
+            <validation>
+                <validator type="text">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="614c46b0-6f03-11e2-bcfd-0800200c9a66">
+            <name>hplc_desc</name>
+            <description>Description </description>
+            <validation>
+                <validator type="text">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="ea68fbf0-6f03-11e2-bcfd-0800200c9a66">
+            <name>model</name>
+            <description>Model</description>
+            <validation>
+                <validator type="text">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="ae0aa4a2-8d87-11e1-b0c4-0800200c9a66">
+            <name>serial_number </name>
+            <description>Serial Number</description>
+            <validation>
+                <validator type="text">
+                </validator>
+            </validation>
+        </term>
+        <term uuid="1dbd2910-6f02-11e2-bcfd-0800200c9a66">
+            <name>Diameter</name>
+            <description>Seperation column diameter</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, +infinity]</property>
+                    <property name="minPrecision">2</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="25398300-6f02-11e2-bcfd-0800200c9a66">
+            <name>length</name>
+            <description>Seperation column length</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, +infinity]</property>
+                    <property name="minPrecision">2</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="2bd5b620-6f02-11e2-bcfd-0800200c9a66">
+            <name>seperation_column_enabled</name>
+            <description>Whether the separation column is available or not</description>
+            <validation>
+                <validator type="boolean">
+                </validator>
+            </validation>
+        </term>
+    </terms>
+</vocabulary>

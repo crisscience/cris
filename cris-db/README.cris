@@ -1,0 +1,6 @@
+If this is a new installation or you want to give your database a fresh new start
+    1) cd run_once_on_new_installation
+    2) create_user_and_db
+
+To bring you database up to date
+    1) bin/migrate --path=cris up

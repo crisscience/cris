@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/tiles" var="url"/>
+    <spring:url value="/shortcuts" var="urlShortcuts"/>
+    <spring:url value="/smallobjects" var="urlSmallObjects"/>
+    <spring:url value="/tiles/parameters" var="urlParameters"/>
+
+    <script type="text/javascript">
+        // <![CDATA[
+
+        cris.require('dijit/form/FilteringSelect');
+        cris.require('dijit/form/Form');
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/RadioButton");
+        cris.require("dijit/form/DateTextBox");
+        cris.require("dijit/form/TextBox");
+        cris.require("dijit/form/Textarea");
+        cris.require("dojox/data/JsonRestStore");
+
+        function updateHtml(item) {
+            dojo.byId("idId").innerHTML = item.id || "";
+            dijit.byId("idName").setValue(item.name || "");
+            dijit.byId("idDescription").setValue(item.description || "");
+            dijit.byId("idHtml").setValue(item.html || "");
+            dijit.byId("idStyle").setValue(item.style || "");
+            dijit.byId("idLocation").setValue(item.location || "");
+            dojo.byId("timeCreated").innerHTML = item.timeCreated ? item.timeCreated.$date : "";
+            dojo.byId("lastUpdated").innerHTML = item.timeUpdated ? item.timeUpdated.$date : "";
+        }
+
+        function updateItem(item) {
+            store.setValue(item, "name", dijit.byId("idName").getValue());
+            store.setValue(item, "description", dijit.byId("idDescription").getValue());
+            store.setValue(item, "html", dijit.byId("idHtml").getValue());
+            store.setValue(item, "style", dijit.byId("idStyle").getValue());
+            store.setValue(item, "location", dijit.byId("idLocation").getValue());
+        }
+
+        function isModified(item) {
+
+            var name = dijit.byId("idName").getValue();
+            var description = dijit.byId("idDescription").getValue();
+            var html = dijit.byId("idHtml").getValue();
+            var style = dijit.byId("idStyle").getValue();
+            var location = dijit.byId("idLocation").getValue();
+
+            var isModified = false;
+            if ((item.name !== name)) {
+                isModified = true;
+            } else if (item.description !== description) {
+                isModified = true;
+            } else if (item.htlp !== html) {
+                isModified = true;
+            } else if (item.style !== style) {
+                isModified = true;
+            } else if (item.location !== location) {
+                isModified = true;
+            }
+
+            return isModified;
+        }
+
+        function saveItem(item) {
+            var modified = isModified(item);
+            if (modified) {
+                var yes = showConfirm("Do you want to save the changes?");
+                if (yes) {
+                    updateItem(item);
+                    var pd = createProgressDialog();
+                    store.save({
+                        onComplete: function(data) {
+                            pd.hide();
+                            if (data.error) {
+                                showMessage(data.error);
+                            } else if (data.message) {
+                                showMessage(data.message);
+                            }
+                        },
+                        onError: function(error) {
+                            pd.hide();
+                            showMessage("Failed to save changes. " + error.responseText);
+                        }
+                    });
+                }
+            } else {
+                showMessage("No change is made");
+                return;
+            }
+        }
+
+        function deleteItem(item) {
+            var pd = createProgressDialog();
+            store.deleteItem(item);
+            store.save({
+                onComplete: function(data) {
+                    var xhr = data[0].deferred.ioArgs.xhr.response;
+                    if(xhr ==""){
+                        grid.setQuery({});
+                        pd.hide();
+                    }else{
+                        var object = JSON.parse(xhr);
+                        if(object.message){
+                            updateHtml(item);
+                            grid.setQuery({});
+                            pd.setContent("Failed to save changes. " + object.message);
+                        }
+                    }
+                },
+                onError: function(error) {
+                    pd.setContent("Failed to delete tile. " + error);
+                }
+            });
+        }
+
+        creatingNew = false;
+
+        cris.ready(function() {
+            store = createJsonRestStore("${url}");
+            storeShortcuts = createJsonRestStore("${urlShortcuts}");
+            storeSmallObjects = createJsonRestStore("${urlSmallObjects}");
+
+            var editor = new dijit.Editor({}, "description");
+            editor.startup();
+
+            var layout = [{cells: [
+                        {field: 'id', name: 'ID', datatype: "number", width: '40px'},
+                        {field: 'name', name: 'name', width: 'auto'},
+                        {field: 'timeCreated', name: 'Time Created', width: '100px', get: function(row, item) {
+                                if (!item) {
+                                    return "Loading...";
+                                }
+                                return stringDate(item.timeCreated);
+                            }},
+                        {field: 'timeUpdated', name: 'Time Updated', width: '100px', get: function(row, item) {
+                                if (!item) {
+                                    return "Loading...";
+                                }
+                                return stringDate(item.timeUpdated);
+                            }}
+                    ]}];
+
+            var asc = true;
+            var args = {
+                sortFields: [{attribute: "name", descending: !asc}]
+            };
+
+            grid = createGrid(store, layout, "idGrid", args);
+            grid.setSortIndex(1, asc);
+            if ("${filter}" !== "") {
+                grid.setQuery({filter: "${filter}"});
+            }
+
+            dojo.connect(grid, "onSelected", function(index) {
+                dojo.byId("detailPrompt").innerHTML = "Edit an existing tile";
+                creatingNew = false;
+                var item = grid.getItem(index);
+                updateHtml(item);
+            });
+
+            var buttonNew = dijit.byId("idNewButton");
+            dojo.connect(buttonNew, "onClick", function(evt) {
+                dojo.byId("detailPrompt").innerHTML = "Create a new tile";
+                creatingNew = true;
+                grid.selection.deselectAll();
+                updateHtml({});
+            });
+
+            var buttonDelete = dijit.byId("idDeleteButton");
+            dojo.connect(buttonDelete, "onClick", function(evt) {
+                var item = grid.selection.getSelected("row")[0];
+                if (!item) {
+                    showMessage("Please select a tile");
+                    return;
+                }
+
+                var yes = showConfirm("Do you want to delete tile " + item.name + "?");
+                if (!yes) {
+                    return;
+                }
+
+                deleteItem(item);
+
+                item = grid.selection.getSelected("row")[0];
+                if (item !== null) {
+                    updateHtml(item);
+                } else {
+                    updateHtml({});
+                }
+            });
+
+            var buttonSave = dijit.byId("idSaveButton");
+            dojo.connect(buttonSave, "onClick", function(evt) {
+                var item;
+                if (creatingNew) {
+                    item = store.newItem();
+                } else {
+                    if (grid.selection.getSelectedCount("row") >= 1) {
+                        item = grid.selection.getSelected("row")[0];
+                    } else {
+                        showMessage("Please select a tile");
+                        return;
+                    }
+                }
+
+                saveItem(item);
+            });
+
+            var shortcutList = new dijit.form.FilteringSelect({
+                id: "idSelectShortcut",
+                name: "shortcutId",
+                store: this.storeShortcuts,
+                query: {showAllStatus: true},
+                autoComplete: true
+            }, "idSelectShortcut");
+
+            var imageList = new dijit.form.FilteringSelect({
+                id: "idSelectImage",
+                name: "imageId",
+                store: this.storeSmallObjects,
+                query: {showAllStatus: true},
+                autoComplete: true
+            }, "idSelectImage");
+        });
+        // ]]>
+    </script>
+
+    <div style="width: 49%; float: left">
+        <h2>Tiles</h2>
+
+        <input id="idNewButton" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'New'"/>
+        <input id="idDeleteButton" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Delete'"/>
+        <br/>
+        <div id="idGrid"><!-- fix ff problem --></div>
+    </div>
+
+    <div style="width: 49%; float: right">
+        <form id="idForm" data-dojo-type="dijit.form.Form">
+            <h2>Details</h2>
+            <div id="detailPrompt" style="text-align: center">No tile selected</div>
+            <div>
+                <table style="width: 100%">
+                    <tr>
+                        <td style="width: 30%">ID:</td><td id="idId"  style="width: 70%"><!-- fix ff problem --></td>
+                    </tr>
+                    <!--
+                    <tr>
+                        <td>Parent:</td><td><input id="idParent" data-dojo-type="dijit.form.FilteringSelect"/></td>
+                    </tr>
+                    -->
+                    <tr>
+                        <td>Name:</td><td class="tdTextBox"><input id="idName" data-dojo-type="dijit.form.TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Description:</td><td class="tdTextBox"><input id="idDescription" data-dojo-type="dijit.form.TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>HTML:</td><td class="tdTextBox"><input id="idHtml" data-dojo-type="dijit.form.TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Shortcut:</td><td class="tdTextBox"><input id="idSelectShortcut" /></td>
+                    </tr>
+                    <tr>
+                        <td>Image:</td><td class="tdTextBox"><input id="idSelectImage" /></td>
+                    </tr>
+                    <tr>
+                        <td>Style:</td><td class="tdTextBox"><input id="idStyle" data-dojo-type="dijit.form.TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Location:</td><td class="tdTextBox"><input id="idLocation" data-dojo-type="dijit.form.TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div style="float: right">
+                <input id="idSaveButton" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label : "Save"'/>
+            </div>
+        </form>
+    </div>
+
+    <br style="clear: both"/>
+
+</jsp:root>

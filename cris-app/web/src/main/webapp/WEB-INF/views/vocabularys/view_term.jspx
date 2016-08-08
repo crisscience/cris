@@ -1,0 +1,556 @@
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <div>
+        <script type="text/ng-template" id="view_term_empty">
+        <div>
+            <h2>{{emptyMessage}}</h2>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_vocabulary_metadata">
+        <div>
+            <table class="form" style="width: 100%">
+                <tr>
+                    <td style="width: 30%">ID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.id' read-only='true'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 30%">UUID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uuid' read-only='true'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Version:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.version'/>
+                    </td>
+                </tr>
+                <tr ng-show="ngModel.id">
+                    <td>Time Updated:</td>
+                    <td>
+                        <cris-vocabulary-version data-ng-model='ngModel' root-parent-scope="rootParentScope"></cris-vocabulary-version>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Domain:</td>
+                    <td>
+                        <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="" data-ng-model="ngModel.domain"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Name:</td>
+                    <td>
+                        <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="" data-ng-model="ngModel.name"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Description:</td>
+                    <td>
+                        <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="" data-ng-model="ngModel.description"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Copyright:</td>
+                    <td>
+                        <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="" data-ng-model="ngModel.copyright"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Contributors:</td>
+                    <td>
+                        <cris-item-list items="ngModel.contributors.contributor"><!-- --></cris-item-list>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_attachto">
+        <div>
+            <table class="form" style="width: 100%">
+                <tr>
+                    <td style="width: 30%">UUID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uuid' read-only='true'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Version:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.version'/>
+                        
+                        <!-- Delete Invalid Term Button -->
+                        <div data-ng-hide="rootParentScope.template.selectedTerm.isTermValid">
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Invalid Term - Delete"' data-ng-click="rootParentScope.deleteInvalidTerm(rootParentScope.deleteTermCallback)"/>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>UI Display Order:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uiDisplayOrder'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>ID Field:</td>
+                    <td>
+                        <cris-select items="{{ngModel.fieldList}}" item="ngModel.idField" value="{{ngModel.idField}}"><!-- --></cris-select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Name Field:</td>
+                    <td>
+                        <cris-select items="{{ngModel.fieldList}}" item="ngModel.nameField" value="{{ngModel.nameField}}"><!-- --></cris-select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Use Alias:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props='regExp: "^(?!_)[a-zA-Z0-9_]*$", invalidMessage: "Characters allowed: alphanumeric and underscore (underscore cannot be first character)"' data-ng-model='ngModel.useAlias'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Description:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.description'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Query:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.query'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Default Value:</td>
+                    <td>
+                        <cris-term-default-value data-ng-model="ngModel"></cris-term-default-value>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Required?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="required"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Read Only?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="readOnly"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr>
+                    <td>List?</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.list'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr data-ng-show="ngModel.list">
+                    <td>Display as Grid:</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.grid'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Show Expression</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="" data-ng-model='ngModel.showExpression'/>
+                    </td>
+                </tr>
+                <!--
+                <tr>
+                    <td>Validation:</td>
+                    <td>
+                        <cris-term-validator data-ng-model='ngModel.validation.validator[0]'></cris-term-validator>
+                    </td>
+                </tr>
+                -->
+            </table>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_reference">
+        <div>
+            <table class="form" style="width: 100%">
+                <tr>
+                    <td style="width: 30%">UUID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uuid'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Version:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.version'/>
+                        
+                        <!-- Update Term Version Buttons -->
+                        <div data-ng-show="rootParentScope.getCurrentView()==='template' &amp;&amp; !rootParentScope.template.selectedTerm.isLatest &amp;&amp; rootParentScope.template.selectedTerm.isTermValid">
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Update Term to Latest Version"' data-ng-click="rootParentScope.updateTermToLatestVersion(true)"/>
+                        </div>
+                        <div data-ng-show="rootParentScope.getCurrentView()==='vocabulary' &amp;&amp; !rootParentScope.vocabulary.selectedTerm.isLatest &amp;&amp; rootParentScope.vocabulary.selectedTerm.isTermValid">
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Update Term to Latest Version"' data-ng-click="rootParentScope.updateTermToLatestVersion()"/>
+                        </div>
+                        
+                        <!-- Delete Invalid Term Button -->
+                        <div data-ng-hide="(rootParentScope.getCurrentView()==='template' &amp;&amp; rootParentScope.template.selectedTerm.isTermValid) || (rootParentScope.getCurrentView()==='vocabulary' &amp;&amp; rootParentScope.vocabulary.selectedTerm.isTermValid)">
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Invalid Term - Delete"' data-ng-click="rootParentScope.deleteInvalidTerm(rootParentScope.deleteTermCallback)"/>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>UI Display Order:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uiDisplayOrder'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Alias:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props='regExp: "^(?!_)[a-zA-Z0-9_]*$", invalidMessage: "Characters allowed: alphanumeric and underscore (underscore cannot be first character)"' data-ng-model='ngModel.alias'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Description:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.description'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Unit:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.unit'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Default Value:</td>
+                    <td>
+                        <cris-term-default-value data-ng-model="ngModel"></cris-term-default-value>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Required?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="required"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Read Only?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="readOnly"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.validation.validator[0].type === 'file'">
+                    <td>List?</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.list'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr data-ng-show="ngModel.list">
+                    <td>Display as Grid:</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.grid'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Show Expression</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="" data-ng-model='ngModel.showExpression'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Validation:</td>
+                    <td>
+                        <cris-term-validator data-ng-model='ngModel.validation.validator[0]'></cris-term-validator>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_composite">
+        <div>
+            <table class="form" style="width: 100%">
+                <tr ng-show="ngModel.id">
+                    <td style="width: 30%">ID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.id' read-only='true'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 30%">UUID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uuid' read-only='true'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Version:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.version'/>
+                    </td>
+                </tr>
+                <tr ng-show="ngModel.id">
+                    <td>Time Updated:</td>
+                    <td>
+                        <cris-template-version data-ng-model='ngModel' root-parent-scope="rootParentScope"></cris-template-version>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.isRoot">
+                    <td>UI Display Order:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uiDisplayOrder'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Name:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.name'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Description:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.description'/>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.isRoot">
+                    <td>Default Value:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.value'/>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.isRoot || rootParentScope.getCurrentView()==='vocabulary'">
+                    <td>Required?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="required"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.isRoot || rootParentScope.getCurrentView()==='vocabulary'">
+                    <td>Read Only?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="readOnly"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.isRoot || rootParentScope.getCurrentView()==='vocabulary'">
+                    <td>List?</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.list'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr data-ng-hide="rootParentScope.getCurrentView()==='vocabulary'">
+                    <td>Display as Grid:</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.grid'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.isRoot || rootParentScope.getCurrentView()==='vocabulary'">
+                    <td>Show Expression</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="" data-ng-model='ngModel.showExpression'/>
+                    </td>
+                </tr>
+                <!--
+                We don't do validation on composite terms and don't allow to set default values at this point
+                <tr>
+                    <td>Default Value:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.value'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Validation:</td>
+                    <td>
+                        <cris-term-validator data-ng-model='ngModel.validation.validator[0]'></cris-term-validator>
+                    </td>
+                </tr>
+                -->
+            </table>
+        </div>
+        </script>
+
+        <script type="text/ng-template" id="view_term_simple">
+        <div>
+            <table class="form" style="width: 100%">
+                <tr ng-show="ngModel.id">
+                    <td style="width: 30%">ID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.id' read-only='true'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 30%">UUID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uuid' read-only='true'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Version:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.version'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>UI Display Order:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uiDisplayOrder'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Name:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props='regExp: "^(?!_)[a-zA-Z0-9_]*$", invalidMessage: "Characters allowed: alphanumeric and underscore (underscore cannot be first character)"' data-ng-model='ngModel.name'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Description:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.description'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Unit:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-ng-model='ngModel.unit'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Default Value:</td>
+                    <td>
+                        <cris-term-default-value data-ng-model="ngModel"></cris-term-default-value>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Required?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="required"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Read Only?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="readOnly"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.validation.validator[0].type === 'file'">
+                    <td>List?</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.list'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr data-ng-show="ngModel.list">
+                    <td>Display as Grid:</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.grid'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr data-ng-hide="rootParentScope.getCurrentView()==='vocabulary'">
+                    <td>Show Expression</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="" data-ng-model='ngModel.showExpression'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Validation:</td>
+                    <td>
+                        <cris-term-validator data-ng-model='ngModel.validation.validator[0]' is-new='{{ngModel.isNew ? true : false}}'></cris-term-validator>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        </script>
+        
+        <script type="text/ng-template" id="view_term_composite_reference_child">
+        <div>
+            <table class="form" style="width: 100%">
+                <tr>
+                    <td style="width: 30%">UUID:</td>
+                    <td style="width: 70%">
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uuid'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Version:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.version'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>UI Display Order:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.uiDisplayOrder'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Alias:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.alias'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Description:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.description'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Unit:</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.unit'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Default Value:</td>
+                    <td>
+                        <cris-term-default-value data-ng-model="ngModel"></cris-term-default-value>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Required?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="required"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Read Only?</td>
+                    <td>
+                        <cris-checkbox-and-expression data-ng-model="ngModel" field="readOnly"></cris-checkbox-and-expression>
+                    </td>
+                </tr>
+                <tr data-ng-hide="ngModel.validation.validator[0].type === 'file'">
+                    <td>List?</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.list'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr data-ng-show="ngModel.list">
+                    <td>Display as Grid:</td>
+                    <td>
+                        <cris-one-check-box items='[false, true]' item='ngModel.grid'><!-- --></cris-one-check-box>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Show Expression</td>
+                    <td>
+                        <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="" data-ng-model='ngModel.showExpression'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Validation:</td>
+                    <td>
+                        <cris-term-validator data-ng-model='ngModel.validation.validator[0]'></cris-term-validator>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        </script>
+
+        <div>
+            <div ng-include="type" data-ng-model="ngModel" empty-message='{{emptyMessage}}'><!-- --></div>
+        </div>
+    </div>
+
+</jsp:root>

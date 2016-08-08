@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<term uuid="c4d6a240-cded-11e2-8b8b-0800200c9a66"
+      xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd">
+
+    <name>Acme Data Export File</name>
+    <description>Definition of a Acme Data Export File</description>
+
+    <term uuid="f3b15fc0-cdec-11e2-8b8b-0800200c9a66" alias="acme_data_export_file"/>
+</term>

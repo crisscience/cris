@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:security="http://www.springframework.org/schema/security"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+                        http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.2.xsd
+                        ">
+
+    <!-- LDAP server -->
+    <!--
+    <bean class="org.springframework.jndi.JndiObjectFactoryBean" id="ldapSource">
+        <property name="jndiName" value="java:comp/env/ldap/dm"/>
+        <property name="lookupOnStartup" value="false"/>
+        <property name="cache" value="true"/>
+        <property name="proxyInterface" value="org.springframework.ldap.core.support.LdapContextSource"/>
+    </bean>
+    -->
+
+    <!-- a local test server -->
+    <!--
+    <security:ldap-server id="ldapSource" ldif="classpath:users.ldif" port="33389"/>
+    -->
+    <security:ldap-server id="ldapSource" url="${ldap.server.url}"/>
+
+    <bean class="org.springframework.ldap.core.LdapTemplate" id="ldapTemplate">
+        <constructor-arg ref="ldapSource"/>
+    </bean>
+
+    <!-- This was added for passing login info from the query string of a URL for running a workflow through a URL
+         The username/password are now hardcoded so this is no longer needed
+    -->
+    <bean class="edu.purdue.cybercenter.dm.web.filter.RestLoginFilter" id="rest-login-filter">
+        <property name="authenticationManager" ref="authenticationManager"/>
+        <property name="authenticationSuccessHandler" ref="authentication-success-handler"/>
+        <property name="authenticationFailureHandler" ref="authentication-failure-handler"/>
+    </bean>
+
+    <!-- authentication success/failure handler -->
+    <bean class="edu.purdue.cybercenter.dm.web.filter.DmAuthenticationSuccessHandler" id="authentication-success-handler"/>
+    <bean class="edu.purdue.cybercenter.dm.web.filter.DmAuthenticationFailureHandler" id="authentication-failure-handler"/>
+
+    <bean class="edu.purdue.cybercenter.dm.security.UserDetailsServiceImpl" id="userDetailsService"/>
+
+    <bean id="aclCache" class="org.springframework.security.acls.domain.EhCacheBasedAclCache">
+        <constructor-arg>
+            <bean class="org.springframework.cache.ehcache.EhCacheFactoryBean">
+                <property name="cacheManager" ref="ehcache"/>
+                <property name="cacheName" value="aclCache"/>
+            </bean>
+        </constructor-arg>
+        <constructor-arg ref="permissionGrantingStrategy"/>
+        <constructor-arg ref="aclAuthorizationStrategy"/>
+    </bean>
+
+    <bean id="lookupStrategy" class="org.springframework.security.acls.jdbc.BasicLookupStrategy">
+        <constructor-arg ref="dataSource"/>
+        <constructor-arg ref="aclCache"/>
+        <constructor-arg ref="aclAuthorizationStrategy"/>
+        <constructor-arg ref="permissionGrantingStrategy"/>
+        <property name="permissionFactory" ref="permissionFactory"/>
+    </bean>
+
+    <bean id="permissionFactory" class="edu.purdue.cybercenter.dm.security.CustomPermissionFactory"/>
+
+    <bean id="permissionGrantingStrategy" class="edu.purdue.cybercenter.dm.security.CustomPermissionGrantingStrategy">
+        <constructor-arg>
+            <bean class="org.springframework.security.acls.domain.ConsoleAuditLogger"/>
+        </constructor-arg>
+    </bean>
+
+    <bean id="aclAuthorizationStrategy" class="edu.purdue.cybercenter.dm.security.CustomAclAuthorizationStrategyImpl">
+        <constructor-arg>
+            <list>
+                <bean class="org.springframework.security.core.authority.SimpleGrantedAuthority">
+                    <constructor-arg value="ROLE_ADMINISTRATOR"/>
+                </bean>
+                <bean class="org.springframework.security.core.authority.SimpleGrantedAuthority">
+                    <constructor-arg value="ROLE_ADMINISTRATOR"/>
+                </bean>
+                <bean class="org.springframework.security.core.authority.SimpleGrantedAuthority">
+                    <constructor-arg value="ROLE_ADMINISTRATOR"/>
+                </bean>
+            </list>
+        </constructor-arg>
+
+    </bean>
+
+    <bean id="aclService" class="org.springframework.security.acls.jdbc.JdbcMutableAclService">
+        <constructor-arg ref="dataSource"/>
+        <constructor-arg ref="lookupStrategy"/>
+        <constructor-arg ref="aclCache"/>
+        <property name="classIdentityQuery" value="select currval(pg_get_serial_sequence('acl_class','id'))"/>
+        <property name="sidIdentityQuery" value="select currval(pg_get_serial_sequence('acl_sid','id'))"/>
+    </bean>
+
+    <security:global-method-security pre-post-annotations="enabled" proxy-target-class="true">
+        <security:expression-handler ref="expressionHandler"/>
+    </security:global-method-security>
+
+    <bean id="expressionHandler" class="edu.purdue.cybercenter.dm.security.CustomMethodSecurityExpressionHandler">
+        <property name="permissionEvaluator" ref="permissionEvaluator"/>
+    </bean>
+
+    <bean id="permissionEvaluator" class="edu.purdue.cybercenter.dm.security.CustomAclPermissionEvaluator">
+        <constructor-arg ref="aclService"/>
+        <property name="permissionFactory" ref="permissionFactory"/>
+    </bean>
+
+     <bean id="webExpressionHandler" class="org.springframework.security.web.access.expression.DefaultWebSecurityExpressionHandler">
+        <property name="permissionEvaluator" ref="permissionEvaluator"/>
+    </bean>
+
+    <!-- Security configuration -->
+    <security:http use-expressions="true" auto-config="true" disable-url-rewriting="true">
+        <security:intercept-url access="permitAll" pattern="/static/**"/>
+
+        <security:intercept-url access="permitAll" pattern="/"/>
+        <security:intercept-url access="permitAll" pattern="/tenants/createForm"/>
+        <security:intercept-url access="permitAll" pattern="/tenants/create"/>
+        <security:intercept-url access="permitAll" pattern="/tenants/show"/>
+        <security:intercept-url access="permitAll" pattern="/home/**"/>
+        <security:intercept-url access="permitAll" pattern="/auth/**"/>
+        <security:expression-handler ref="webExpressionHandler"/>
+        <!--
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/accounts/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/assets/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/classifications/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/configurations/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/enumassetstatuses/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/enumassettypes/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/groups/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/groupusers/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/organizationunits/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/organizationunitgroups/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/organizationunitservices/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/permissions/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/projects/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/ratecategorys/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/resources/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/resourceservices/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/services/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/servicerates/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/serviceunits/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/tools/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/users/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/xtrarasaccounts/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/xtrarasgroups/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/xtraraspayrolls/**"/>
+        <security:intercept-url access="hasRole('ROLE_ADMIN')" pattern="/xtrarasscientificprograms/**"/>
+        -->
+
+        <security:intercept-url access="isAuthenticated()" pattern="/**"/>
+
+        <security:form-login login-page="/auth/signin" login-processing-url="/auth/verify" username-parameter="username" password-parameter="password" authentication-failure-url="/auth/signin?authFailed=true" authentication-success-handler-ref="authentication-success-handler" always-use-default-target="false"/>
+        <security:logout logout-url="/auth/signout"/>
+
+        <security:access-denied-handler error-page="/resourceNotFound" />
+
+        <security:custom-filter before="FORM_LOGIN_FILTER" ref="rest-login-filter"/>
+    </security:http>
+
+    <security:authentication-manager alias="authenticationManager">
+        <security:authentication-provider user-service-ref="userDetailsService">
+            <security:password-encoder hash="sha-256">
+                <security:salt-source user-property="salt"/>
+            </security:password-encoder>
+        </security:authentication-provider>
+
+        <!-- used with the local test server -->
+        <!--
+        <security:ldap-authentication-provider server-ref="ldapSource" user-dn-pattern="uid={0},ou=people" user-search-base="ou=people" user-search-filter="uid={0}" group-search-base="ou=groups" group-search-filter="member={0}" user-context-mapper-ref="userDetailsService">
+        </security:ldap-authentication-provider>
+        -->
+        <security:ldap-authentication-provider server-ref="ldapSource" user-dn-pattern="uid={0},ou=authenticate,dc=purdue,dc=edu" user-search-filter="uid={1}" user-search-base="ou=authenticate,dc=purdue,dc=edu" group-search-filter="uid={1}" group-search-base="ou=authorize,dc=purdue,dc=edu" user-context-mapper-ref="userDetailsService">
+        </security:ldap-authentication-provider>
+    </security:authentication-manager>
+
+</beans>

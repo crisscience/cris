@@ -1,0 +1,18 @@
+<script type="text/javascript">
+    // <![CDATA[
+    cris.workflow = {};
+
+    cris.workflow.app = {
+        init: function() {
+            dojo.byId("idFile").innerHTML = '#{error_message}';
+        }
+    };
+
+    cris.ready(function() {
+        cris.workflow.app.init();
+    });
+    // ]]>
+</script>
+<h3>Import failed</h3>
+
+<div id="errors"></div>

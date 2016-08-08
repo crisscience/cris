@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<vocabulary xmlns="http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="51c5ddd0-09a2-11e2-892e-0800200c9a66" version="87d9c2b9-27b7-4d78-9d00-c4b765bb8abf" xsi:schemaLocation="http://www.purdue.edu/cybercenter/schemas/vocabulary vocabulary-1.0.xsd">
+    <domain>HPLC</domain>
+    <name>HPLC Vocabulary</name>
+    <description>Vocabulary for HPLC</description>
+    <contributors>
+        <contributor>Peter Baker</contributor>
+        <contributor>Clint Chapple</contributor>
+    </contributors>
+    <copyright>(C)2013 Purdue University</copyright>
+    <terms>
+        <term uuid="d300c950-b735-11e2-9e96-0800200c9a66" version="b7bb9189-90c3-45fb-af79-aa18fe42029a">
+            <name>stationaryPhase</name>
+            <description>Stationary Phase</description>
+            <validation>
+                <validator type="list">
+                    <property name="item">Reverse Phase</property>
+                    <property name="item">Normal Phase</property>
+                    <property name="item">Ion Exchange</property>
+                    <property name="item">Size Exclusion</property>
+                    <property name="isMultiSelect">false</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="1dbd2910-6f02-11e2-bcfd-0800200c9a66" version="8a405258-714c-49bc-8d18-762c5496f73b">
+            <name>separationColumnDiameter</name>
+            <description>Separation column diameter</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 25]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">1</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="25398300-6f02-11e2-bcfd-0800200c9a66" version="b76d9524-4d1d-440c-9d21-3a8fe3b5f55f">
+            <name>separationColumnLength</name>
+            <description>Separation column length</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 250]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">0</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="e94e85a0-b8cd-11e2-9e96-0800200c9a66" version="3d997478-32c6-4b67-939b-e23d0d63dda7">
+            <name>solventName</name>
+            <description>Solvent Name</description>
+            <validation>
+                <validator type="text">
+                    <property name="type">printable</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="bb6ee670-b8cd-11e2-9e96-0800200c9a66" version="0670675f-5054-4a79-8eb4-e1b0e7bf6f80">
+            <name>solventComposition</name>
+            <description>Solvent Composition</description>
+            <term alias="solventPercentage" uuid="3ca59b00-6f02-11e2-bcfd-0800200c9a66"/>
+            <term alias="basePercentage" uuid="3ca59b00-6f02-11e2-bcfd-0800200c9a66"/>
+            <attach-to id-field="uniqueId" name-field="solventName" use-alias="selectedSolventId" uuid="4d86ba90-b817-11e2-9e96-0800200c9a66"/>
+        </term>
+        <term uuid="79ba71c7-8e2d-11e1-b0c4-0800200c9a66" version="a9fca29e-c346-4cd0-9e02-6873e1f7c629">
+            <name>HPLCDetectorType</name>
+            <description>HPLC Detector Type</description>
+            <validation>
+                <validator type="list">
+                    <property name="item">UV</property>
+                    <property name="item">Diode Array</property>
+                    <property name="item">Fluorescent</property>
+                    <property name="isMultiSelect">false</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="f90f6100-8e2e-11e1-b0c4-0800200c9a66" version="7847ced4-dbe3-48b0-a439-0e809758f546">
+            <name>HPLCDetectorWavelength</name>
+            <description>HPLC Detector Wavelength</description>
+            <unit>nanometer</unit>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 700]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">0</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="1a916ce0-10da-11e3-8ffd-0800200c9a66" version="b7214ec8-99b3-4485-b1af-c46ffa99520d">
+            <name>traySize</name>
+            <description>Tray size for rows and columns</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 10]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">0</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="1fb519f0-82b5-11e2-9e96-0800200c9a66" version="97f7fc10-562e-4649-bc0b-51df4a7fefe7">
+            <name>symbol_name</name>
+            <description>Description of Symbol Name</description>
+            <validation>
+                <validator type="text"/>
+            </validation>
+        </term>
+        <term uuid="2b3e0600-82b6-11e2-9e96-0800200c9a66" version="f7bebb38-5150-4298-878a-ed7588afda08">
+            <name>fill_name</name>
+            <description>Description of Fill Name</description>
+            <validation>
+                <validator type="text"/>
+            </validation>
+        </term>
+        <term uuid="b1770e30-82b4-11e2-9e96-0800200c9a66" version="d59a96cc-5221-4efe-a902-6df93c41a837">
+            <name>atg_column</name>
+            <description>Description of the ATG_Column</description>
+            <validation>
+                <validator type="text"/>
+            </validation>
+        </term>
+        <term uuid="4c4e3df0-6f02-11e2-bcfd-0800200c9a66" version="6e196dbb-81e4-41be-8b14-6175877f2ab9">
+            <name>age</name>
+            <description>The age of plant sample</description>
+            <unit>days</unit>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 100]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">1</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="50ff69f0-6f02-11e2-bcfd-0800200c9a66" version="538aa1b9-b8af-4bb2-b5cc-98b9d10f06cc">
+            <name>tissue</name>
+            <description>Tissue</description>
+            <validation>
+                <validator type="list">
+                    <property name="item">Leaf</property>
+                    <property name="item">Stem</property>
+                    <property name="item">Root</property>
+                    <property name="item">Rhizome</property>
+                    <property name="isMultiSelect">false</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="5595baf0-6f02-11e2-bcfd-0800200c9a66" version="b58eb076-85c7-4c02-a5a6-9564664fad12">
+            <name>temperature</name>
+            <description>Temperature</description>
+            <unit>degree C</unit>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[-infinity, +infinity]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">1</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="59901a10-6f02-11e2-bcfd-0800200c9a66" version="b928d697-b04d-4e72-98b8-77e2cf142c4a">
+            <name>photoperiod</name>
+            <description>Photoperiod</description>
+            <unit>hours</unit>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, +infinity]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">1</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="5e1cce20-6f02-11e2-bcfd-0800200c9a66" version="196ffca3-2868-45a4-befe-062a8709359b">
+            <name>extract_concentration</name>
+            <description>Extract Concentration</description>
+            <unit>mg/ml</unit>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 100]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="63036200-6f02-11e2-bcfd-0800200c9a66" version="7528228a-fa45-4b9e-a8e5-4e6096bad323">
+            <name>processing_applied</name>
+            <description>Processing applied to the sample</description>
+            <validation>
+                <validator type="text"/>
+            </validation>
+        </term>
+        <term uuid="840712d0-6f02-11e2-bcfd-0800200c9a66" version="2cbd9229-022d-4500-8d9e-99da54fa5ade">
+            <name>sample_injection_volume</name>
+            <description>Sample Injection Volume</description>
+            <unit>ml</unit>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 100]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="883971e0-6f02-11e2-bcfd-0800200c9a66" version="a839c548-3d30-4e33-9fd7-518a4f6ae7cb">
+            <name>sequence_file_type</name>
+            <description>Sequence File Type</description>
+            <validation>
+                <validator type="text"/>
+            </validation>
+        </term>
+        <term uuid="91ad07f0-6f02-11e2-bcfd-0800200c9a66" version="331c31dc-fe40-4a8e-be6c-e6ecaab0e4c0">
+            <name>number_of_samples</name>
+            <description>Number Of Samples</description>
+            <property name="unit">quantity</property>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 100]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="9c19a400-6f02-11e2-bcfd-0800200c9a66" version="cfd6a20d-fbf6-4c61-9a5c-699c04c27ae1">
+            <name>mobile_phase</name>
+            <description>Mobile Phase</description>
+            <validation>
+                <validator type="text"/>
+            </validation>
+        </term>
+        <term uuid="ab1453b0-6f02-11e2-bcfd-0800200c9a66" version="d3c087d5-2b21-4f93-81d6-1e67c205a09f">
+            <name>column</name>
+            <description>column</description>
+            <term alias="id" uuid="77c30450-9de0-11e1-a8b0-0800200c9a66"/>
+            <term alias="name" uuid="77c30452-9de0-11e1-a8b0-0800200c9a66"/>
+        </term>
+        <term uuid="309e3780-73e0-11e2-bcfd-0800200c9a66" version="1ab94256-0b3e-40e9-9ec7-558f55eed7bf">
+            <name>accession_id</name>
+            <description>Accession ID</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 100]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="34395fa0-73e0-11e2-bcfd-0800200c9a66" version="eeb9daf1-7745-469b-9781-9e1d86f1290c">
+            <name>seedline_name</name>
+            <description>Seedline Name</description>
+            <validation>
+                <validator type="numeric">
+                    <property name="range">[0, 100]</property>
+                    <property name="minPrecision">0</property>
+                    <property name="maxPrecision">2</property>
+                </validator>
+            </validation>
+        </term>
+        <term uuid="d9e05fa0-73ed-11e2-bcfd-0800200c9a66" version="5ed005a9-2eaa-42bd-9262-7fc34bee1d21">
+            <name>sc</name>
+            <description>SC</description>
+            <term alias="id" uuid="e0976dc0-73ed-11e2-bcfd-0800200c9a66"/>
+            <term alias="name" uuid="e0976dc0-73ed-11e2-bcfd-0800200c9a66"/>
+        </term>
+    </terms>
+</vocabulary>

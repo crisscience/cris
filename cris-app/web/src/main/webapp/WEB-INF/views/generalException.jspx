@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:fn="http://java.sun.com/jsp/jstl/functions" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <h2>Error</h2>
+
+    <p>
+        Sorry, we encountered an error when accessing ${url} at ${timestamp}
+    </p>
+
+    <p>
+        ${exception.message}
+    </p>
+
+</jsp:root>

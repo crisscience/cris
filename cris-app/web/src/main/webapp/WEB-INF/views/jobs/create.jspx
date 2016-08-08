@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <script type="text/javascript">
+        cris.require([
+            "dojo/behavior",
+            "dijit/form/Button",
+            "dijit/form/FilteringSelect",
+            "dijit/form/Form",
+            "dijit/form/ValidationTextBox",
+            "dijit/Editor"
+        ]);
+
+        cris.ready(function() {
+            cris.job = {};
+            cris.job.create = {};
+            cris.job.create.app = {
+
+                storeExperiments: null,
+                storeWorkflows: null,
+                experimentList: null,
+                workflowList: null,
+                form: null,
+
+                behavior: {
+                    "#buttonSubmit": {
+                        onclick: function(evt) {
+                            dojo.byId("idHiddenDescription").innerHTML = dijit.byId("idDescription").get("value");
+                            if (cris.job.create.app.form.validate()) {
+                                cris.job.create.app.form.submit();
+                            }
+                        }
+                    }
+                },
+
+                updateExperimentList: function(projectId) {
+                   this.experimentList.query.projectId = projectId;
+                   this.experimentList.reset();
+                },
+
+                updateWorkflowList: function(resourceId) {
+                   this.workflowList.query.resourceId = resourceId;
+                   this.workflowList.reset();
+                },
+
+                init: function() {
+                    <spring:url value="/experiments" var="url"/>
+                    this.storeExperiments = createJsonRestStore("${url}");
+
+                    <spring:url value="/workflows" var="url"/>
+                    this.storeWorkflows = createJsonRestStore("${url}");
+
+                    var experimentId = dojo.fromJson("${experimentId}" ? "${experimentId}" : "null");
+                    this.experimentList = new dijit.form.FilteringSelect({
+                        id: "idSelectExperiment",
+                        name: "experimentId",
+                        value: experimentId,
+                        store: this.storeExperiments,
+                        fetchProperties: {
+                            sort: [{attribute: "name"}]
+                        },
+                        autoComplete: true
+                    }, "idSelectExperiment");
+                    this.updateExperimentList(dijit.byId("idSelectProject").getValue());
+
+                    var workflowId = dojo.fromJson("${workflowId}" ? "${workflowId}" : "null");
+                    this.workflowList = new dijit.form.FilteringSelect({
+                        id: "idSelectWorkflow",
+                        name: "workflowId",
+                        value: workflowId,
+                        store: this.storeWorkflows,
+                        fetchProperties: {
+                            sort: [{attribute: "name"}]
+                        },
+                        autoComplete: true
+                    }, "idSelectWorkflow");
+
+                    this.form = dijit.byId("formCreate");
+
+                    dojo.behavior.add(this.behavior);
+                    dojo.behavior.apply();
+
+                    dojo.connect(dijit.byId("idSelectProject"), "onChange", function(value) {
+                        cris.job.create.app.updateExperimentList(value);
+                    });
+                }
+            };
+
+            cris.job.create.app.init();
+        });
+
+    </script>
+
+    <div class="sixTenths">
+        <h2>Create a New Job</h2>
+
+        <spring:url value="/jobs/" var="url"/>
+        <div id="formCreate" data-dojo-type="dijit.form.Form" data-dojo-props="action: '${url}', method: 'POST'">
+            <table style="width: 100%">
+                <tr>
+                    <td style="width: 25%">Project:<span style="color:red;font-weight:bold;">&#160;*</span></td>
+                    <td class="tdTextBox" style="width: 75%">
+                        <select id="idSelectProject" name="projectId" data-dojo-type="dijit/form/FilteringSelect" data-dojo-props="required: 'true', placeHolder: 'select a project'">
+                            <c:forEach items="${projects}" var="item">
+                                <c:choose>
+                                <c:when test="${item.id eq job.projectId.id}">
+                                    <option value="${item.id}" selected="selected">${item.name}</option>
+                                </c:when>
+                                <c:otherwise>
+                                    <option value="${item.id}">${item.name}</option>
+                                </c:otherwise>
+                                </c:choose>
+                            </c:forEach>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Experiment:<span style="color:red;font-weight:bold;">&#160;*</span></td>
+                    <td class="tdTextBox" style="width: 75%">
+                        <input id="idSelectExperiment"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Workflow:<span style="color:red;font-weight:bold;">&#160;*</span></td>
+                    <td class="tdTextBox">
+                        <input id="idSelectWorkflow"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Name:<span style="color:red;font-weight:bold;">&#160;*</span></td>
+                    <td class="tdTextBox">
+                        <input id="idName" name="name" value="${name}" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-props="required: 'true', promptMessage: 'Enter a name for your job', invalidMessage: 'You must enter a name for your project'" placeHolder="give your job a name" />
+                        <span class="error">${errorMessage.getModel()['org.springframework.validation.BindingResult.job'].hasFieldErrors('name') ? errorMessage.getModel()['org.springframework.validation.BindingResult.job'].getFieldError("name").defaultMessage : ""}</span>
+                    </td>
+                </tr>
+                <!-- maybe handy for debug purpose
+                <tr>
+                    <td>Init Params:</td>
+                    <td class="tdTextBox">
+                        <input id="idInitParams" name="initParams" value="${initParams}" data-dojo-type="dijit/form/SimpleTextarea" data-dojo-props="required: 'true', promptMessage: 'Enter a initParams for your job', invalidMessage: '', rows: 5" placeHolder="initial parameters" />
+                        <span class="error">${errorMessage.getModel()['org.springframework.validation.BindingResult.job'].hasFieldErrors('initParams') ? errorMessage.getModel()['org.springframework.validation.BindingResult.job'].getFieldError("initParams").defaultMessage : ""}</span>
+                    </td>
+                </tr>
+                -->
+                <tr>
+                    <td colspan="2" style="text-align: center">Description:</td>
+                </tr>
+                <tr>
+                    <td class="tdTextArea" colspan="2">
+                        <textarea id="idHiddenDescription" name="description" hidden="true"><!-- --></textarea>
+                        <div id="idDescription" data-dojo-type="dijit/Editor" data-dojo-props="rows: '8', name: 'description', value: '${description}'"><!-- --></div>
+                    </td>
+                </tr>
+            </table>
+
+            <p></p>
+            <div>
+                <input id="buttonSubmit" type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Submit'"/>
+            </div>
+
+            <br/>
+        </div>
+    </div>
+
+</jsp:root>

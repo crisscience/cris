@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/experiments" var="urlExperiments"/>
+    <spring:url value="/projects" var="urlProjects"/>
+
+    <script type="text/javascript">
+// <![CDATA[
+        cris.require("dijit/Editor");
+        cris.require("dijit/form/Form");
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/TextBox");
+        cris.require("dijit/form/SimpleTextarea");
+        cris.require("dijit/form/FilteringSelect");
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dojo/behavior");
+
+        cris.experiment = {};
+        cris.experiment.app = {
+            store: null,
+            storeProjects: null,
+            grid: null,
+            creatingNew: false,
+            projectList: null,
+            defaultQuery: {showAllStatus: true},
+            setGridFilter: function(status) {
+                if (status === 0 || status === 1) {
+                    this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: status}]);
+                } else {
+                    this.grid.setFilter();
+                }
+            },
+            updateHtml: function(item) {
+                if (item) {
+                    dojo.byId("configId").innerHTML = item.id || "";
+                    dijit.byId("idSelectProject").setValue(item.projectId ? item.projectId.id : "");
+                    dijit.byId("name").set("value", item.name || "");
+                    dijit.byId("description").set("value", item.description || "");
+                    dojo.byId("status").innerHTML = convertAssetStatusIdToName(item.statusId);
+                    dojo.byId("timeCreated").innerHTML = item.timeCreated && item.timeCreated.$date ? dateIsoToLocale(item.timeCreated.$date) : "";
+                    dojo.byId("lastUpdated").innerHTML = item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
+                    if (item.statusId === 1) {
+                        dijit.byId("buttonDeprecate").set("label", "Deprecate");
+                    } else if (item.statusId === 0) {
+                        dijit.byId("buttonDeprecate").set("label", "Restore");
+                    } else {
+                        dijit.byId("buttonDeprecate").set("label", "Deprecate");
+                    }
+                }
+            },
+            updateStore: function(item) {
+                this.store.setValue(item, "projectId", this.storeProjects.fetchItemByIdentity({identity: dijit.byId("idSelectProject").getValue(), sync: true}));
+                this.store.setValue(item, "name", dijit.byId("name").getValue());
+                this.store.setValue(item, "description", dijit.byId("description").getValue());
+            },
+            isModified: function(item) {
+                var modified = false;
+
+                var projectId = dijit.byId("idSelectProject");
+                if (item.projectId.id != projectId.getValue()) {
+                    modified = true;
+                }
+
+                var name = dijit.byId("name");
+                if (item.name !== name.getValue()) {
+                    modified = true;
+                }
+
+                var description = dijit.byId("description");
+                if (item.description !== description.getValue()) {
+                    modified = true;
+                }
+
+                return modified;
+            },
+            saveStore: function() {
+                var pd = createProgressDialog();
+                this.store.save({
+                    onComplete: function(data) {
+                        var response = JSON.parse(data[0].deferred.ioArgs.xhr.response);
+                        if (response.hasError) {
+                            pd.setContent("Failed to save changes. " + response.message + " " + response.status);
+                            cris.experiment.app.updateHtml({});
+                            cris.experiment.app.grid.setQuery({showAllStatus: true});
+                        } else {
+                            var selectedItem = cris.experiment.app.grid.selection.getSelected("row")[0];
+                            var selectedIndex = cris.experiment.app.grid.selection.selectedIndex;
+                            if (selectedItem) {
+                                cris.experiment.app.grid.updateRow(selectedIndex);
+                                cris.experiment.app.updateHtml(selectedItem);
+                            } else {
+                                cris.experiment.app.updateHtml({});
+                            }
+                            cris.experiment.app.grid.setQuery({showAllStatus: true});
+                            pd.hide();
+                        }
+                    },
+                    onError: function(error) {
+                        var message;
+                        if (error && error.response && error.response.text) {
+                            message = dojo.fromJson(error.response.text).message;
+                        } else {
+                            message = error;
+                        }
+                        pd.setContent("Failed to save changes. " + message);
+                    }
+                });
+            },
+            behavior: {
+                "#idGrid": {
+                    onclick: function(evt) {
+                        dojo.publish("cris/project/newSelection", []);
+                    }
+                },
+                "#idShowOperational": {
+                    onclick: function(evt) {
+                        cris.experiment.app.setGridFilter(1);
+                    }
+                },
+                "#idShowDeprecated": {
+                    onclick: function(evt) {
+                        cris.experiment.app.setGridFilter(0);
+                    }
+                },
+                "#idShowAll": {
+                    onclick: function(evt) {
+                        cris.experiment.app.setGridFilter(null);
+                    }
+                },
+                "#buttonNew": {
+                    onclick: function(evt) {
+                        dojo.byId("detailPrompt").innerHTML = "Create a new experiment";
+                        cris.experiment.app.creatingNew = true;
+                        cris.experiment.app.grid.selection.deselectAll();
+                        cris.experiment.app.updateHtml({});
+                    }
+                },
+                "#buttonDeprecate": {
+                    onclick: function(evt) {
+                        var item = cris.experiment.app.grid.selection.getSelected("row")[0];
+                        if (!item) {
+                            showMessage("Please select an experiment");
+                            return;
+                        }
+
+                        var status;
+                        if (item.statusId === 1) {
+                            status = 0;
+                        } else {
+                            status = 1;
+                        }
+                        cris.experiment.app.store.setValue(item, "statusId", status ? 1 : 0);
+                        cris.experiment.app.saveStore();
+                    }
+                },
+                "#buttonSave": {
+                    onclick: function(evt) {
+                        var formManager = dijit.byId("form");
+                        formManager.validate();
+
+                        if (!formManager.isValid()) {
+                            return;
+                        }
+
+                        var item;
+                        if (cris.experiment.app.creatingNew) {
+                            var name = dojo.byId("name").value;
+                            if (!name) {
+                                showMessage("You must specify a name for the experiment");
+                                return;
+                            }
+
+                            item = cris.experiment.app.store.newItem();
+                        } else {
+                            if (cris.experiment.app.grid.selection.getSelectedCount("row") >= 1) {
+                                var item = cris.experiment.app.grid.selection.getSelected("row")[0];
+                                if (!cris.experiment.app.isModified(item)) {
+                                    showMessage("No change is made");
+                                    return;
+                                }
+                            } else {
+                                showMessage("Please select a experiment");
+                                return;
+                            }
+                        }
+
+                        cris.experiment.app.creatingNew = false;
+                        cris.experiment.app.updateStore(item);
+                        cris.experiment.app.saveStore();
+                    }
+                },
+                "#buttonReset": {
+                    onclick: function(evt) {
+                        if (cris.experiment.app.grid.selection.getSelectedCount("row") >= 1) {
+                            var item = cris.experiment.app.grid.selection.getSelected("row")[0];
+                            cris.experiment.app.updateHtml(item);
+                        } else {
+                            cris.experiment.app.updateHtml({});
+                        }
+                    }
+                }
+            },
+            init: function() {
+                this.creatingNew = false;
+
+                this.store = createJsonRestStore("${urlExperiments}");
+
+                this.storeProjects = createJsonRestStore("${urlProjects}");
+
+                var layout = [{cells: [
+                            {field: 'statusId', name: 'Status ID', datatype: "number", hidden: true},
+                            {field: 'id', name: 'ID', datatype: "number", width: '50px'},
+                            {field: 'name', name: 'Name', width: 'auto'},
+                            {field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px',
+                                dataTypeArgs: {
+                                    datePattern: "yyyy-M-d"
+                                },
+                                get: function(row, item) {
+                                    if (!item) {
+                                        return "Loading...";
+                                    }
+                                    return item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
+                                }}
+                        ]}];
+
+                var asc = true;
+                var args = {
+                    query: this.defaultQuery,
+                    sortFields: [{attribute: "name", descending: !asc}],
+                    rowsPerPage: 15,
+                    pageSizes: []
+                };
+                this.grid = createGrid(this.store, layout, "idGrid", args);
+                this.grid.setSortIndex(2, asc);
+                this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: 1}]);
+
+                this.projectList = new dijit.form.FilteringSelect({
+                    id: "idSelectProject",
+                    name: "projectId",
+                    store: this.storeProjects,
+                    query: {showAllStatus: true},
+                    autoComplete: true
+                }, "idSelectProject");
+
+                var editor = new dijit.Editor({}, "description");
+                editor.startup();
+
+                dojo.style("buttonDeprecate", "width", "70px");
+
+                this.updateHtml({});
+
+                dojo.behavior.add(this.behavior);
+                dojo.behavior.apply();
+
+                dojo.subscribe("cris/project/newSelection", this, function(evt) {
+                    if (this.grid.selection.getSelectedCount("row") >= 1) {
+                        dojo.byId("detailPrompt").innerHTML = "Edit an existing experiment";
+                        this.creatingNew = false;
+                        var item = this.grid.selection.getSelected("row")[0];
+                        this.updateHtml(item);
+                    }
+                });
+            }
+        };
+
+        cris.ready(function() {
+            cris.experiment.app.init();
+        });
+// ]]>
+    </script>
+
+    <div class="floatLeft halfMinus">
+        <h2>Experiments</h2>
+
+        <span>
+            <input id="buttonNew" type="button" value="New" data-dojo-type="dijit.form.Button" data-dojo-props='label: "New"'/>
+            <input id="buttonDeprecate" type="button" value="Delete" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Deprecate"'/>
+        </span>
+        <div class="floatRightToButton">
+            Show:
+            <input id="idShowOperational" type="radio" name="showStatus" value="1" checked="checked" data-dojo-type="dijit.form.RadioButton"/><span>Operational</span>
+            &amp;nbsp
+            <input id="idShowDeprecated" type="radio" name="showStatus" value="0" data-dojo-type="dijit.form.RadioButton"/><span>Deprecated</span>
+            &amp;nbsp
+            <input id="idShowAll" type="radio" name="showStatus" value="" data-dojo-type="dijit.form.RadioButton"/><span>All</span>
+            &amp;nbsp
+        </div>
+        <br/>
+        <div id="idGrid"><!-- fix ff problem --></div>
+    </div>
+
+    <div class="floatRight half">
+        <h2>Details</h2>
+        <div id="detailPrompt" style="text-align: center">No experiment selected</div>
+        <form id="form" data-dojo-type="dijit.form.Form">
+            <div>
+                <table class="form" style="width: 100%">
+                    <tr>
+                        <td style="width: 30%">ID:</td><td id="configId" style="width: 70%"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Project:</td>
+                        <td class="tdTextBox"><input id="idSelectProject"/></td>
+                    </tr>
+                    <tr>
+                        <td>Name:</td><td class="tdTextBox"><input id="name" data-dojo-type="dijit.form.TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Status:</td><td id="status"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center" colspan="2">Description</td>
+                    </tr>
+                    <tr>
+                        <td class="tdTextArea" colspan="2"><div id="description"><!-- --></div></td>
+                    </tr>
+                </table>
+            </div>
+            <div style="float: right">
+                <input id="buttonSave" type="button" value='Save' data-dojo-type="dijit.form.Button" data-dojo-props='label: "Save"'/>
+                <input id="buttonReset" type="button" value='Reset' data-dojo-type="dijit.form.Button" data-dojo-props='label: "Reset"'/>
+            </div>
+        </form>
+    </div>
+
+</jsp:root>

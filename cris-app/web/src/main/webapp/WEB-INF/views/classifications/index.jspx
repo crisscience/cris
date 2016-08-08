@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<div xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags" xmlns:form="http://www.springframework.org/tags/form" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:page="urn:jsptagdir:/WEB-INF/tags/form" xmlns:table="urn:jsptagdir:/WEB-INF/tags/form/fields"
+     xmlns:field="urn:jsptagdir:/WEB-INF/tags/form/fields" version="2.0">
+
+    <jsp:output omit-xml-declaration="yes"/>
+    <script type="text/javascript">
+
+        cris.require('dijit/form/Form');
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/TextBox");
+        cris.require("dijit/form/SimpleTextarea");
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dojox/grid/EnhancedGrid");
+        cris.require("dojox/grid/enhanced/plugins/Pagination");
+        cris.require("dojox/grid/enhanced/plugins/Selector");
+        cris.require("dojox/grid/enhanced/plugins/Filter");
+
+        function updateDetail(item) {
+            dojo.byId("configId").innerHTML = item.id || "";
+            dijit.byId("name").setValue(item.name || "");
+            dijit.byId("description").setValue(item.description || "");
+            dojo.byId("timeCreated").innerHTML = stringDateTime(item.timeCreated);
+            dojo.byId("lastUpdated").innerHTML = stringDateTime(item.timeUpdated);
+        }
+
+        function updateRateCategoryDetail(item) {
+            dojo.byId("rcId").innerHTML = item.id || "";
+            dijit.byId("rcName").setValue(item.name || "");
+            dijit.byId("rcDescription").setValue(item.description || "");
+            dojo.byId("rcClassification").innerHTML = item.classificationId.name || "";
+            dojo.byId("rcInsider").innerHTML = item.insider != null ? item.insider : "";
+            dojo.byId("rcTimeCreated").innerHTML = stringDateTime(item.timeCreated);
+            dojo.byId("rcLastUpdated").innerHTML = stringDateTime(item.timeUpdated);
+        }
+
+        function updateStore(item) {
+            store.setValue(item, "name", dijit.byId("name").getValue());
+            store.setValue(item, "description", dijit.byId("description").getValue());
+        }
+
+        function updateRateCategoryStore(item) {
+            storeRateCategory.setValue(item, "name", dijit.byId("rcName").getValue());
+            storeRateCategory.setValue(item, "description", dijit.byId("rcDescription").getValue());
+        }
+
+        cris.ready(function() {
+            <spring:url value="/classifications" var="url"/>
+            store = createJsonRestStore("${url}");
+
+            <spring:url value="/ratecategorys" var="url"/>
+            storeRateCategory = createJsonRestStore("${url}");
+
+            var layout= [{cells: [
+                        { field: 'id', name: 'ID', datatype: "number", width: '50px' },
+                        { field: 'name', name: 'Name', width: 'auto' },
+                        { field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px', get: function(row, item){
+                            if (!item) {
+                                return "Loading...";
+                            }
+                            return stringDate(item.timeUpdated);
+                        }},
+                    ]},];
+
+            var asc = true;
+            var args = {
+                sortFields: [{attribute: "id", descending: !asc}],
+                rowsPerPage: 10,
+                pageSizes: []
+            };
+            grid = createGrid(store, layout, "classifications", args);
+            grid.setSortIndex(0, asc);
+
+            gridRateCategory = createGrid(storeRateCategory, layout, "rateCategories", args);
+            gridRateCategory.setSortIndex(0, asc);
+
+            dojo.connect(grid, "onSelected", function(index){
+                var item = grid.getItem(index);
+                updateDetail(item);
+            });
+
+            dojo.connect(gridRateCategory, "onSelected", function(index){
+                var item = gridRateCategory.getItem(index);
+                updateRateCategoryDetail(item);
+            });
+
+            var buttonSave = dijit.byId("buttonSave");
+            dojo.connect(buttonSave, "onClick", function(evt){
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    var modified = false;
+                    var item = grid.selection.getSelected("row")[0];
+
+                    var name = dijit.byId("name");
+                    if (item.name != name.getValue()) {
+                        modified = true;
+                    }
+
+                    var description = dijit.byId("description");
+                    if (item.description != description.getValue()) {
+                        modified = true;
+                    }
+
+                    if (modified) {
+                        var yes = showConfirm("Do you want to save the changes?");
+                        if (yes) {
+                            var pd = createProgressDialog();
+                            updateStore(item);
+                            store.save({
+                                onComplete: function() {
+                                    pd.hide();
+                                },
+                                onError: function(error) {
+                                    pd.setContent("Failed to save changes. " + error);
+                                }
+                            });
+                        }
+                    } else {
+                        showMessage("No change is made")
+                        return;
+                    }
+                } else {
+                    showMessage("Please select a classification");
+                }
+            });
+
+            var rcButtonSave = dijit.byId("rcButtonSave");
+            dojo.connect(rcButtonSave, "onClick", function(evt){
+                if (gridRateCategory.selection.getSelectedCount("row") >= 1) {
+                    var modified = false;
+                    var item = gridRateCategory.selection.getSelected("row")[0];
+
+                    var name = dijit.byId("rcName");
+                    if (item.name != name.getValue()) {
+                        modified = true;
+                    }
+
+                    var description = dijit.byId("rcDescription");
+                    if (item.description != description.getValue()) {
+                        modified = true;
+                    }
+
+                    if (modified) {
+                        var yes = showConfirm("Do you want to save the changes?");
+                        if (yes) {
+                            var pd = createProgressDialog();
+                            updateRateCategoryStore(item);
+                            storeRateCategory.save({
+                                onComplete: function() {
+                                    pd.hide();
+                                },
+                                onError: function(error) {
+                                    pd.setContent("Failed to save changes. " + error);
+                                }
+                            });
+                        }
+                    } else {
+                        showMessage("No change is made")
+                        return;
+                    }
+                } else {
+                    showMessage("Please select a classification");
+                }
+            });
+
+            var buttonReset = dijit.byId("buttonReset");
+            dojo.connect(buttonReset, "onClick", function(evt){
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    var item = grid.selection.getSelected("row")[0];
+                    updateDetail(item);
+                } else {
+                    updateDetail({});
+                }
+            });
+
+            var rcButtonReset = dijit.byId("rcButtonReset");
+            dojo.connect(rcButtonReset, "onClick", function(evt){
+                if (gridRateCategory.selection.getSelectedCount("row") >= 1) {
+                    var item = gridRateCategory.selection.getSelected("row")[0];
+                    updateRateCategoryDetail(item);
+                } else {
+                    updateRateCategoryDetail({});
+                }
+            });
+        });
+
+    </script>
+
+
+    <div>
+        <div style="width: 58%; float: left">
+            <h2>Classifications</h2>
+            <div id="classifications"><!-- fix ff problem --></div>
+        </div>
+
+        <div style="width: 38%; float: right">
+            <h2>Details</h2>
+            <form id="form" dojoType="dijit.form.Form">
+                <div>
+                    <table style="width: 100%">
+                        <tr>
+                            <td style="width: 30%">ID:</td><td id="configId" style="width: 70%"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Name:</td><td class="tdTextBox"><input id="name" dojoType="dijit.form.TextBox"/></td>
+                        </tr>
+                        <tr>
+                            <td>Description:</td><td class="tdTextArea"><textarea rows="4" id="description" dojoType="dijit.form.SimpleTextarea"><!-- --></textarea></td>
+                        </tr>
+                        <tr>
+                            <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                        </tr>
+                    </table>
+                </div>
+                <p/>
+                <div style="float: right">
+                    <button id="buttonSave" label="Save" dojoType="dijit.form.Button" type="button"><!-- fix ff problem --></button>
+                    <button id="buttonReset" label="Reset" dojoType="dijit.form.Button" type="button"><!-- fix ff problem --></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <p style="clear: both"/>
+
+    <div>
+        <div style="width: 58%; float: left">
+            <h2>Rate Categories</h2>
+            <div id="rateCategories"><!-- fix ff problem --></div>
+        </div>
+
+        <div style="width: 38%; float: right">
+            <h2>Details</h2>
+            <form id="rcForm" dojoType="dijit.form.Form">
+                <div>
+                    <table style="width: 100%">
+                        <tr>
+                            <td style="width: 30%">ID:</td><td id="rcId" style="width: 70%"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Name:</td><td class="tdTextBox"><input id="rcName" dojoType="dijit.form.TextBox"/></td>
+                        </tr>
+                        <tr>
+                            <td>Description:</td><td class="tdTextArea"><textarea rows="4" id="rcDescription" dojoType="dijit.form.SimpleTextarea"><!-- --></textarea></td>
+                        </tr>
+                        <tr>
+                            <td>Classification:</td><td id="rcClassification"><!-- --></td>
+                        </tr>
+                        <tr>
+                            <td>Insider:</td><td id="rcInsider"><!-- --></td>
+                        </tr>
+                        <tr>
+                            <td>Time Created:</td><td id="rcTimeCreated"><!-- fix ff problem --></td>
+                        </tr>
+                        <tr>
+                            <td>Last Updated:</td><td id="rcLastUpdated"><!-- fix ff problem --></td>
+                        </tr>
+                    </table>
+                </div>
+                <p/>
+                <div style="float: right">
+                    <button id="rcButtonSave" label="Save" dojoType="dijit.form.Button" type="button"><!-- fix ff problem --></button>
+                    <button id="rcButtonReset" label="Reset" dojoType="dijit.form.Button" type="button"><!-- fix ff problem --></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>

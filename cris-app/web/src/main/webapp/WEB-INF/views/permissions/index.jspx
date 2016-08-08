@@ -1,0 +1,794 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+          xmlns:jsp="http://java.sun.com/JSP/Page"
+          xmlns:c="http://java.sun.com/jsp/jstl/core"
+          xmlns:spring="http://www.springframework.org/tags"
+          xmlns:sec="http://www.springframework.org/security/tags"
+          xmlns:form="http://www.springframework.org/tags/form"
+          >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/permissions" var="urlGeneratedGet"/>
+    <spring:url value="/permissions" var="urlGeneratedPost"/>
+    <spring:url value="/projects" var="urlGeneratedGetProjects"/>
+    <spring:url value="/experiments" var="urlGeneratedGetExperiments"/>
+    <spring:url value="/workflows" var="urlGeneratedGetWorkflows"/>
+    <spring:url value="/shortcuts" var="urlGeneratedGetShortcuts"/>
+    <spring:url value="/users" var="urlUsers"/>
+    <spring:url value="/groups" var="urlGroups"/>
+
+    <script type="text/javascript">
+        cris.require([
+            "dojo/data/ObjectStore",
+            "dojo/store/Memory",
+            "dijit/Dialog",
+            "dijit/form/FilteringSelect",
+            "dijit/form/Form",
+            "dijit/form/Button",
+            "dijit/layout/TabContainer"
+        ]);
+
+        cris.ready(function() {
+
+            var storeUsers = createJsonRestStore("${urlUsers}");
+            var storeGroups = createJsonRestStore("${urlGroups}");
+
+            var layoutUsers = [{cells: [
+                        {field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true},
+                        {field: 'lastName', name: 'Last Name', width: 'auto'},
+                        {field: 'firstName', name: 'First Name', width: 'auto'},
+                        {field: 'username', name: 'User Name', width: 'auto'}
+                    ]}];
+
+            var layoutGroups = [{cells: [
+                        {field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true},
+                        {field: 'name', name: 'Name', width: 'auto'}
+                    ]}];
+
+            var layout = [{cells: [
+                        {field: 'id', name: 'ID', width: '40px', hidden: true},
+                        {field: 'name', name: 'Name', width: 'auto'},
+                        {field: 'create', name: 'Create', width: '45px'},
+                        {field: 'read', name: 'Read', width: '35px'},
+                        {field: 'update', name: 'Update', width: '45px'},
+                        {field: 'delete1', name: 'Delete', width: '40px'},
+                        {field: 'execute', name: 'Execute', width: '50px'},
+                        {field: 'value', name: 'Value', width: '90px', get: function(row, item) {
+                            if (!item) {
+                                return "Loading...";
+                            }
+                            return item.value = 'Click for Values';
+                        }}
+                    ]}];
+
+            var layoutAdmin = [{cells: [
+                        {field: 'id', name: 'ID', width: '40px', hidden: true},
+                        {field: 'name', name: 'Name', width: 'auto'},
+                        {field: 'create', name: 'Create', width: '45px'},
+                        {field: 'read', name: 'Read', width: '35px'},
+                        {field: 'update', name: 'Update', width: '45px'},
+                        {field: 'delete1', name: 'Delete', width: '40px'},
+                        {field: 'execute', name: 'Execute', width: '50px'},
+                        {field: 'value', name: 'Value', width: '90px', get: function(row, item) {
+                                if (!item) {
+                                    return "Loading...";
+                                }
+                                return item.value = 'Click for Values';
+                            }}
+                    ]}];
+
+            var myObjectIds = new Array();
+
+            function getObjects(value) {
+                var url = null;
+                if (value === "Project") {
+                    url = "${urlGeneratedGetProjects}";
+                } else if (value === "Experiment") {
+                    url = "${urlGeneratedGetExperiments}";
+                } else if (value === "Workflow") {
+                    url = "${urlGeneratedGetWorkflows}";
+//                } else if (value === "Tool") {
+//                    url = "${urlGeneratedGetTools}";
+                }
+
+                dojo.xhrGet({
+                    url: url,
+                    sync: true,
+                    load: function(data) {
+                        var obj = JSON.parse(data);
+                        for (var i = 0; obj.length > i; i++) {
+                            objectStore.put({id: obj[i].id, name: obj[i].name});
+                            myObjectIds[i] = obj[i].id;
+                        }
+
+                        gridPermissionSet.setStore(store);
+                        gridPermissionSet.setQuery({});
+
+                        getSubjectPermission(value, false);
+                        initialFlagSetting(value);
+                    }
+                });
+            }
+
+            function initialFlagSetting(value) {
+                dijit.byId("create").set('disabled', true);
+                dijit.byId("read").set('disabled', false);
+                dijit.byId("update").set('disabled', false);
+                dijit.byId("delete").set('disabled', true);
+                dijit.byId("execute").set('disabled', true);
+                if (value === "Project" || value === "Experiment") {
+                    dijit.byId("create").set('disabled', false);
+                    dijit.byId("delete").set('disabled', false);
+                }
+                if (value === "Shortcut") {
+                    dijit.byId("delete").set('disabled', false);
+                }
+                if (value === "Workflow") {
+                    dijit.byId("update").set('disabled', true);
+                }
+            }
+
+            function initialAdminFlagSetting(className) {
+                dijit.byId("createAdmin").set('disabled', false);
+                dijit.byId("readAdmin").set('disabled', false);
+                dijit.byId("updateAdmin").set('disabled', false);
+                dijit.byId("deleteAdmin").set('disabled', true);
+                dijit.byId("executeAdmin").set('disabled', true);
+                if (className === "Group" || className === "Shortcut") {
+                    dijit.byId("deleteAdmin").set('disabled', false);
+                }
+                if (className === "User") {
+                    dijit.byId("createAdmin").set('disabled', true);
+                }
+                if (className === "Workflow") {
+                    dijit.byId("updateAdmin").set('disabled', true);
+                }
+            }
+            
+            function setUIPermission(object, store) {
+                for (var i in object) {
+                    for (var j in object[i]) {
+                        var permissionType = store.get(object[i].id);
+                        if (object[i]["read"] === true) {
+                            permissionType.read = "yes";
+                        } else {
+                            permissionType.read = "no";
+                        }
+                        if (object[i]["update"] === true) {
+                            permissionType.update = "yes";
+                        } else {
+                            permissionType.update = "no";
+                        }
+                        if (object[i]["create"] === true) {
+                            permissionType.create = "yes";
+                        } else {
+                            permissionType.create = "no";
+                        }
+                        if (object[i]["delete"] === true) {
+                            permissionType.delete1 = "yes";
+                        } else {
+                            permissionType.delete1 = "no";
+                        }
+                        if (object[i]["execute"] === true) {
+                            permissionType.execute = "yes";
+                        } else {
+                            permissionType.execute = "no";
+                        }
+                    }
+                }
+            }
+
+            function getSubjectPermission(className, isAdminType) {
+                var selectedUsers = dijit.byId("tabUsers").selected;
+                var selectedGroups = dijit.byId("tabGroups").selected;
+                var item;
+                var isGroup = "no";
+                var objectClass = className;
+
+                if (selectedUsers) {
+                    item = gridUsers.selection.getSelected("row")[0] === undefined ? null : gridUsers.selection.getSelected("row")[0].id;
+                } else if (selectedGroups) {
+                    item = gridGroups.selection.getSelected("row")[0] === undefined ? null : gridGroups.selection.getSelected("row")[0].id;
+                    isGroup = "yes";
+                }
+                if (item !== null) {
+                    var objectIds = "";
+                    if (!isAdminType) {
+                        for (var i = 0; myObjectIds.length > i; i++) {
+                            objectIds = objectIds + "," + myObjectIds[i];
+                        }
+                    } else {
+                        objectIds = ",0";
+                    }
+
+                    dojo.xhrGet({
+                        url: "${urlGeneratedGet}" + "?format=old&amp;sId=" + item + "&amp;objectIds=" + objectIds + "&amp;objectClass=" + objectClass + "&amp;group=" + isGroup,
+                        sync: true,
+                        load: function(data) {
+                            var object = JSON.parse(data);
+                            setUIPermission(object, isAdminType ? objectStoreAdmin : objectStore);
+                            if (isAdminType) {
+                                gridPermissionSetAdmin.setQuery({});
+                            } else {
+                                gridPermissionSet.setQuery({});
+                            }
+                        }
+                    });
+                } else {
+                    // if no previous permission set, do nothing; otherwise clear permission
+                    var store = isAdminType ? objectStoreAdmin : objectStore;
+                    store.query(function(item) {
+                        item.create = null;
+                        item.read = null;
+                        item.update = null;
+                        item.delete1 = null;
+                        item.execute = null;
+                    });
+                    if (isAdminType) {
+                        gridPermissionSetAdmin.setQuery({});
+                    } else {
+                        gridPermissionSet.setQuery({});
+                    }
+                }
+            }
+
+            function getObjectClassName(name) {
+                var objectClass = null;
+                if (name === "Project") {
+                    objectClass = "Project";
+                } else if (name === "Experiment") {
+                    objectClass = "Experiment";
+                } else if (name === "Workflow") {
+                    objectClass = "Workflow";
+                } else if (name === "Group") {
+                    objectClass = "Group";
+                } else if (name === "User") {
+                    objectClass = "User";
+                }
+                return objectClass;
+            }
+
+            function resetObjectPermission() {
+                dijit.byId("read").reset();
+                dijit.byId("create").reset();
+                dijit.byId("execute").reset();
+                dijit.byId("update").reset();
+                dijit.byId("delete").reset();
+            }
+
+            function resetObjectAdminTypePermission() {
+                dijit.byId("readAdmin").reset();
+                dijit.byId("createAdmin").reset();
+                dijit.byId("updateAdmin").reset();
+                dijit.byId("deleteAdmin").reset();
+                dijit.byId("executeAdmin").reset();
+            }
+
+            function onClickForValues(e, isAdminType) {
+                var colfield = e.cell.field;
+                var item = e.grid.getItem(e.rowIndex);
+                
+                if (colfield === "value") {
+                    var createId = isAdminType ? "createAdmin" : "create";
+                    var readId = isAdminType ? "readAdmin" : "read";
+                    var updateId = isAdminType ? "updateAdmin" : "update";
+                    var deleteId = isAdminType ? "deleteAdmin" : "delete";
+                    var executeId = isAdminType ? "executeAdmin" : "execute";
+                    
+                    var isPublicUser = false;
+                    var selectedUsers = dijit.byId("tabUsers").selected;
+                    if (selectedUsers) {
+                        if (gridUsers.selection.getSelected("row")[0] !== undefined) {
+                            var itemUser = gridUsers.selection.getSelected("row")[0].id;
+                            var userItem = storeUsers.fetchItemByIdentity({identity: itemUser, sync: true});
+                            var userName = userItem.username;
+                            if (userName === "public.user" || userName === "public") {
+                                isPublicUser = true;
+                            }
+                        }
+                    }
+
+                    var objectClass = isAdminType ? getObjectClassName(dijit.byId("idSelectObjectClassAdmin").get("value")) : dijit.byId("idSelectObjectClass").get("value");
+
+                    if (item.create === "yes") {
+                        dijit.byId(createId).setAttribute('checked', true);
+                    } else {
+                        dijit.byId(createId).setAttribute('checked', false);
+                    }
+                    if (item.read === "yes") {
+                        dijit.byId(readId).setAttribute('checked', true);
+                    } else {
+                        dijit.byId(readId).setAttribute('checked', false);
+                    }
+                    if (item.update === "yes") {
+                        dijit.byId(updateId).setAttribute('checked', true);
+                    } else {
+                        dijit.byId(updateId).setAttribute('checked', false);
+                    }
+                    if (item.delete1 === "yes") {
+                        dijit.byId(deleteId).setAttribute('checked', true);
+                    } else {
+                        dijit.byId(deleteId).setAttribute('checked', false);
+                    }
+                    if (item.execute === "yes") {
+                        dijit.byId(executeId).setAttribute('checked', true);
+                    } else {
+                        dijit.byId(executeId).setAttribute('checked', false);
+                    }
+
+                    if (isPublicUser) {
+                        if (isAdminType) {
+                            dijit.byId(createId).setAttribute('disabled', true);
+                            dijit.byId(readId).setAttribute('disabled', true);
+                            dijit.byId(updateId).setAttribute('disabled', true);
+                            dijit.byId(deleteId).setAttribute('disabled', true);
+                            dijit.byId(executeId).setAttribute('disabled', true);
+                        } else {
+                            dijit.byId(createId).setAttribute('disabled', true);
+                            dijit.byId(readId).setAttribute('disabled', true);
+                            dijit.byId(updateId).setAttribute('disabled', true);
+                            dijit.byId(deleteId).setAttribute('disabled', true);
+                            dijit.byId(executeId).setAttribute('disabled', true);
+                            
+                            if (objectClass === "Experiment") {
+                                dijit.byId(readId).set('disabled', false);
+                                dijit.byId(createId).set('disabled', false);
+                            }
+                            if (objectClass === "Workflow") {
+                                dijit.byId(readId).set('disabled', false);
+                            }
+                            if (objectClass === "Project") {
+                                dijit.byId(readId).set('disabled', false);
+                            }
+                        }
+                    } else {
+                        if (isAdminType) {
+                            initialAdminFlagSetting(objectClass);
+                        } else {
+                            initialFlagSetting(objectClass);
+                        }
+                    }
+                    
+                    if (isAdminType) {
+                        myFormDialogAdmin.show();
+                    } else {
+                        myFormDialog.show();
+                    }
+                }
+            }
+
+            function setPermission(sid, objectId, objectClass, group, isAdminType) {
+                var read, update, create, delete1, execute = null;
+                var createId = isAdminType ? "createAdmin" : "create";
+                var readId = isAdminType ? "readAdmin" : "read";
+                var updateId = isAdminType ? "updateAdmin" : "update";
+                var deleteId = isAdminType ? "deleteAdmin" : "delete";
+                var executeId = isAdminType ? "executeAdmin" : "execute";
+
+                var updateValue = dijit.byId(updateId).get("value");
+                if (updateValue === false) {
+                    update = false;
+                        } else {
+                    update = true;
+                            }
+                var deleteValue = dijit.byId(deleteId).get("value");
+                if (deleteValue === false) {
+                    delete1 = false;
+                } else {
+                    delete1 = true;
+                            }
+                var createValue = dijit.byId(createId).get("value");
+                if (createValue === false) {
+                    create = false;
+                } else {
+                    create = true;
+                            }
+                var readValue = dijit.byId(readId).get("value");
+                if (deleteValue === "on" || updateValue === "on" || createValue === "on") {
+                    read = true;
+                } else {
+                    if (readValue === false) {
+                        read = false;
+                    } else {
+                        read = true;
+                    }
+                }
+                var executeValue = dijit.byId(executeId).get("value");
+                if (executeValue === false) {
+                    execute = false;
+                } else {
+                    execute = true;
+                }
+                var isGroup = group;
+
+                dojo.xhrPost({
+                    url: "${urlGeneratedPost}",
+                    postData: dojo.toJson({"sId": sid, "objectId": +objectId, "objectClass": objectClass, "read": read, "update": update,
+                        "create": create, "delete": delete1, "execute": execute, "group": isGroup}),
+                    handleAs: "text",
+                    headers: {"Content-Type": "application/json", "Accept": "application/json"},
+                    load: function(response) {
+                        var objectItem = isAdminType ? gridPermissionSetAdmin.selection.getSelected("row")[0].id : gridPermissionSet.selection.getSelected("row")[0].id;
+                        var permissionType = isAdminType ? objectStoreAdmin.get(objectItem) : objectStore.get(objectItem);
+                        if (readValue === false) {
+                            permissionType.read = "no";
+                        } else {
+                            permissionType.read = "yes";
+                        }
+                        if (updateValue === false) {
+                            permissionType.update = "no";
+                        } else {
+                            permissionType.update = "yes";
+                            permissionType.read = "yes";
+                        }
+                        if (createValue === false) {
+                            permissionType.create = "no";
+                        } else {
+                            permissionType.create = "yes";
+                            permissionType.read = "yes";
+                        }
+                        if (deleteValue === false) {
+                            permissionType.delete1 = "no";
+                        } else {
+                            permissionType.delete1 = "yes";
+                            permissionType.read = "yes";
+                        }
+                        if (executeValue === false) {
+                            permissionType.execute = "no";
+                        } else {
+                            permissionType.execute = "yes";
+                        }
+                        if (isAdminType) {
+                            gridPermissionSetAdmin.setQuery({});
+                        } else {
+                            gridPermissionSet.setQuery({});
+                        }
+                    },
+                    error: function(response) {
+                        showMessage("This user is an Admin and cannot be assigned permissions on objects");
+                    }
+                });
+                if (isAdminType) {
+                    resetObjectAdminTypePermission();
+                } else {
+                    resetObjectPermission();
+                }
+            }
+
+            var asc = true;
+            var args = {
+                pageSizes: ["10"],
+                autoHeight: 100,
+                rowsPerPage: 10
+            };
+
+            args.sortFields = [{attribute: "lastName", descending: !asc}];
+            args.query = {enabled: true};
+            var gridUsers = createGrid(storeUsers, layoutUsers, "users", args);
+            gridUsers.setSortIndex(1, asc);
+
+            args.sortFields = [{attribute: "name", descending: !asc}];
+            var gridGroups = createGrid(storeGroups, layoutGroups, "groups", args);
+            delete args.query;
+            gridGroups.setSortIndex(1, asc);
+
+            var objectStore = new dojo.store.Memory({data: []});
+            var store = new dojo.data.ObjectStore({objectStore: objectStore});
+
+            args.sortFields = [{attribute: "name", descending: !asc}];
+            var gridPermissionSet = createGrid(store, layout, "objectPermissions", args);
+            gridPermissionSet.setSortIndex(1, asc);
+            if ("${filter}" !== "") {
+                gridPermissionSet.setQuery({filter: "${filter}"});
+            }
+
+        <c:if test="${isAdmin}">
+            var objectStoreAdmin = new dojo.store.Memory({data: []});
+            var storeAdmin = new dojo.data.ObjectStore({objectStore: objectStoreAdmin});
+
+            args.sortFields = [{attribute: "name", descending: !asc}];
+            var gridPermissionSetAdmin = createGrid(storeAdmin, layoutAdmin, "objectPermissionsAdmin", args);
+            gridPermissionSetAdmin.setSortIndex(1, asc);
+            if ("${filter}" !== "") {
+                gridPermissionSetAdmin.setQuery({filter: "${filter}"});
+            }
+
+            gridPermissionSetAdmin.onCellClick = function(e) {
+                resetObjectAdminTypePermission();
+                onClickForValues(e, true);
+            };
+
+            dojo.connect(dijit.byId("idSelectObjectClassAdmin"), "onChange", function(value) {
+                objectStoreAdmin = new dojo.store.Memory({data: []});
+                storeAdmin = new dojo.data.ObjectStore({objectStore: objectStoreAdmin});
+                var className = getObjectClassName(value);
+                var name = "ALL-" + className + "s";
+                objectStoreAdmin.put({id: "0", name: name});
+                gridPermissionSetAdmin.setStore(storeAdmin);
+                gridPermissionSetAdmin.setQuery({});
+                getSubjectPermission(className, true);
+                initialAdminFlagSetting(className);
+            });
+        </c:if>
+
+            function onSelectSubject() {
+                var objectClass = dijit.byId("idSelectObjectClass").get("value");
+                if (objectClass !== "Select an Object Class") {
+                    getSubjectPermission(objectClass, false);
+                }
+                objectClass = dijit.byId("idSelectObjectClassAdmin").get("value");
+                var className = getObjectClassName(objectClass);
+                if (className !== null) {
+                    getSubjectPermission(className, true);
+                }
+            }
+
+            // Get permissions for a particular user when a certain user is clicked
+            gridUsers.onRowClick = function(e) {
+                onSelectSubject();
+            };
+            // Get permissions for a particular group when a certain group is clicked
+            gridGroups.onRowClick = function(e) {
+                onSelectSubject();
+            };
+
+            //reset the values of the dialog and then set them based on set permissions once the particular cell "value" is clicked
+            gridPermissionSet.onCellClick = function(e) {
+                resetObjectPermission();
+                onClickForValues(e, false);
+            };
+
+            //this event is fired when a particular object class is selected
+            dojo.connect(dijit.byId("idSelectObjectClass"), "onChange", function(value) {
+                objectStore = new dojo.store.Memory({data: []});
+                store = new dojo.data.ObjectStore({objectStore: objectStore});
+                myObjectIds = new Array();
+                getObjects(value);
+            });
+
+            // this event is fired when the user hits the save button
+            dojo.connect(dijit.byId("save"), "onClick", function(evt) {
+                var selectedUsers = dijit.byId("tabUsers").selected;
+                var selectedGroups = dijit.byId("tabGroups").selected;
+
+                if (selectedUsers) {
+                    setPermissionUserType(evt);
+                } else if (selectedGroups) {
+                    setPermissionGroupType(evt);
+                }
+            });
+
+            dojo.connect(dijit.byId("cancel"), "onClick", function(evt) {
+                myFormDialog.hide();
+            });
+
+            dojo.connect(dijit.byId("saveAdmin"), "onClick", function(evt) {
+                var selectedUsers = dijit.byId("tabUsers").selected;
+                var selectedGroups = dijit.byId("tabGroups").selected;
+
+                if (selectedUsers) {
+                    setPermissionUserTypeAdmin(evt);
+                } else if (selectedGroups) {
+                    setPermissionGroupTypeAdmin(evt);
+                }
+            });
+
+            dojo.connect(dijit.byId("cancelAdmin"), "onClick", function(evt) {
+                myFormDialogAdmin.hide();
+            });
+
+            var tabContainer = dijit.byId("tabContainer");
+            tabContainer.watch("selectedChildWidget", function(name, oval, nval){
+                var tabName = nval.get("id");
+                switch (tabName) {
+                    case "tabUsers":
+                        onSelectSubject();
+                        break;
+                    case "tabGroups":
+                        onSelectSubject();
+                        break;
+                }
+            });
+
+            function setPermissionUserType(evt) {
+                var countUsers = gridUsers.selection.getSelectedCount("row");
+
+                if (countUsers === 0) {
+                    showMessage("You must pick one user and one object");
+                    resetObjectPermission();
+                    return;
+                }
+
+                var itemUser = gridUsers.selection.getSelected("row")[0].id;
+                var objectIds = gridPermissionSet.selection.getSelected("row")[0].id;
+                var objectClass = dijit.byId("idSelectObjectClass").get("value");
+
+                setPermission(itemUser, objectIds, objectClass, false, false);
+            }
+
+            function setPermissionGroupType(evt) {
+                var countGroups = gridGroups.selection.getSelectedCount("row");
+
+                if (countGroups === 0) {
+                    showMessage("You must pick one group and one object");
+                    resetObjectPermission();
+                    return;
+                }
+
+                var itemGroup = gridGroups.selection.getSelected("row")[0].id;
+                var objectIds = gridPermissionSet.selection.getSelected("row")[0].id;
+                var objectClass = dijit.byId("idSelectObjectClass").get("value");
+
+                setPermission(itemGroup, objectIds, objectClass, true, false);
+            }
+
+            function setPermissionUserTypeAdmin(evt) {
+                var countUsers = gridUsers.selection.getSelectedCount("row");
+
+                if (countUsers === 0) {
+                    showMessage("You must pick one user and one object class");
+                    resetObjectAdminTypePermission();
+                    return;
+                }
+
+                var itemUser = gridUsers.selection.getSelected("row")[0].id;
+                var objectIds = gridPermissionSetAdmin.selection.getSelected("row")[0].id;
+                var objectClass = dijit.byId("idSelectObjectClassAdmin").get("value");
+                var className = getObjectClassName(objectClass);
+                setPermission(itemUser, objectIds, className, false, true);
+            }
+
+            function setPermissionGroupTypeAdmin(evt) {
+                var countGroups = gridGroups.selection.getSelectedCount("row");
+
+                if (countGroups === 0) {
+                    showMessage("You must pick one group and one object");
+                    resetObjectAdminTypePermission();
+                    return;
+                }
+
+                var itemGroup = gridGroups.selection.getSelected("row")[0].id;
+                var objectIds = gridPermissionSetAdmin.selection.getSelected("row")[0].id;
+                var objectClass = dijit.byId("idSelectObjectClassAdmin").get("value");
+                var className = getObjectClassName(objectClass);
+                setPermission(itemGroup, objectIds, className, true, true);
+            }
+        });
+
+    </script>
+
+    <div>
+        <div class="fourTenths floatLeft">
+            <h2>Step 1: Select Users/Groups</h2>
+
+            <div id="tabContainer" data-dojo-type="dijit/layout/TabContainer" doLayout="false" useMenu="false"  useSlider="false" style="width: 100%;">
+                <div id="tabUsers" data-dojo-type="dijit/layout/ContentPane" data-dojo-props='title: "Users", selected: "true"' style="border: 0px; padding: 0px; height: 100%">
+                    <div id="users"><!-- fix ff problem --></div>
+                </div>
+
+                <div id="tabGroups" data-dojo-type="dijit/layout/ContentPane" data-dojo-props='title: "Groups", selected: "false"' style="border: 0px; padding: 0px; height: 100%">
+                    <div id="groups"><!-- fix ff problem --></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="permissionDetail" class="sixTenths floatRight">
+            <h2>Step 2: Select Object Class and Set Permissions</h2>
+
+            <c:if test="${isAdmin}">
+                <h3>Management Permissions</h3>
+
+                <form id="accountFormAdmin" data-dojo-type="dijit/form/Form">
+                    <table style="width: 100%">
+                        <tr>
+                            <td>Object Class:</td>
+                            <td class="tdTextBox" style="width: 75%">
+                                <select id="idSelectObjectClassAdmin" data-dojo-type="dijit/form/FilteringSelect"  data-dojo-props="required: 'true', placeHolder: 'Select an Object Class'">
+                                    <option selected="selected">Select an Object Class</option>
+                                    <option value='Project'>Project Management</option>
+                                    <!--
+                                    <option value='Experiment'>Experiment Management</option>
+                                    -->
+                                    <option value='Workflow'>Workflow Management</option>
+                                    <!--
+                                    <option value='Report'>Report Management</option>
+                                    <option value='Tool'>Tool Management</option>
+                                    <option value='Vocabulary'>Vocabulary Management</option>
+                                    <option value='Template'>Template Management</option>
+                                    -->
+                                    <option value='Group'>Group Management</option>
+                                    <option value='User'>User Management</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </table>
+                </form>
+
+                <br />
+
+                <div id="objectPermissionsAdmin"><!-- fix ff problem --></div>
+            </c:if>
+
+            <h3>Usage/Dataset Permissions</h3>
+
+            <form id="accountForm" data-dojo-type="dijit/form/Form">
+                <table style="width: 100%">
+                    <tr>
+                        <td>Object Class:</td>
+                        <td class="tdTextBox" style="width: 75%">
+                            <select id="idSelectObjectClass" data-dojo-type="dijit/form/FilteringSelect"  data-dojo-props="required: 'true', placeHolder: 'Select an Object Class'">
+                                <option selected="selected">Select an Object Class</option>
+                                <option value='Workflow'>Workflow Usage</option>
+                                <!--
+                                <option value='Report'>Report Usage</option>
+                                <option value='Tool'>Tool Usage</option>
+                                -->
+                                <option value='Project'>Project Dataset</option>
+                                <option value='Experiment'>Experiment Dataset</option>
+                            </select>
+                        </td>
+                    </tr>
+
+                </table>
+            </form>
+
+            <br />
+
+            <div id="objectPermissions"><!-- fix ff problem --></div>
+        </div>
+
+        <div data-dojo-type="dijit/Dialog" data-dojo-id="myFormDialog" style="margin: 0 auto" title="Permissions">
+            <div class="dijitDialogPaneContentArea">
+                <table class='form'>
+                    <tr>
+                        <td style='width: 100px;'>Create:</td><td style="text-align: center"><input id="create" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Read:</td><td style="text-align: center"><input id="read" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Update:</td><td style="text-align: center"><input id="update" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Delete:</td><td style="text-align: center"><input id="delete" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Execute:</td><td style="text-align: center"><input id="execute" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="dijitDialogPaneActionBar">
+                <button data-dojo-type="dijit/form/Button" type="submit" id="save">Save</button>
+                <button data-dojo-type="dijit/form/Button" type="button" id="cancel">Cancel</button>
+            </div>
+        </div>
+
+        <div data-dojo-type="dijit/Dialog" data-dojo-id="myFormDialogAdmin" title="Permissions">
+            <div class="dijitDialogPaneContentArea">
+                <table class='form'>
+                    <tr>
+                        <td style='width: 100px;'>Create:</td><td style="text-align: center"><input id="createAdmin" data-dojo-type="dijit/form/CheckBox" checked="checked"/></td>
+                    </tr>
+                    <tr>
+                        <td>Read:</td><td style="text-align: center"><input id="readAdmin" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Update:</td><td style="text-align: center"><input id="updateAdmin" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Delete:</td><td style="text-align: center"><input id="deleteAdmin" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Execute:</td><td style="text-align: center"><input id="executeAdmin" data-dojo-type="dijit/form/CheckBox"/></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="dijitDialogPaneActionBar">
+                <button data-dojo-type="dijit/form/Button" type="submit" id="saveAdmin">Save</button>
+                <button data-dojo-type="dijit/form/Button" type="button" id="cancelAdmin">Cancel</button>
+            </div>
+        </div>
+    </div>
+</jsp:root>

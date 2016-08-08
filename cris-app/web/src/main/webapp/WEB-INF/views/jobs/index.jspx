@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:fn="http://java.sun.com/jsp/jstl/functions" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/jobs/json/list" var="urlJobs"/>
+    <spring:url value="/jobs/?form" var="urlJobsForm"/>
+    <spring:url value="/jobs/cancel/" var="urlJobsCancel"/>
+
+    <c:choose>
+        <c:when test="${not empty param['status']}">
+            <spring:eval expression="param['status']" var="status"/>
+        </c:when>
+        <c:otherwise>
+            <spring:eval expression="'true,false,false'" var="status"/>
+        </c:otherwise>
+    </c:choose>
+
+    <script type="text/javascript">
+    // <![CDATA[
+    angular.module("crisJob", ["angular-dojo"]);
+
+    angular.module("crisJob").controller("jobController", ["$scope", function($scope) {
+        cris.require([
+            "dojo/request/xhr",
+            "dijit/form/Button",
+            "dijit/form/RadioButton"
+        ]);
+
+        cris.ready(function() {
+            var store = createJsonRestStore("${urlJobs}");
+
+            var formatHref = function(value, rowIndex) {
+                var newValue;
+                if (value) {
+                    newValue = value.replace(/&lt;/g, "<");
+                } else {
+                    newValue = "";
+                }
+                return newValue;
+            };
+
+            var layout = [
+                {
+                    cells: [
+                        { field: 'id', name: 'Job ID', datatype: "number", width: '50px' },
+                        { field: 'name', name: 'Name', width: 'auto', formatter: formatHref },
+                        { field: 'workflowId.name', name: 'Workflow', width: 'auto' },
+                        { field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px', get: function(index, item) {
+                            if (!item) {
+                                return;
+                            }
+                            return stringDate(item.timeUpdated);
+                        } },
+                        { field: 'statusId.name', name: 'Status', width: '75px' },
+                        { field: 'actionNeeded', name: 'Next Task', filterable: false, width: 'auto', formatter: formatHref, canSort: false}
+                    ]
+                }
+            ];
+
+            var args = {};
+
+            var status;
+            if ("${status}") {
+                status = "${status}";
+            } else {
+                status = "true,true,true";
+            }
+
+            var query = {status: status};
+            //TODO: there may be better ways
+            var dateFilter = '${param["dateFilter"]}';
+            if (dateFilter) {
+                //dateFilter = dojo.fromJson(dateFilter);
+                query.dateFilter = dateFilter;
+            }
+            args.query = query;
+
+            var asc = false;
+            args.sortFields = [{attribute: "timeUpdated", descending: !asc}];
+            args.pageSizes = ["10", "25", "50", "100"];
+
+            var grid = createGrid(store, layout, "idGrid", args);
+            grid.setSortIndex(3, asc);
+
+            grid.canSort = function(col) {
+                if (Math.abs(col) === 6 || Math.abs(col) === 5) {
+                    return false;
+                } else {
+                    return true;
+                }
+            };
+
+            var buttonDelete = dijit.byId("idDelete");
+            dojo.connect(grid, "onSelected", function(index) {
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    var item = grid.getItem(index);
+                    var status = item["statusId.name"];
+                    if (status === "CANCELED") {
+                        buttonDelete.set("disabled", true);
+                    } else {
+                        buttonDelete.set("disabled", false);
+                    }
+                } else {
+                    buttonDelete.set("disabled", false);
+                }
+            });
+
+            $scope.onDelete = function() {
+                if (grid.selection.getSelectedCount("row") >= 1) {
+                    var item = grid.selection.getSelected()[0];
+                    var status = item["statusId.name"];
+                    if (status !== "CANCELLED") {
+                        var index = item.name.indexOf(">");
+                        var name;
+                        if (index !== -1) {
+                            name = item.name.substring(index + 1);
+                        } else {
+                            name = item.name;
+                        }
+                        index = name.lastIndexOf("<");
+                        if (index !== -1) {
+                            name = name.substring(0, index);
+                        }
+                        var yes = confirm("Are you sure to delete job: " + item.id + ": " + name);
+                        if (yes) {
+                            var xhrArgs = {
+                                url: "${urlJobsCancel}" + item.id,
+                                handleAs: "json",
+
+                                load: function(data) {
+                                    grid.setQuery(query);
+                                    buttonDelete.set("disabled", true);
+                                    grid.selection.setSelected(grid.selection.selectedIndex, false);
+                                },
+
+                                error: function(error) {
+                                }
+                            };
+
+                            dojo.xhrDelete(xhrArgs);
+                        }
+                    }
+                }
+            };
+
+            $scope.errorMessage = "";
+            $scope.status = [];
+            var arrayStatus = dojo.fromJson("[" + status + "]");
+            angular.forEach(arrayStatus, function(v, i) {
+                if (v === true) {
+                    $scope.status.push(i);
+                }
+            });
+            $scope.$apply();
+
+            $scope.$watch("status", function(value) {
+                console.dir($scope.status);
+                var running = false;
+                var finished = false;
+                var cancelled = false;
+                angular.forEach($scope.status, function(v, i) {
+                    if (v === 0) {
+                        running = true;
+                    } else if (v === 1) {
+                        finished = true;
+                    } else if (v === 2) {
+                        cancelled = true;
+                    }
+                });
+                query.status = running +  "," + finished + "," + cancelled;
+                grid.setQuery(query);
+            }, true);
+        });
+    }]);
+
+
+        cris.bootstrapAngular("idJob", "crisJob");
+    // ]]>
+    </script>
+
+    <div id="idJob" data-ng-controller="jobController">
+        <h1 class="center">Jobs</h1>
+
+        <div>
+            <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Create a New Job"' onClick="window.location.href='${urlJobsForm}'"/>
+            <span data-ng-show="${fn:length(views) > 1}">
+                <input id="idDelete" type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Deprecate", disabled: true' data-ng-click="onDelete()"/>
+            </span>
+            &amp;nbsp;&amp;nbsp;&amp;nbsp;{{errorMessage}}
+
+            <div class="floatRightToButton">
+                <cris-check-box name="status" orientation="horizontal" items="{Running: 0, Finished: 1, Cancelled: 2}" data-ng-model="status"><!-- --></cris-check-box>
+            </div>
+        </div>
+
+        <div id="idGrid"><!-- --></div>
+    </div>
+
+</jsp:root>

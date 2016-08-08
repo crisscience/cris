@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+    xmlns:jsp="http://java.sun.com/JSP/Page"
+    xmlns:c="http://java.sun.com/jsp/jstl/core"
+    xmlns:spring="http://www.springframework.org/tags"
+    xmlns:form="http://www.springframework.org/tags/form"
+    >
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <script type="text/javascript">
+        cris.require([
+            "dijit/form/Form",
+            "dijit/form/ValidationTextBox",
+            "dijit/form/Button"
+        ]);
+
+        cris.ready(function() {
+        });
+    </script>
+
+    <div class="half">
+        <h2>Password Reset</h2>
+
+        <div class="instruction">
+            ${wsAuthReset}
+        </div>
+        <br/>
+
+        <spring:url value="/auth/reset" var="url"/>
+        <form action='${url}' method='POST'  data-dojo-type="dijit.form.Form">
+            <label for="token">Token:</label><input id="token" type="text" name="token" data-dojo-type="dijit.form.ValidationTextBox"/>
+            <p/>
+            <label for="password1">Password:</label><input id="passowrd1" type="password" name="password1" data-dojo-type="dijit.form.ValidationTextBox"/>
+            <p/>
+            <label for="password2">Retype Password:</label><input id="passowrd2" type="password" name="password2" data-dojo-type="dijit.form.ValidationTextBox"/>
+            <p/>
+            <form:errors cssClass="errors" path="user"/>
+            <div>
+                <input type="submit" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Submit'"/>&amp;nbsp;
+                <input type="reset" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Reset'"/>
+            </div>
+        </form>
+    </div>
+
+</jsp:root>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jsp:root version="2.1" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:spring="http://www.springframework.org/tags">
+    <jsp:directive.page contentType="text/html;charset=UTF-8"/>
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/smallobjects" var="baseUrl"/>
+
+    <script type="text/javascript">
+        <!-- -->
+    </script>
+
+    <div>
+        <h2>Small Objects</h2>
+    </div>
+
+</jsp:root>

@@ -1,0 +1,449 @@
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <spring:url value="/vocabularys" var="urlVocabularies"/>
+    <spring:url value='/vocabularys/load' var="urlFetchVocabularyDetails"/>
+    <spring:url value='/terms/fetchAllTerms' var="urlReference"/>
+
+    <spring:url value="/templates" var="urlTemplates"/>
+    <spring:url value='/templates/load' var="urlFetchTemplateDetails"/>
+    <spring:url value='/terms/fetchAllTemplates' var="urlAttachTo"/>
+
+    <c:set value="${jsRoot}/dm/dataset.js" var="urlVocabulary" />
+    <c:set value="${jsRoot}/dm/VocabularyController.js" var="urlVocabularyController" />
+
+    <div id="idVocabulary">
+        <div id="idPageController" data-ng-controller="PageController">
+
+            <div class="threeTenths floatLeft">
+                <div style="width: 100%; height: 800px">
+                    <div id="idTabContainer1" data-dojo-type="dijit/layout/TabContainer" style="width: 100%; height: 50%;">
+                        <div id="idTabVocabulary" data-dojo-type="dijit/layout/ContentPane" title="Vocabularies" data-dojo-props="selected: true" style="border: 0px; padding: 0px; height:100%; overflow: hidden;">
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "New"' data-ng-click="createVocabulary()"/>
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Import"' data-ng-click="importVocabulary()"/>
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "{{vocabulary.statusId === 1 ? "Deprecate" : "Restore"}}", disabled: {{vocabulary.definition === null}}' data-ng-click="deprecateVocabulary()"/>&amp;nbsp;&amp;nbsp;
+                            <cris-select items='[{id: "active", name: "Active"}, {id: "deprecated", name: "Deprecated"}, {id: "both", name: "Both"}]' item='showVocabulary' value="active" style="width: 70px;"><!-- --></cris-select>
+                            <div>
+                                <input id="idVocabularyFilter" type="text" data-dojo-type="dijit/form/TextBox"  data-dojo-props="placeHolder: 'Filter by name', intermediateChanges:true" style="width:99%;"></input>
+                            </div>
+                            <div id="idGridVocabulary" style="height:87%">
+                                <!-- -->
+                            </div>
+                        </div>
+
+                        <div id="idTabTemplate" data-dojo-type="dijit/layout/ContentPane" title="Templates" style="border: 0px; padding: 0px; height:100%; overflow: hidden;">
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "New"' data-ng-click="createTemplate()"/>
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Import"' data-ng-click="importTemplate()"/>
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "{{template.statusId === 1 ? "Deprecate" : "Restore"}}", disabled: {{template.definition === null}}' data-ng-click="deprecateTemplate()"/>&amp;nbsp;&amp;nbsp;
+                            <cris-select items='[{id: "active", name: "Active"}, {id: "deprecated", name: "Deprecated"}, {id: "both", name: "Both"}]' item='showTemplate' value="active" style="width: 70px;"><!-- --></cris-select>
+                            <div>
+                                <input id="idTemplateFilter" type="text" data-dojo-type="dijit/form/TextBox"  data-dojo-props="placeHolder: 'Filter by name', intermediateChanges:true" style="width:99%;"></input>
+                            </div>
+                            <div id="idGridTemplate" style="height:87%">
+                                <!-- -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <p/>
+
+                    <div style="height:100%">
+                        <div id="idTabContainer2" style="width: 50%; height: 50%; float: left;">
+                            <div>Reference</div>
+                            <div data-dojo-type="dijit/layout/ContentPane" title="Reference" style="border: 0px; padding: 0px; height: 80%; overflow: hidden;">
+                                <div>
+                                    <input id="idTermFilter" type="text" data-dojo-type="dijit/form/TextBox"  data-dojo-props="placeHolder: 'Filter by name', intermediateChanges:true" style="width:98%;"></input>
+                                </div>
+                                <div id="idGridTerm" style="height:90%">
+                                    <!-- -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="idTabContainer3" style="width: 50%; height: 50%; float: right;">
+                            <div>Attach To</div>
+                            <div id="idPaneAttachTo" data-dojo-type="dijit/layout/ContentPane" data-dojo-props="disabled: true" title="AttachTo" style="border: 0px; padding: 0px; height: 80%; overflow: hidden;">
+                                <div>
+                                    <input id="idAttachToFilter" type="text" data-dojo-type="dijit/form/TextBox"  data-dojo-props="placeHolder: 'Filter by name', intermediateChanges:true" style="width:98%;"></input>
+                                </div>
+                                <div id="idGridAttachTo" style="height:90%">
+                                    <!-- -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sevenTenths floatRight">
+                <span class="errors" data-ng-show="errors.message">{{errors.message}}&amp;nbsp;</span>
+
+                <p/>
+
+                <div class="floatRight">
+                    <div ng-hide="getCurrentView()==='vocabulary'" style="display:inline">
+                        <input id="idPreviewTemplate" type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Preview", disabled: {{!template.definition || !template.definition.id || template.isInEditMode}}' data-ng-click="previewTemplate()"/>
+                    </div>
+                    <input id="idMakeCurrentVersion" type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Make Current Version", disabled : {{disableVersionButton()}}' data-ng-click="makeCurrentVersion()"/>
+                    <input id="idSave" type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Save", disabled : {{disableSaveButton() || !disableVersionButton()}}' data-ng-click="save()"/>
+                </div>
+
+                <!-- either vocabulary or template view -->
+                <div id="idView" style="width: 100%;">
+                    <form id="idViewForm" data-dojo-type="dijit/form/Form" method="post" enctype="multipart/form-data">
+                        <cris-view><!-- --></cris-view>
+                    </form>
+                </div>
+            </div>
+
+            <!-- dialog -->
+            <div id="idDialogVocabulary" data-dojo-type="dijit/Dialog" title="Import Vocabulary" style="width: 500px">
+                <cris-uploader-dialog id="idUploaderVocabulary" dialog-id="idDialogVocabulary" title="Select a Vocabulary Xml File" label-text="Browse..." placeholder="Vocabulary Xml file (*.xml)" allow-multiple="true" submit-url="vocabularys/import" errors="errors"><!-- --></cris-uploader-dialog>
+            </div>
+
+            <div id="idDialogTemplate" data-dojo-type="dijit/Dialog" title="Import Template" style="width: 500px">
+                <cris-uploader-dialog id="idUploaderTemplate" dialog-id="idDialogTemplate" title="Select a Template Xml File" label-text="Browse..." placeholder="Template Xml file (*.xml)" allow-multiple="true" submit-url="templates/import" errors="errors"><!-- --></cris-uploader-dialog>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript" src="${urlVocabulary}"><!----></script>
+    <script type="text/javascript" src="${urlVocabularyController}"><!----></script>
+
+    <script type="text/javascript">
+    // <![CDATA[
+        cris.require([
+            "dijit/layout/TabContainer",
+            "dijit/layout/ContentPane",
+            "dijit/TitlePane",
+            "dijit/form/Button",
+            "dijit/form/DropDownButton",
+            "dijit/DropDownMenu",
+            "dijit/MenuItem",
+            "dojox/data/JsonRestStore",
+            "dojox/xml/parser"
+        ]);
+
+        cris.vocabulary = {
+            init: function() {
+                var layout = [
+                    {field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true},
+                    {field: 'name', name: 'Name', width: 'auto'},
+                    {field: 'statusId', name: 'Status', width: 'auto', hidden: true}
+                ];
+
+                var layoutNameOnly = [
+                    {field: 'name', name: 'Name', width: 'auto'},
+                    {field: 'statusId', name: 'Status', width: 'auto', hidden: true}
+                ];
+
+                var args = {
+                    query: {"showAllStatus" : true},
+                    sortFields: [{attribute: "name", descending: false}],
+                    rowsPerPage: 20
+                };
+                
+                var _args = {
+                    query: {"showAllStatus" : true},
+                    sortFields: [{attribute: "name", descending: false}],
+                    rowsPerPage: 20,
+                    filter: {column: 2, type: "number", condition: "equalTo", value: 1}
+                }
+
+                var scope = getAngularElementScope("idPageController");
+
+                /******************************************
+                 * Vocabulary
+                 ******************************************/
+                var storeVocabulary = new dojox.data.JsonRestStore({
+                    target: "${urlVocabularies}",
+                    idAttribute: "id"
+                });
+
+                var gridVocabulary = createScrollableGrid(storeVocabulary, layout, "idGridVocabulary", _args);
+                gridVocabulary.setSortIndex(1, true);
+                scope.vocabularyGrid = gridVocabulary;
+                dojo.connect(gridVocabulary, "onClick", function(evt) {
+                    if (gridVocabulary.selection.getSelectedCount("row") >= 1) {
+                        scope.view = "view_vocabulary";
+
+                        require(["dojo/request/xhr"], function(xhr){
+                            var item = gridVocabulary.selection.getSelected("row")[0];
+
+                            var xhrArgs = {
+                                headers: {Accept: "application/json"},
+                                query: {"showAllStatus" : true},
+                                handleAs: "json"
+                            };
+
+                            xhr.get('${urlFetchVocabularyDetails}/' + item.id, xhrArgs).then(function(data) {
+                                var scope = getAngularElementScope("idPageController");
+                                if (data.hasError) {
+                                    scope.vocabulary.errors = data.message;
+                                    scope.$apply();
+                                } else {
+                                    scope.vocabulary.errors = parseDataMessage(data);
+                                    scope.headVocabularyVersion = data.version;
+                                    scope.loadVocabulary(item, data);
+                                }
+                            }, function(error) {
+                                var scope = getAngularElementScope("idPageController");
+                                scope.vocabulary.errors = parseErrorMessage(error);
+                                scope.$apply();
+                            });;
+
+                            console.log("======== Vocabulary: " + item.name);
+                        });
+                    }
+                });
+                
+                var _timeoutVocabularyFilter;
+                dijit.registry.byId('idVocabularyFilter').onChange = function (value) {
+                    if (_timeoutVocabularyFilter) {
+                        clearTimeout(_timeoutVocabularyFilter);
+                        _timeoutVocabularyFilter = null;
+                    }
+                    
+                    _timeoutVocabularyFilter = setTimeout(function() {
+                        var statusId = null;
+                        if (scope.showVocabulary === 'active') {
+                            statusId = 1;
+                        } else if (scope.showVocabulary === 'deprecated') {
+                            statusId = 0;
+                        }
+                        
+                        var statusFilter = {column: 2, type: "number", condition: "equalTo", value: statusId};
+                        if (value) {
+                            var nameFilter = {column: 1, type: "string", condition: "startsWith", value: value};
+                            if (statusId !== null) {
+                                gridVocabulary.setFilter([statusFilter, nameFilter], 'logicall');
+                            } else {
+                                gridVocabulary.setFilter(nameFilter);
+                            }
+                        } else {
+                            if (statusId !== null) {
+                                gridVocabulary.setFilter(statusFilter);
+                            } else {
+                                gridVocabulary.setFilter(null);
+                            }
+                        }
+                    }, 500);
+                };
+                
+                scope.$watch('showVocabulary', function(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        dijit.byId('idVocabularyFilter').set('value', '');
+                    }    
+                })
+
+                /******************************************
+                 * Template
+                 ******************************************/
+                var storeTemplate = new dojox.data.JsonRestStore({
+                    target: "${urlTemplates}",
+                    idAttribute: "id"
+                });
+
+                var gridTemplate = createScrollableGrid(storeTemplate, layout, "idGridTemplate", dojo.mixin({id: "idGridTemplate"}, _args));
+                gridTemplate.setSortIndex(1, true);
+                scope.templateGrid = gridTemplate;
+                dojo.connect(gridTemplate, "onClick", function(evt) {
+                    if (gridTemplate.selection.getSelectedCount("row") >= 1) {
+                        scope.view = "view_template";
+
+                        require(["dojo/request/xhr"], function(xhr){
+                            var item = gridTemplate.selection.getSelected("row")[0];
+
+                            var xhrArgs = {
+                                headers: {Accept: "application/json"},
+                                query: {"showAllStatus" : true},
+                                handleAs: "json"
+                            };
+
+                            xhr.get('${urlFetchTemplateDetails}/' + item.id, xhrArgs).then(function(data) {
+                                var scope = getAngularElementScope("idPageController");
+                                if (data.hasError) {
+                                    scope.template.errors = data.message;
+                                    scope.$apply();
+                                } else {
+                                    scope.template.errors = parseDataMessage(data);
+                                    scope.headTemplateVersion = data.version;
+                                    scope.loadTemplate(item, data);
+                                }
+                            }, function(error) {
+                                var scope = getAngularElementScope("idPageController");
+                                scope.template.errors = parseErrorMessage(error);
+                                scope.$apply();
+                            });
+
+                            console.log("======== Template: " + item.name);
+                        });
+                    }
+                });
+                
+                 var _timeoutTemplateFilter;
+                dijit.registry.byId('idTemplateFilter').onChange = function (value) {
+                    if (_timeoutTemplateFilter) {
+                        clearTimeout(_timeoutTemplateFilter);
+                        _timeoutTemplateFilter = null;
+                    }
+                    
+                    _timeoutTemplateFilter = setTimeout(function() {
+                        var statusId = null;
+                        if (scope.showTemplate === 'active') {
+                            statusId = 1;
+                        } else if (scope.showTemplate === 'deprecated') {
+                            statusId = 0;
+                        }
+                        
+                        var statusFilter = {column: 2, type: "number", condition: "equalTo", value: statusId};
+                        if (value) {
+                            var nameFilter = {column: 1, type: "string", condition: "startsWith", value: value};
+                            if (statusId !== null) {
+                                gridTemplate.setFilter([statusFilter, nameFilter], 'logicall');
+                            } else {
+                                gridTemplate.setFilter(nameFilter);
+                            }
+                        } else {
+                            if (statusId !== null) {
+                                gridTemplate.setFilter(statusFilter);
+                            } else {
+                                gridTemplate.setFilter(null);
+                            }
+                        }
+                    }, 500);
+                };
+                
+                scope.$watch('showTemplate', function(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        dijit.byId('idTemplateFilter').set('value', '');
+                    }    
+                })
+
+                /******************************************
+                 * Term
+                 ******************************************/
+                var storeTerm = new dojox.data.JsonRestStore({
+                    target: "${urlReference}",
+                    idAttribute: "$$uuid"
+                });
+
+                var gridTerm = createScrollableGrid(storeTerm, layoutNameOnly, "idGridTerm", args);
+                gridTerm.setSortIndex(0, true);
+                var filter = {column: 1, type: "number", condition: "equalTo", value: 1};
+            	gridTerm.setFilter(filter);
+                scope.referenceGrid = gridTerm;
+                
+                var _timeoutTermFilter;
+                dijit.registry.byId('idTermFilter').onChange = function (value) {
+                    if (_timeoutTermFilter) {
+                        clearTimeout(_timeoutTermFilter);
+                        _timeoutTermFilter = null;
+                    }
+                    
+                    _timeoutTermFilter = setTimeout(function() {
+                        if (value) {
+                            var nameFilter = {column: 0, type: "string", condition: "startsWith", value: value};
+                            gridTerm.setFilter([filter, nameFilter], 'logicall');
+                        } else {
+                            gridTerm.setFilter(filter);
+                        }
+                    }, 500);
+                };
+
+                /******************************************
+                 * AttachTo
+                 ******************************************/
+                var storeAttachTo = new dojox.data.JsonRestStore({
+                    target: "${urlAttachTo}",
+                    idAttribute: "$$uuid"
+                });
+
+                var gridAttachTo = createScrollableGrid(storeAttachTo, layoutNameOnly, "idGridAttachTo", args);
+                gridAttachTo.setSortIndex(0, true);
+                var filter = {column: 1, type: "number", condition: "equalTo", value: 1};
+            	gridAttachTo.setFilter(filter);
+                scope.attachToGrid = gridAttachTo;
+                
+                var _timeoutAttachToFilter;
+                dijit.registry.byId('idAttachToFilter').onChange = function (value) {
+                    if (_timeoutAttachToFilter) {
+                        clearTimeout(_timeoutAttachToFilter);
+                        _timeoutAttachToFilter = null;
+                    }
+                    
+                    _timeoutAttachToFilter = setTimeout(function() {
+                        if (value) {
+                            var nameFilter = {column: 0, type: "string", condition: "startsWith", value: value};
+                            gridAttachTo.setFilter([filter, nameFilter], 'logicall');
+                        } else {
+                            gridAttachTo.setFilter(filter);
+                        }
+                    }, 500);
+                };
+
+                /******************************************
+                 * Set up view conntrol
+                 ******************************************/
+                var tabContainer1 = dijit.byId("idTabContainer1");
+                scope.tabContainer = tabContainer1;
+                tabContainer1.watch("selectedChildWidget", function(name, oval, nval) {
+                    var scope = getAngularElementScope("idPageController");
+                    if (nval.title === "Vocabularies") {
+                        // load vocabulary view
+                        console.dir("== load vocabulary view");
+                        var items = gridVocabulary.selection.getSelected("row");
+                        if (items.length === 0) {
+                            scope.view = "view_empty";
+                            scope.emptyMessage = "Please select a vocabulary to edit";
+                        } else {
+                            scope.view = "view_vocabulary";
+                        }
+                        scope.$apply();
+
+                        // we don't want users to use attachto in vocabulary mode
+                        dojo.style(dojo.byId("idTabContainer3"), "visibility", "hidden");
+                    } else if (nval.title === "Templates") {
+                        // load template view
+                        console.dir("== load template view");
+                        var items = gridTemplate.selection.getSelected("row");
+                        if (items.length === 0) {
+                            scope.view = "view_empty";
+                            scope.emptyMessage = "Please select a template to edit";
+                        } else {
+                            scope.view = "view_template";
+                        }
+                        scope.$apply();
+
+                        // allow attachto in template mode
+                        dojo.style(dojo.byId("idTabContainer3"), "visibility", "visible");
+                    } else {
+                        // use empty view
+                        console.dir("== keep current view");
+                        scope.view = "view_empty";
+                        scope.emptyMessage = "Please select a vocabulary/template to edit";
+                        scope.$apply();
+                    }
+                });
+
+                // initialize it to vocabulary view
+                dojo.style(dojo.byId("idTabContainer3"), "visibility", "hidden");
+                var tab = dijit.byId("idTabVocabulary");
+                tabContainer1.selectChild(tab);
+
+                scope.view = "view_empty";
+                scope.emptyMessage = "Please select a vocabulary to edit";
+                scope.$apply();
+            }
+        };
+
+        cris.ready(function() {
+            cris.vocabulary.init();
+        });
+
+        cris.bootstrapAngular("idVocabulary", "crisVocabulary");
+    // ]]>
+    </script>
+
+</jsp:root>

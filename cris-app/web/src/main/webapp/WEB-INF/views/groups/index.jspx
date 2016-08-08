@@ -1,0 +1,541 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/groups" var="urlGroups"/>
+    <spring:url value="/users" var="urlUsers"/>
+    <spring:url value="/groupusers/" var="urlGroupUsers"/>
+
+    <div>
+        <div class="halfMinus floatLeft">
+            <h2>Groups</h2>
+
+            <div class="floatLeft">
+                <input id="buttonNew" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "New"'/>
+            </div>
+
+            <div class="floatRightToButton">
+                <input id="idShowEnabled" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton" checked="checked"/><span>Show Enabled</span>
+                &amp;nbsp
+                <input id="idShowAll" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton"/><span>Show All</span>
+            </div>
+            <br class="clearBoth"/>
+
+            <div id="groups"><!-- fix ff problem --></div>
+        </div>
+
+        <div id="groupDetail" class="half floatRight" style="display:none;">
+            <h2>Group Details</h2>
+
+            <form id="accountForm" data-dojo-type="dijit/form/Form">
+                <table class="form" style="width: 100%">
+                    <tr>
+                        <td style="width: 25%">ID:</td>
+                        <td id="groupId" style="width: 75%"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Name:</td>
+                        <td class="tdTextBox"><input id="name" data-dojo-type="dijit/form/TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Description:</td>
+                        <td><textarea id="description" rows="4" data-dojo-type="dijit/form/SimpleTextarea"><!-- --></textarea></td>
+                    </tr>
+                    <tr>
+                        <td>Enabled?</td><td class="center"><input id="enabled" data-dojo-type="dijit.form.CheckBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Time Created:</td>
+                        <td id="timeCreated"><!-- --></td>
+                    </tr>
+                    <tr>
+                        <td>Last Updated:</td>
+                        <td id="lastUpdated"><!-- --></td>
+                    </tr>
+                </table>
+                <p/>
+
+                <div style="float: right">
+                    <input id="buttonSave" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Save"'/>
+                    <input id="buttonReset" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Reset"'/>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <br style="clear: both"/>
+    <p/>
+
+    <h2 style="text-align: center">Group Membership</h2>
+
+    <div id="users">
+        <div style="width: 44%; float: left; padding: 3px">
+            <h2>Users in the Group</h2>
+
+            <input id="buttonChangeOwner" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Change Owner"'/>
+
+            &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+
+            <div style="display: inline">
+                Owner:&amp;nbsp;&amp;nbsp;<span id="ownerName"><!-- adfad --></span>
+            </div>
+
+            <div id="groupUsers"><!-- fix ff problem --></div>
+        </div>
+
+        <div style="float: left; width: 10%; text-align: center">
+            <br/><br/><br/><br/><br/><br/><br/>
+            <br/><br/>
+            <input id="buttonAddToGroup" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "&lt;- Add"'/>
+            <br/><br/>
+            <input id="buttonRemoveFromGroup" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Remove -&gt;"'/>
+        </div>
+
+        <div style="width: 44%; float: right; padding: 3px">
+            <h2>Other Users</h2>
+
+            <div id="otherUsers"><!-- fix ff problem --></div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        // <![CDATA[
+        cris.require('dijit/form/FilteringSelect');
+        cris.require('dijit/form/Form');
+        cris.require('dijit/form/SimpleTextarea');
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/RadioButton");
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dojox/grid/EnhancedGrid");
+        cris.require("dojox/grid/enhanced/plugins/Pagination");
+        cris.require("dojox/grid/enhanced/plugins/Selector");
+        cris.require("dojox/grid/enhanced/plugins/Filter");
+
+        var AdminGroupName = "Admin Group";
+
+        function isShowEnabled() {
+            var showEnabled = dijit.byId("idShowEnabled");
+            if (showEnabled.checked) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        function updateGroupDetails(item) {
+            dojo.style(dojo.byId('groupDetail'), 'display', 'block');
+            if (item) {
+                var name = dijit.byId("name");
+                var description = dijit.byId("description");
+                var enabled = dijit.byId("enabled");
+                name.setValue(item.name);
+                description.setValue(item.description);
+                enabled.setValue(item.enabled || false);
+                dojo.byId("groupId").innerHTML = item.id;
+                dojo.byId("timeCreated").innerHTML = item.timeCreated ? dateIsoToLocale(item.timeCreated.$date) : "";
+                dojo.byId("lastUpdated").innerHTML = item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
+
+                var buttonSave = dijit.byId("buttonSave");
+                var buttonReset = dijit.byId("buttonReset");
+                var buttonChangeOwner = dijit.byId("buttonChangeOwner");
+
+                if (item.name === AdminGroupName) {
+                    name.set("disabled", true);
+                    description.set("disabled", true);
+                    enabled.set("disabled", true);
+
+                    buttonSave.set("disabled", true);
+                    buttonReset.set("disabled", true);
+                    buttonChangeOwner.set("disabled", true);
+                } else {
+                    name.set("disabled", false);
+                    description.set("disabled", false);
+                    enabled.set("disabled", false);
+
+                    buttonSave.set("disabled", false);
+                    buttonReset.set("disabled", false);
+                    buttonChangeOwner.set("disabled", false);
+                }
+            }
+        }
+
+        function updateGroupStore(item) {
+            var name = dijit.byId("name");
+            var description = dijit.byId("description");
+            var enabled = dijit.byId("enabled");
+
+            storeGroups.setValue(item, "name", name.getValue());
+            storeGroups.setValue(item, "description", description.getValue());
+            storeGroups.setValue(item, "enabled", enabled.getValue() === "on");
+        }
+
+        function isModyfiled(item) {
+            var modified = false;
+            var name = dijit.byId("name");
+            var description = dijit.byId("description");
+            var enabled = dijit.byId("enabled");
+
+            if (item.name !== name.getValue()) {
+                modified = true;
+            }
+            if (item.description !== description.getValue()) {
+                modified = true;
+            }
+            if ((item.enabled || false) !== (enabled.getValue() === "on")) {
+                modified = true;
+            }
+
+            return modified;
+        }
+
+        cris.ready(function() {
+
+            storeGroups = createJsonRestStore("${urlGroups}");
+            storeUsers = createJsonRestStore("${urlUsers}");
+            storeGroupUsers = createJsonRestStore("${urlGroupUsers}");
+
+            var layoutGroups = [{cells: [
+                        {field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true},
+                        {field: 'name', name: 'Name', width: 'auto'}
+                    ]}];
+
+            var layoutUsers = [{cells: [
+                        {field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true},
+                        {field: 'lastName', name: 'Last Name', width: 'auto'},
+                        {field: 'firstName', name: 'First Name', width: 'auto'},
+                        {field: 'username', name: 'User Name', width: 'auto'}
+                    ]}];
+
+            var asc = true;
+            var args = {
+                rowsPerPage: 10,
+                pageSizes: []
+            };
+
+            args.sortFields = [{attribute: "name", descending: !asc}];
+            args.query = {enabled: true};
+            gridGroups = createGrid(storeGroups, layoutGroups, "groups", args);
+            gridGroups.setSortIndex(1, asc);
+
+            args.sortFields = [{attribute: "lastName", descending: !asc}];
+            args.query = {enabled: true, groupId: 0};
+            gridGroupUsers = createGrid(storeUsers, layoutUsers, "groupUsers", args);
+            gridGroupUsers.setSortIndex(1, asc);
+
+            args.query = {enabled: true};
+            gridOtherUsers = createGrid(storeUsers, layoutUsers, "otherUsers", args);
+            gridOtherUsers.setSortIndex(1, asc);
+
+            dojo.connect(gridGroups, "onSelected", function(index) {
+                var item = gridGroups.getItem(index);
+
+                updateGroupDetails(item);
+                var query = {groupId: item.id};
+                if (isShowEnabled()) {
+                    query.enabled = true;
+                } else {
+                    delete query.enabled;
+                }
+                gridGroupUsers.setQuery(query);
+                var ownerName = dojo.byId("ownerName");
+                if (item.ownerId) {
+                    if (storeGroups.isItemLoaded(item.ownerId)) {
+                        ownerName.innerHTML = item.ownerId.firstName + ' ' + item.ownerId.lastName;
+                    } else {
+                        storeGroups.loadItem({item: item.ownerId, onItem: function(item) {
+                                ownerName.innerHTML = item.firstName + ' ' + item.lastName;
+                            }});
+                    }
+                } else {
+                    ownerName.innerHTML = "(none)";
+                }
+
+                var query = {groupId: -item.id};
+                if (isShowEnabled()) {
+                    query.enabled = true;
+                }
+                gridOtherUsers.setQuery(query);
+            });
+
+            var buttonSave = dijit.byId("buttonSave");
+            dojo.connect(buttonSave, "onClick", function(evt) {
+                if (gridGroups.selection.getSelectedCount("row") >= 1) {
+                    // existing group
+                    var item = gridGroups.selection.getSelected("row")[0];
+
+                    var modified = isModyfiled(item);
+                    if (modified) {
+                        updateGroupStore(item)
+                        var pd = createProgressDialog();
+                        storeGroups.save({
+                            onComplete: function(data) {
+                                var xhr = data[0].deferred.ioArgs.xhr.response;
+                                var object = JSON.parse(xhr);
+                                
+                                var query = {};
+                                if (isShowEnabled()) {
+                                    query.enabled = true;
+                                }
+                                
+                                if (object.error) {
+                                    gridGroups.setQuery(query);
+                                    pd.setContent("Failed to save changes. " + object["error"].message + ": " + object["error"].status);
+                                } else {
+                                    gridGroups.setQuery(query);
+                                    updateGroupDetails(object);
+                                    pd.hide();
+                                }
+                            },
+                            onError: function(error) {
+                                var message;
+                                if (error.responseText) {
+                                    var data = dojo.fromJson(error.responseText);
+                                    message = data.exception.message;
+                                } else {
+                                    message = error;
+                                }
+                                pd.setContent("Failed to save changes: " + message);
+                            }
+                        });
+                    } else {
+                        showMessage("No change is made");
+                    }
+                } else {
+                    // new group
+                    var name = dijit.byId("name");
+                    if (name.getValue() == "") {
+                        showMessage("You must provide a name for the group");
+                        return;
+                    }
+
+                    var yes = showConfirm("Do you want to create a new group: " + name.getValue() + "?");
+                    if (yes) {
+                        var pd = createProgressDialog();
+                        var itemGroup = storeGroups.newItem();
+                        var description = dijit.byId("description");
+                        var enabled = dijit.byId("enabled");
+
+                        storeGroups.setValue(itemGroup, "name", name.getValue());
+                        storeGroups.setValue(itemGroup, "description", description.getValue());
+                        storeGroups.setValue(itemGroup, "enabled", enabled.getValue() === "on");
+                        storeGroups.save({
+                            onComplete: function(data) {
+                                var xhr = data[0].deferred.ioArgs.xhr.response;
+                                var object = JSON.parse(xhr);
+                                
+                                var query = {};
+                                if (isShowEnabled()) {
+                                    query.enabled = true;
+                                }
+                                
+                                if (object.error) {
+                                    gridGroups.setQuery(query);
+                                    pd.setContent("Failed to save changes. " + object["error"].message + ": " + object["error"].status);
+                                } else {
+                                    gridGroups.setQuery(query);
+                                    pd.hide();
+                                }
+                            },
+                            onError: function(error) {
+                                pd.setContent("Failed to save changes. " + error);
+                            }
+                        });
+                    }
+                }
+            });
+
+            var buttonReset = dijit.byId("buttonReset");
+            dojo.connect(buttonReset, "onClick", function(evt) {
+                var name = dijit.byId("name");
+                var description = dijit.byId("description");
+                var enabled = dijit.byId("enabled");
+                if (gridGroups.selection.getSelectedCount("row") >= 1) {
+                    var item = gridGroups.selection.getSelected("row")[0];
+                    name.setValue(item.name);
+                    description.setValue(item.description);
+                    enabled.set("checked", item.enabled);
+                } else {
+                    name.setValue("");
+                    description.setValue("");
+                    enabled.set("checked", true);
+                }
+            });
+
+            var buttonChangeOwner = dijit.byId("buttonChangeOwner");
+            dojo.connect(buttonChangeOwner, "onClick", function(evt) {
+                if (gridGroupUsers.selection.getSelectedCount("row") >= 1) {
+                    var itemUser = gridGroupUsers.selection.getSelected("row")[0];
+                    var itemGroup = gridGroups.selection.getSelected("row")[0];
+                    if (itemGroup.ownerId && itemUser.id === itemGroup.ownerId.id) {
+                        showMessage("You selected the current owner");
+                    } else {
+                        var pd = createProgressDialog();
+                        storeGroups.setValue(itemGroup, "ownerId", itemUser);
+                        storeGroups.save({
+                            onComplete: function() {
+                                var ownerName = dojo.byId("ownerName");
+                                ownerName.innerHTML = itemUser.firstName + ' ' + itemUser.lastName;
+                                pd.hide();
+                            },
+                            onError: function(error) {
+                                pd.setContent("Failed to change owner. " + error);
+                            }
+                        });
+                    }
+                } else {
+                    showMessage("No user selected");
+                }
+            });
+
+            var buttonAdd = dijit.byId("buttonAddToGroup");
+            dojo.connect(buttonAdd, "onClick", function(evt) {
+                if (gridGroups.selection.getSelectedCount("row") !== 1) {
+                    showMessage("Please select a group");
+                    return;
+                }
+                if (gridOtherUsers.selection.getSelectedCount("row") !== 1) {
+                    showMessage("Please select a user");
+                    return;
+                }
+
+                var itemGroup = gridGroups.selection.getSelected("row")[0];
+                var itemUser = gridOtherUsers.selection.getSelected("row")[0];
+                var pd = createProgressDialog();
+                var itemGroupUser = storeGroupUsers.newItem();
+                itemGroupUser.groupId = itemGroup;
+                itemGroupUser.userId = itemUser;
+                storeGroupUsers.save({
+                    onComplete: function(data) {
+                        var xhr = data[0].deferred.ioArgs.xhr.response;
+                        var object = JSON.parse(xhr);
+                        if (object.error) {
+                            pd.setContent("Failed to save changes. " + object["error"].message + ": " + object["error"].status);
+                        } else {
+                            gridGroupUsers.setQuery({groupId: itemGroup.id, enabled: true});
+                            gridOtherUsers.setQuery({groupId: -itemGroup.id, enabled: true});
+                            pd.hide();
+                        }
+                    },
+                    onError: function(error) {
+                        var message;
+                        if (error.responseText) {
+                            var data = dojo.fromJson(error.responseText);
+                            message = data.exception.message;
+                        } else {
+                            message = error;
+                        }
+                        pd.setContent("Failed: " + message);
+                    }
+                });
+            });
+
+            var buttonRemove = dijit.byId("buttonRemoveFromGroup");
+            dojo.connect(buttonRemove, "onClick", function(evt) {
+                if (gridGroups.selection.getSelectedCount("row") !== 1) {
+                    showMessage("Please select a group");
+                    return;
+                }
+                if (gridGroupUsers.selection.getSelectedCount("row") !== 1) {
+                    showMessage("Please select a user");
+                    return;
+                }
+
+                var itemGroup = gridGroups.selection.getSelected("row")[0];
+                var itemUser = gridGroupUsers.selection.getSelected("row")[0];
+                var pd = createProgressDialog();
+                storeGroupUsers.fetch({
+                    query: {groupId: itemGroup.id, userId: itemUser.id},
+                    onComplete: function(item, request) {
+                        if (item) {
+                            storeGroupUsers.deleteItem(item);
+                            storeGroupUsers.save({
+                                onComplete: function(data) {
+                                    var xhr = data[0].deferred.ioArgs.xhr.response;
+                                    if (xhr == "") {
+                                        gridGroupUsers.setQuery({groupId: itemGroup.id, enabled: true});
+                                        gridOtherUsers.setQuery({groupId: -itemGroup.id, enabled: true});
+                                        pd.hide();
+
+                                    } else {
+                                        var object = JSON.parse(xhr);
+                                        if (object.message) {
+                                            pd.setContent("Failed to save changes. " + object.message);
+                                        }
+                                    }
+                                },
+                                onError: function(error) {
+                                    var message;
+                                    if (error.responseText) {
+                                        var data = dojo.fromJson(error.responseText);
+                                        message = data.exception.message;
+                                    } else {
+                                        message = error;
+                                    }
+                                    pd.setContent("Failed: " + message);
+                                }
+                            });
+                        } else {
+                            pd.setContent("Unable to remove user from group. Error: user is not in the group");
+                        }
+                    },
+                    onError: function(error, request) {
+                        pd.setContent("Unable to remove user from group. " + error);
+                    }
+                });
+            });
+
+            var buttonNew = dijit.byId("buttonNew");
+            dojo.connect(buttonNew, "onClick", function(evt) {
+                dojo.style(dojo.byId('groupDetail'), 'display', 'block');
+                gridGroups.selection.clear();
+
+                var name = dijit.byId("name");
+                var description = dijit.byId("description");
+                var enabled = dijit.byId("enabled");
+
+                dojo.byId("groupId").innerHTML = "";
+                name.setValue("");
+                description.setValue("");
+                enabled.set("checked", true);
+                console.log(enabled.get("value"));
+                console.log(enabled.get("checked"));
+                dojo.byId("timeCreated").innerHTML = "";
+                dojo.byId("lastUpdated").innerHTML = "";
+
+                gridGroupUsers.setQuery({groupId: 0});
+                gridOtherUsers.setQuery({});
+            });
+
+            dojo.connect(dijit.byId("idShowEnabled"), "onClick", function(evt){
+                console.log("enabled");
+                gridGroups.setQuery({enabled: true});
+
+                var query = gridGroupUsers.query;
+                query.enabled = true;
+                gridGroupUsers.setQuery(query);
+
+                query = gridOtherUsers.query;
+                query.enabled = true;
+                gridOtherUsers.setQuery(query);
+            });
+
+            dojo.connect(dijit.byId("idShowAll"), "onClick", function(evt){
+                console.log("all");
+                gridGroups.setQuery({});
+
+                var query = gridGroupUsers.query;
+                delete query.enabled;
+                gridGroupUsers.setQuery(query);
+
+                query = gridOtherUsers.query;
+                delete query.enabled;
+                gridOtherUsers.setQuery(query);
+            });
+        });
+        // ]]>
+    </script>
+
+</jsp:root>

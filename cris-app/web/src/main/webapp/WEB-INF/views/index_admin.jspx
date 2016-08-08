@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <h1 style="text-align: center;">${wsName}</h1>
+
+    <div>${wsDescription}</div>
+
+</jsp:root>

@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/projects" var="urlStore"/>
+
+    <div style="display: none;">
+        <h4>TODO: Users can put general, project specific, experiment specific, job specific, dataset specific, subject specific, equipment specific comments/notes/discussion. These information can be either private (to the user) or public (to the project) </h4>
+        <h4>TODO: Each project/experiment has a wiki-like page where all the facts/discoveries are posted, and interesting links/articles are referenced</h4>
+        <hr/>
+    </div>
+
+    <div class="floatLeft halfMinus">
+        <h2>Projects</h2>
+
+        <span>
+            <input id="buttonNew" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'New'"/>
+            <input id="buttonDeprecate" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Deprecate'"/>
+        </span>
+        <span class="floatRightToButton">
+            Show:
+            <input id="idShowOperational" type="radio" name="showStatus" value="1" checked="checked" data-dojo-type="dijit/form/RadioButton"/><span>Operational</span>
+            &amp;nbsp
+            <input id="idShowDeprecated" type="radio" name="showStatus" value="0" data-dojo-type="dijit/form/RadioButton"/><span>Deprecated</span>
+            &amp;nbsp
+            <input id="idShowAll" type="radio" name="showStatus" value="" data-dojo-type="dijit/form/RadioButton"/><span>All</span>
+            &amp;nbsp
+        </span>
+        <br/>
+        <div id="idGrid"><!-- fix ff problem --></div>
+    </div>
+
+    <div class="floatRight half">
+        <h2>Details</h2>
+        <div id="detailPrompt" style="text-align: center">No project selected</div>
+        <form id="form" data-dojo-type="dijit/form/Form">
+            <div>
+                <table class="form" style="width: 100%">
+                    <tr>
+                        <td style="width: 30%">ID:</td><td id="configId" style="width: 70%"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Name:</td><td class="tdTextBox"><input id="name" data-dojo-type="dijit/form/TextBox"/></td>
+                    </tr>
+                    <tr>
+                        <td>Status:</td><td id="status"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: center" colspan="2">Description</td>
+                    </tr>
+                    <tr>
+                        <td class="tdTextArea" colspan="2"><div id="description"><!-- --></div></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="floatRight">
+                <input id="buttonSave" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Save'"/>
+                <input id="buttonReset" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Reset'"/>
+            </div>
+        </form>
+    </div>
+
+    <script type="text/javascript">
+    // <![CDATA[
+        cris.require([
+            "dijit/Editor",
+            "dijit/form/Form",
+            "dijit/form/Button",
+            "dijit/form/TextBox",
+            "dijit/form/SimpleTextarea",
+            "dojox/data/JsonRestStore",
+            "dojo/behavior"
+        ]);
+
+        cris.project = {};
+        cris.project.app = {
+            store: null,
+            grid: null,
+            creatingNew: false,
+            defaultQuery: {showAllStatus: true},
+            setGridFilter: function(status) {
+                if (status === 0 || status === 1) {
+                    this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: status}]);
+                } else {
+                    this.grid.setFilter();
+                }
+            },
+            updateHtml: function(item) {
+                if (item) {
+                    dojo.byId("configId").innerHTML = item.id || "";
+                    dijit.byId("name").set("value", item.name || "");
+                    dijit.byId("description").set("value", item.description || "");
+                    dojo.byId("status").innerHTML = convertAssetStatusIdToName(item.statusId);
+                    dojo.byId("timeCreated").innerHTML = item.timeCreated && item.timeCreated.$date ? dateIsoToLocale(item.timeCreated.$date) : "";
+                    dojo.byId("lastUpdated").innerHTML = item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
+                    if (item.statusId === 1) {
+                        dijit.byId("buttonDeprecate").set("label", "Deprecate");
+                    } else if (item.statusId === 0) {
+                        dijit.byId("buttonDeprecate").set("label", "Restore");
+                    } else {
+                        dijit.byId("buttonDeprecate").set("label", "Deprecate");
+                    }
+                }
+            },
+            updateStore: function(item) {
+                this.store.setValue(item, "name", dijit.byId("name").getValue());
+                this.store.setValue(item, "description", dijit.byId("description").getValue());
+            },
+            isModified: function(item) {
+                var modified = false;
+
+                var name = dijit.byId("name");
+                if (item.name !== name.getValue()) {
+                    modified = true;
+                }
+
+                var description = dijit.byId("description");
+                if (item.description !== description.getValue()) {
+                    modified = true;
+                }
+
+                return modified;
+            },
+            saveStore: function() {
+                var pd = createProgressDialog();
+                this.store.save({
+                    onComplete: function(data) {
+                        var response = JSON.parse(data[0].deferred.ioArgs.xhr.response);
+                        if (response.hasError) {
+                            pd.setContent("Failed to save changes. " + response.message + " " + response.status);
+                            cris.project.app.updateHtml({});
+                            cris.project.app.grid.setQuery({showAllStatus: true});
+                        } else {
+                            var selectedItem = cris.project.app.grid.selection.getSelected("row")[0];
+                            var selectedIndex = cris.project.app.grid.selection.selectedIndex;
+                            if (selectedItem) {
+                                cris.project.app.grid.updateRow(selectedIndex);
+                                cris.project.app.updateHtml(selectedItem);
+                            } else {
+                                cris.project.app.updateHtml({});
+                            }
+                            cris.project.app.grid.setQuery({showAllStatus: true});
+                            pd.hide();
+                        }
+                    },
+                    onError: function(error) {
+                        pd.setContent("Failed to save changes. " + error);
+                    }
+                });
+            },
+            behavior: {
+                "#idGrid": {
+                    onclick: function(evt) {
+                        dojo.publish("cris/project/newSelection", []);
+                    }
+                },
+                "#idShowOperational": {
+                    onclick: function(evt) {
+                        cris.project.app.setGridFilter(1);
+                    }
+                },
+                "#idShowDeprecated": {
+                    onclick: function(evt) {
+                        cris.project.app.setGridFilter(0);
+                    }
+                },
+                "#idShowAll": {
+                    onclick: function(evt) {
+                        cris.project.app.setGridFilter(null);
+                    }
+                },
+                "#buttonNew": {
+                    onclick: function(evt) {
+                        dojo.byId("detailPrompt").innerHTML = "Create a new project";
+                        cris.project.app.creatingNew = true;
+                        cris.project.app.grid.selection.deselectAll();
+                        cris.project.app.updateHtml({});
+                    }
+                },
+                "#buttonDeprecate": {
+                    onclick: function(evt) {
+                        var item = cris.project.app.grid.selection.getSelected("row")[0];
+                        if (!item) {
+                            showMessage("Please select a project");
+                            return;
+                        }
+
+                        var status;
+                        if (item.statusId === 1) {
+                            status = 0;
+                        } else {
+                            status = 1;
+                        }
+                        cris.project.app.store.setValue(item, "statusId", status ? 1 : 0);
+                        cris.project.app.saveStore();
+                    }
+                },
+                "#buttonSave": {
+                    onclick: function(evt) {
+                        var formManager = dijit.byId("form");
+                        formManager.validate();
+
+                        if (!formManager.isValid()) {
+                            return;
+                        }
+
+                        var item;
+                        if (cris.project.app.creatingNew) {
+                            var name = dojo.byId("name").value;
+                            if (!name) {
+                                showMessage("You must specify a name for the project");
+                                return;
+                            }
+
+                            item = cris.project.app.store.newItem();
+                        } else {
+                            if (cris.project.app.grid.selection.getSelectedCount("row") >= 1) {
+                                var item = cris.project.app.grid.selection.getSelected("row")[0];
+                                if (!cris.project.app.isModified(item)) {
+                                    showMessage("No change is made");
+                                    return;
+                                }
+                            } else {
+                                showMessage("Please select a project");
+                                return;
+                            }
+                        }
+
+                        cris.project.app.creatingNew = false;
+                        cris.project.app.updateStore(item);
+                        cris.project.app.saveStore(item);
+                    }
+                },
+                "#buttonReset": {
+                    onclick: function(evt) {
+                        if (cris.project.app.grid.selection.getSelectedCount("row") >= 1) {
+                            var item = cris.project.app.grid.selection.getSelected("row")[0];
+                            cris.project.app.updateHtml(item);
+                        } else {
+                            cris.project.app.updateHtml({});
+                        }
+                    }
+                }
+            },
+            init: function() {
+                this.creatingNew = false;
+
+                this.store = createJsonRestStore("${urlStore}");
+
+                var layout = [{cells: [
+                            {field: 'statusId', name: 'Status ID', hidden: true},
+                            {field: 'id', name: 'ID', width: '50px'},
+                            {field: 'name', name: 'Name', width: 'auto'},
+                            {field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px',
+                                dataTypeArgs: {
+                                    datePattern: "yyyy-M-d"
+                                },
+                                get: function(row, item) {
+                                    if (!item) {
+                                        return "Loading...";
+                                    }
+                                    return item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
+                                }}
+                        ]}];
+
+                var asc = true;
+                var args = {
+                    query: this.defaultQuery,
+                    sortFields: [{attribute: "name", descending: !asc}],
+                    rowsPerPage: 15,
+                    pageSizes: []
+                };
+                this.grid = createGrid(this.store, layout, "idGrid", args);
+                this.grid.setSortIndex(2, asc);
+                this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: 1}]);
+
+                var editor = new dijit.Editor({}, "description");
+                editor.startup();
+
+                dojo.style("buttonDeprecate", "width", "70px");
+
+                this.updateHtml({});
+
+                dojo.behavior.add(this.behavior);
+                dojo.behavior.apply();
+
+                dojo.subscribe("cris/project/newSelection", this, function(evt) {
+                    if (this.grid.selection.getSelectedCount("row") >= 1) {
+                        dojo.byId("detailPrompt").innerHTML = "Edit an existing project";
+                        this.creatingNew = false;
+                        var item = this.grid.selection.getSelected("row")[0];
+                        this.updateHtml(item);
+                    }
+                });
+            }
+        };
+
+        cris.ready(function() {
+            cris.project.app.init();
+        });
+// ]]>
+    </script>
+
+</jsp:root>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1"
+    xmlns:jsp="http://java.sun.com/JSP/Page"
+    xmlns:c="http://java.sun.com/jsp/jstl/core"
+    xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+    xmlns:spring="http://www.springframework.org/tags"
+    >
+
+    <jsp:output omit-xml-declaration="yes" />
+
+    <spring:url value="/auth/verify" var="urlVerify"/>
+    <spring:url value="/auth/problem" var="urlProblem"/>
+
+    <style type="text/css">
+        .dijitOffScreen {
+            visibility: visible !important;
+        }
+    </style>
+
+    <script type="text/javascript">
+        cris.require([
+            "dijit/form/Form",
+            "dijit/form/ValidationTextBox",
+            "dijit/form/Button"
+        ]);
+
+        cris.ready(function() {
+        });
+    </script>
+
+    <div class="half">
+        <h2>Sign In</h2>
+
+        <div>
+            Are you a new user?<br/>
+            &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+            <a href="signup">Create New Account</a>
+        </div>
+
+        <br/>
+        <hr/>
+        <br/>
+
+        <div>
+            <form action='${urlVerify}' method='POST' data-dojo-type="dijit.form.Form">
+                <div class="instruction">
+                    ${wsSigninInstruction}
+                </div>
+                <br/>
+
+                <c:if test="${not empty param.authFailed}">
+                    <c:choose>
+                        <c:when test='${fn:split(SPRING_SECURITY_LAST_EXCEPTION, ":")[0] == "org.springframework.security.authentication.DisabledException"}'>
+                            <span class="errors">Your account is disabled. (it is usually the case after you just signed up). Please contact <a href="mailto:${wsEmailAccountProblem}?subject=Sign In Problem: Account Disabled">${wsEmailAccountProblem}</a> for resolution.</span>
+                        </c:when>
+                        <c:otherwise>
+                            <span class="errors">Invalid username or password. Please try again.</span>
+                        </c:otherwise>
+                    </c:choose>
+                    <p />
+                </c:if>
+
+                <label for="username">Username:</label>
+                <input id="username" type="text" name="username" data-dojo-type="dijit.form.ValidationTextBox" />
+
+                <p/>
+
+                <label for="password">Password:</label>
+                <input id="password" type="password" name="password" value="" data-dojo-type="dijit.form.TextBox" />
+                <div>
+                    <input type="submit" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Sign In'"/>&amp;nbsp;
+                    <input type="reset" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Reset'"/>
+                </div>
+            </form>
+        </div>
+
+        <p/>
+        <div>
+            <a href="${urlProblem}">I forget my password.</a>
+        </div>
+    </div>
+
+</jsp:root>

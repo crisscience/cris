@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jsp:root version="2.1" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:spring="http://www.springframework.org/tags">
+
+    <jsp:output omit-xml-declaration="yes"/>
+
+    <spring:url value="/reports" var="url"/>
+    <spring:url value="/reports/import" var="urlImport"/>
+    <spring:url value="/reports/export" var="urlExport"/>
+    <spring:url value="/reports/run" var="urlRun"/>
+    <spring:url value="/reports/parameters" var="urlParameters"/>
+    <spring:url value="/templates/json/names" var="urlTempNames"/>
+    <spring:url value="/download/" var="urlDownload"/>
+
+    <div style="width: 100%; height: 600px">
+        <div data-dojo-type="dijit.layout.TabContainer" style="width: 100%; height: 100%;">
+            <!--
+            <div data-dojo-type="dijit.layout.ContentPane" data-dojo-props='title : "Design", selected : "true"'>
+                <h4>TODO: Design Reports</h4>
+            </div>
+            -->
+
+            <div data-dojo-type="dijit.layout.ContentPane" title="Import">
+                <h2>Import Report</h2>
+                <form id="form" method="POST" enctype="multipart/form-data" data-dojo-type="dijit.form.Form">
+                    Report File:
+                    <input id="idFileName" name="detailFileName" type="text" placeholder="report file (*.prpt)" data-dojo-type="dijit.form.TextBox" readonly=''/>
+                    <input id="idFile" name="file" data-dojo-type="dojox.form.Uploader" data-dojo-props='multiple : false, label : "Browse..."' style="width: 75px;"/>
+                    <input id="buttonUpload" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label : "Upload" '/>&amp;nbsp
+                    <input id="buttonReset" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label : "Reset"'/>&amp;nbsp
+                </form>
+
+                <div>
+                    <div class="halfMinus floatLeft">
+                        <h2>Reports</h2>
+                        <div id="idGrid"><!-- --></div>
+                    </div>
+
+                    <div class="half floatRight">
+                        <h2>Details</h2>
+
+                        <table class="form" style="width: 100%">
+                            <tr>
+                                <td style="width: 30%">ID:</td>
+                                <td id="detailId" style="width: 70%"><!-- --></td>
+                            </tr>
+                            <tr>
+                                <td>Name:</td>
+                                <td><span id="detailName"> <!-- --></span></td>
+                            </tr>
+                            <tr>
+                                <td>Description:</td>
+                                <td><span id="detailDesc"> <!-- --></span></td>
+                            </tr>
+                            <tr>
+                                <td>Version Number:</td>
+                                <td><span id="detailVerNum"> <!-- --></span></td>
+                            </tr>
+                            <tr>
+                                <td>Time Created:</td>
+                                <td id="detailTimeCreated"><!-- --></td>
+                            </tr>
+                            <tr>
+                                <td>Last Updated:</td>
+                                <td id="detailLastUpdated"><!-- --></td>
+                            </tr>
+                            <tr>
+                                <td>Export:</td>
+                                <td id="detailExport"><a id="detailExportUrl" href="uninitialized"></a></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2"><button id="generateReport" type="button"></button></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div data-dojo-type="dijit/Dialog" data-dojo-id="generateReportDialog" title="Generate Report">
+        <table class="form" id="reportParameterTable">
+            <tr>
+                <td>Template:</td>
+                <td class="tdTextBox">
+                    <input id="idUseEmbedded"/>Use Embedded UUID
+                    <input id="idSelectTemplate"/>
+                </td>
+            </tr>
+            <tr>
+                <td>Output File Type:</td>
+                <td class="tdTextBox">
+                    <input id="idSelectType" />
+                </td>
+            </tr>
+            <tr class="parameter">
+                <td>Description:</td><td style="text-align: center"><input id="descSaveAsTemplate" dojoType="dijit.form.TextBox" type="text" /></td>
+            </tr>
+        </table>
+        <div class="dijitDialogPaneActionBar">
+            <div id ="generateReportActionBar">
+                <button data-dojo-type="dijit/form/Button" type="submit" id="okGenerateReport">Generate</button>
+                <button data-dojo-type="dijit/form/Button" type="button" id="cancelGenerateReport">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <script type="text/javascript">
+        // <![CDATA[
+        cris.require("dojo/_base/connect");
+        cris.require("dojo/_base/array");
+        cris.require("dojo/parser");
+        cris.require("dojo/request");
+        cris.require("dijit/layout/TabContainer");
+        cris.require("dijit/layout/ContentPane");
+        cris.require("dijit/form/Form");
+        cris.require("dijit/form/Button");
+        cris.require("dijit/form/TextBox");
+        cris.require("dijit/form/CheckBox");
+        cris.require("dijit/form/SimpleTextarea");
+        cris.require("dijit/form/FilteringSelect");
+        cris.require("dijit/registry");
+        cris.require("dojox/data/JsonRestStore");
+        cris.require("dojox/form/Uploader");
+        cris.require("dojox/grid/EnhancedGrid");
+        cris.require("dojox/grid/enhanced/plugins/Pagination");
+        cris.require("dojox/grid/enhanced/plugins/Selector");
+        cris.require("dojox/grid/enhanced/plugins/Filter");
+        cris.require("dojox/html/entities");
+        cris.require("dojo/behavior");
+        cris.require("dojo/io/iframe");
+        cris.require("dojox/widget/SortList");
+        cris.require("dijit/form/MultiSelect");
+        cris.require("dojo/dom");
+        cris.require("dojo/json");
+        cris.require("dojo/store/Memory");
+
+        cris.report = {};
+
+        // Report generating dialog.
+        cris.report.generate = {
+            useEmbedded: null,
+            storeTemplates: null,
+            templateList: null,
+            parameters: null,
+            storeType: null,
+            typeList: null,
+
+            // Initialize the dialog.
+            init: function() {
+                var this_ = this;
+
+                dojo.connect(dojo.byId("cancelGenerateReport"), "onclick", this.hideGenerateReportDialog);
+                dojo.connect(dojo.byId("okGenerateReport"), "onclick", this, this.requestReport);
+
+                // Button that opens the pop-up window in the main table.
+                var generateReportButton = new dijit.form.Button({
+                    label: "Generate Report",
+                    onClick: function() {
+                        this_.getParameters();
+                    }
+                }, "generateReport");
+
+                // Fetch template list.
+                this.storeTemplates = new dojox.data.JsonRestStore({
+                    target: "${urlTempNames}",
+                    idAttribute: "id"
+                });
+
+                // Template list combobox.
+                this.templateList = new dijit.form.FilteringSelect({
+                    name: "templateId",
+                    store: this.storeTemplates,
+                    fetchProperties: {sort: [{attribute: "name"}]},
+                    autoComplete: true,
+                    onChange: function(val) {
+                    }
+                }, "idSelectTemplate");
+                this.templateList.reset();
+                this.templateList.startup();
+                dojo.style("idSelectTemplate", "visibility", "hidden");
+
+                // For file types.
+                this.storeType = new dojo.store.Memory({
+                    data: [
+                        {id: "zip", name: "html"},
+                        {id: "pdf", name: "pdf"},
+                        {id: "rtf", name: "rtf"},
+                        {id: "xls", name: "xls"},
+                        {id: "xlsx", name: "xlsx"}
+                    ],
+                    idProperty: "id"
+                });
+
+                this.typeList = new dijit.form.FilteringSelect({
+                    id: "idSelectType",
+                    name: "selectType",
+                    value: "pdf",
+                    store: this.storeType,
+                    fetchProperties: {sort: [{attribute: "name"}]},
+                    autoComplete: true,
+                    onChange: function(val) {
+                    }
+                }, "idSelectType");
+                this.typeList.reset();
+                this.typeList.startup();
+
+                // Chickbox whether the embedded uuid is used or not.
+                this.useEmbedded = new dijit.form.CheckBox({
+                    name: "useEmbedded",
+                    value: "Use Embedded UUID",
+                    checked: true,
+                    onChange: function(b) {
+                        if (b) {
+                            dojo.style("idSelectTemplate", "visibility", "hidden");
+                        } else {
+                            dojo.style("idSelectTemplate", "visibility", "visible");
+                        }
+                    }
+                }, "idUseEmbedded");
+            },
+
+            // Get parameters for the selected report template.
+            getParameters: function() {
+                var this_ = this;
+                var item = cris.report.upload.item;
+                if (item === null)
+                    return;
+                var xhrArgs = {
+                    url: "${urlParameters}/" + item.id,
+                    handleAs: "json",
+                    load: function(data) {
+                        this_.parameters = dojo.clone(data);
+                        this_.updateParameters();
+                        this_.showGenerateReportDialog();
+                    },
+                    error: function(error) {
+                        console.log("An unexpected error occurred: " + error);
+                    }
+                };
+                dojo.xhrGet(xhrArgs);
+            },
+            hideGenerateReportDialog: function() {
+                generateReportDialog.hide();
+            },
+            showGenerateReportDialog: function() {
+                generateReportDialog.show();
+            },
+            updateParameters: function() {
+                var parameterList = dojo.query(".parameter");
+                dojo.forEach(parameterList, function(entry) {
+                    dojo.destroy(entry);
+                });
+
+                var table = dojo.byId("reportParameterTable");
+                for (var key in this.parameters) {
+                    var nodeTr = dojo.create("tr");
+                    dojo.attr(nodeTr, "class", "parameter");
+                    var nodeTd1 = dojo.create("td");
+                    var nodeTd2 = dojo.create("td");
+                    dojo.attr(nodeTd1, "innerHTML", key);
+                    var textbox = dojo.create("input");
+                    dojo.attr(textbox, "type", "text");
+                    dojo.attr(textbox, "id", key);
+                    dojo.attr(textbox, "value", "");
+                    nodeTd2.appendChild(textbox);
+                    nodeTr.appendChild(nodeTd1);
+                    nodeTr.appendChild(nodeTd2);
+                    table.appendChild(nodeTr);
+                }
+                ;
+
+            },
+            requestReport: function() {
+                var item = cris.report.upload.item;
+                var itemId = item.id;
+                var embedded = dijit.registry.byId("idUseEmbedded").get("checked");
+                var uuid = dijit.registry.byId("idSelectTemplate").get("value");
+                var type = dijit.registry.byId("idSelectType").get("value");
+                var url = "${urlRun}/" + itemId + "?outputType=" + type;
+                if (!embedded)
+                    url += "&uuid=" + uuid;
+                for (var key in this.parameters) {
+                    url += "&" + key + "=" + dojo.byId(key).value;
+                }
+
+                window.location.assign(url);
+            }
+        };
+
+        // Main window.
+        cris.report.upload = {
+            store: null,
+            grid: null,
+            item: null,
+            updateHtml: function() {
+                if (this.item === null)
+                    return;
+                var item = this.item;
+                dojo.byId("detailId").innerHTML = this.store.getValue(item, "id") || "";
+                dojo.byId("detailName").innerHTML = this.store.getValue(item, "name") || "";
+                dojo.byId("detailDesc").innerHTML = this.store.getValue(item, "description") || "";
+                dojo.byId("detailVerNum").innerHTML = this.store.getValue(item, "versionNumber") || "";
+                dojo.byId("detailTimeCreated").innerHTML = stringDateTime(this.store.getValue(item, "timeCreated")) || "";
+                dojo.byId("detailLastUpdated").innerHTML = stringDateTime(this.store.getValue(item, "timeUpdated")) || "";
+                dojo.byId("detailExportUrl").href = (item && item.id) ? "${urlExport}/" + item.id : "";
+                dojo.byId("detailExportUrl").innerHTML = (item && item.name) ? item.name : "";
+            },
+            isModified: function() {
+                var modified = false;
+
+                var files = dijit.byId("idFile").getFileList();
+                if (files.length === 1) {
+                    modified = true;
+                }
+
+                return modified;
+            },
+            uploadReport: function() {
+                var pd = createProgressDialog();
+
+                // send item + file to the backend using PUT/POST
+                dojo.io.iframe.send({
+                    url: "${urlImport}",
+                    method: "POST",
+                    form: "form",
+                    handleAs: "json",
+                    load: function(data) {
+                        cris.report.upload.grid.setQuery({});
+                        if (data.error) {
+                            pd.setContent("Error: " + data.error);
+                        } else {
+                            pd.hide();
+                        }
+                    },
+                    error: function(error) {
+                        pd.setContent("Failed to save changes. " + error);
+                    }
+                });
+            },
+            behavior: {
+                "#idGrid": {
+                    onclick: function(evt) {
+                        dojo.publish("cris/reports/newSelection", []);
+                    }
+                },
+                "#idFile": {
+                    onchange: function(evt) {
+                        var files = dijit.byId("idFile").getFileList();
+                        if (files[0]) {
+                            dijit.byId("idFileName").setValue(files[0].name);
+                        }
+                    }
+                },
+                "#buttonUpload": {
+                    onclick: function(evt) {
+                        if (cris.report.upload.isModified()) {
+                            var yes = showConfirm("Do you want to import the report file?");
+                            if (!yes) {
+                                return;
+                            }
+                        } else {
+                            showMessage("Please select a report file (*.prpt).");
+                            return;
+                        }
+
+                        cris.report.upload.uploadReport();
+                    }
+                },
+                "#buttonReset": {
+                    onclick: function(evt) {
+                        dijit.byId("idFile").reset();
+                        dijit.byId("idFileName").setValue("");
+                    }
+                }
+            },
+            init: function() {
+                var this_ = this;
+                this.store = createJsonRestStore("${url}");
+
+                var layout = [{
+                        cells: [{
+                                field: 'id',
+                                name: 'ID',
+                                datatype: "number",
+                                width: '50px'
+                            }, {
+                                field: 'name',
+                                name: 'Name',
+                                width: 'auto'
+                            }, {
+                                field: 'timeUpdated',
+                                name: 'Last Updated',
+                                datatype: "date",
+                                width: '100px',
+                                get: function(row, item) {
+                                    if (!item) {
+                                        return "Loading...";
+                                    }
+                                    return stringDate(item.timeUpdated);
+                                }
+                            }]
+                    }];
+
+                var asc = true;
+                var args = {
+                    sortFields: [{
+                            attribute: "name",
+                            descending: !asc
+                        }],
+                    rowsPerPage: 10,
+                    pageSizes: []
+                };
+                this.grid = createGrid(this.store, layout, "idGrid", args);
+                this.grid.setSortIndex(1, asc);
+                if ("${filter}" !== "") {
+                    this.grid.setQuery({
+                        filter: "${filter}"
+                    });
+                }
+
+                this.updateHtml({});
+
+                dojo.behavior.add(this.behavior);
+                dojo.behavior.apply();
+
+                dojo.connect(dijit.byId("idFile"), "onChange", function(evt) {
+                    var files = dijit.byId("idFile").getFileList();
+                    if (files[0]) {
+                        dijit.byId("idFileName").setValue(files[0].name);
+                    }
+                });
+
+                dojo.subscribe("cris/reports/newSelection", this, function(evt) {
+                    if (this.grid.selection.getSelectedCount("row") >= 1) {
+                        this_.item = this.grid.selection.getSelected("row")[0];
+                        this.updateHtml();
+                    }
+                });
+            }
+        };
+
+        cris.ready(function() {
+            cris.report.upload.init();
+            cris.report.generate.init();
+        });
+        // ]]>
+    </script>
+
+</jsp:root>
