@@ -1,18 +1,18 @@
 package edu.purdue.cybercenter.dm.web;
 
-import edu.purdue.cybercenter.dm.domain.Classification;
 import edu.purdue.cybercenter.dm.domain.Constant;
 import edu.purdue.cybercenter.dm.domain.Group;
-import edu.purdue.cybercenter.dm.util.DomainObjectHelper;
+import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.util.DomainObjectUtils;
 import edu.purdue.cybercenter.dm.web.util.WebJsonHelper;
 import java.util.HashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -30,41 +30,22 @@ public class GroupController {
 
     @RequestMapping(value = "/index", method = RequestMethod.GET, produces = MediaType.TEXT_HTML_VALUE)
     public String index(Model model) {
-        model.addAttribute("classifications", Classification.findAllClassifications());
         return "groups/index";
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
-    public Object showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<String> showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.show(id, request, response, Group.class);
     }
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
-        Session session = DomainObjectHelper.getHbmSession();
-
-        if (request.getParameter("organizationUnitId") != null) {
-            Integer organizationUnit = Integer.parseInt(request.getParameter("organizationUnitId"));
-
-            if (!request.getParameter("organizationUnitId").startsWith("-")) {
-                session.enableFilter("groupInUnitFilter").setParameter("organizationUnitId", organizationUnit);
-            } else {
-                session.enableFilter("groupNotInUnitFilter").setParameter("organizationUnitId", -organizationUnit);
-            }
-        }
-
-        if (request.getParameter("enabled") != null) {
-            Boolean enabled = Boolean.parseBoolean(request.getParameter("enabled"));
-            org.hibernate.Filter enabledFilter = session.enableFilter("enabledFilter");
-            enabledFilter.setParameter("enabled", enabled);
-        }
-
         return WebJsonHelper.list(request, response, Group.class);
     }
 
-    @RequestMapping(method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object createFromJson(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         Object result;
@@ -84,7 +65,7 @@ public class GroupController {
         return result;
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object updateFromJson(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         Group group = DomainObjectUtils.fromJson(json, request.getContextPath(), Group.class);
@@ -110,4 +91,67 @@ public class GroupController {
         return result;
     }
 
+    @RequestMapping(value = "/currentgroup", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public ResponseEntity<String> getCurrentGroup(HttpServletRequest request, HttpServletResponse response) {
+        Integer groupId = (Integer) request.getSession().getAttribute("groupId");
+        Group group = Group.findGroup(groupId);
+        String responseBody;
+        HttpStatus httpStatus;
+        if (group == null) {
+            responseBody = "";
+            httpStatus = HttpStatus.NOT_FOUND;
+        } else {
+            responseBody = DomainObjectUtils.toJson(group, request.getContextPath());
+            httpStatus = HttpStatus.OK;
+        }
+        ResponseEntity responseEntity = new ResponseEntity(responseBody, httpStatus);
+        return responseEntity;
+    }
+
+    @RequestMapping(value = "/currentgroup", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public ResponseEntity setCurrentGroup(HttpServletRequest request, HttpServletResponse response) {
+        request.getSession().removeAttribute("groupId");
+        ResponseEntity responseEntity = new ResponseEntity(HttpStatus.NO_CONTENT);
+        return responseEntity;
+    }
+
+    @RequestMapping(value = "/currentgroup/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public ResponseEntity setCurrentGroup(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
+        Object responseBody;
+        HttpStatus httpStatus;
+        Group group = Group.findGroup(id);
+        if (group != null) {
+            Integer userId = (Integer) request.getSession().getAttribute("userId");
+            User user = User.findUser(userId);
+            boolean isMemebr = group.isMember(user);
+            if (isMemebr) {
+                request.getSession().setAttribute("groupId", id);
+                responseBody = DomainObjectUtils.toJson(group, request.getContextPath());
+                httpStatus = HttpStatus.OK;
+            } else {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "not a member of: " + id);
+                error.put("status", "failed");
+                Map<String, Object> result = new HashMap<>();
+                result.put("error", error);
+                responseBody = result;
+                httpStatus = HttpStatus.NOT_FOUND;
+            }
+        } else {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "group does not exist: " + id);
+            error.put("status", "failed");
+            Map<String, Object> result = new HashMap<>();
+            result.put("error", error);
+            responseBody = result;
+            httpStatus = HttpStatus.NOT_FOUND;
+        }
+
+        ResponseEntity responseEntity = new ResponseEntity(responseBody, httpStatus);
+
+        return responseEntity;
+    }
 }

@@ -168,10 +168,9 @@ public abstract class TermMapper {
 
     private String getLatestVersion(UUID uuid) {
         String version;
-        List<Term> terms = termService.getTerms(uuid, false);
-        if (!terms.isEmpty()) {
-            Term head = terms.get(0);
-            version = head.getVersion();
+        edu.purdue.cybercenter.dm.domain.Term term = termService.findByUuidAndVersionNumber(uuid, null);
+        if (term != null) {
+            version = term.getVersionNumber().toString();
         } else {
             version = null;
         }

@@ -48,10 +48,15 @@ angular.module("crisTask").controller("JobTaskController", ["$scope", function (
         // check if all input are valid
         var formWidget = dijit.byId("idForm");
         var valid = formWidget.validate();
-        if (!valid) {
+        
+        $scope.mainForm.submitted = true;
+        
+        if (!valid || $scope.mainForm.$valid === false) {
+            $scope.errors = "Please correct any errors highlighted in red.";
             errorCallback();
             return;
         }
+        $scope.errors = "";
 
         var _initTemp = this.data._init;
         delete this.data._init;
@@ -64,7 +69,10 @@ angular.module("crisTask").controller("JobTaskController", ["$scope", function (
         payload.experimentId = this.currentExperimentId;
         payload.jobId = this.currentJobId;
         payload.taskId = this.currentTaskId;
-        payload[templateTermName] = dojo.toJson(this.data);
+        
+        var _data = angular.copy(this.data);
+        removeIllegalProperties(_data);
+        payload[templateTermName] = angular.toJson(_data);
 
         var _this = this;
         dojo.io.iframe.send({
@@ -99,4 +107,30 @@ angular.module("crisTask").controller("JobTaskController", ["$scope", function (
             }
         });
     };
+
+    function removeIllegalProperties(obj) {
+        var propertyNames = Object.getOwnPropertyNames(obj);
+        dojo.forEach(propertyNames, function(name) {
+            var currentObj = obj[name];
+
+            // Remove references to individual items of list composite terms. Items are referenced using underscore notation E.g Comp[0] = _Comp.
+            if (!name.startsWith('_') && typeof currentObj === 'object' && currentObj !== null) {
+                if (currentObj instanceof Array) {
+                    delete obj['_' + name]; // delete list item reference here
+                    if (currentObj.length) {
+                        dojo.forEach(currentObj, function(arrayObj) {
+                            if (typeof arrayObj === 'object' && arrayObj !== null) {
+                                removeIllegalProperties(arrayObj);
+                            }
+                        });
+                    }
+                } else {
+                    removeIllegalProperties(currentObj);
+                }
+            }
+            
+            // Add anymore items to remove in the future.....
+            
+        });
+    }
 }]);

@@ -93,6 +93,7 @@ public class CqlService {
                     value = Helper.deepSerialize(getLocalValue(name, context));
                 } else {
                     String paramsString = termName.getQueryString();
+                    String op;
                     Map<String, Object> query;
                     Object distinct;
                     Map<String, Object> group;
@@ -101,6 +102,7 @@ public class CqlService {
                     Integer limit;
                     Map<String, Boolean> project;
                     if (StringUtils.isBlank(paramsString)) {
+                        op = "find";
                         query = new HashMap<>();
                         distinct = false;
                         group = null;
@@ -109,8 +111,9 @@ public class CqlService {
                         limit = null;
                         project = null;
                     } else {
-                        Map<String, Object> params = Helper.deserialize(paramsString, Map.class);
+                        Map<String, Object> params = (Map<String, Object>) DatasetUtils.deserialize(paramsString);
 
+                        op = (String) params.get("$op");
                         distinct = (Object) params.get(DocumentService.AGGREGATOR_DISTINCT);
                         group = (Map<String, Object>) params.get("$group");
                         if (params.get(DocumentService.AGGREGATOR_SORT) != null) {
@@ -124,6 +127,7 @@ public class CqlService {
                         limit = (Integer) params.get(DocumentService.AGGREGATOR_LIMIT);
                         project = (Map<String, Boolean>) params.get(DocumentService.AGGREGATOR_PROJECT);
 
+                        params.remove("$op");
                         params.remove(DocumentService.AGGREGATOR_DISTINCT);
                         params.remove(DocumentService.AGGREGATOR_GROUP);
                         params.remove(DocumentService.AGGREGATOR_SORT);
@@ -143,25 +147,32 @@ public class CqlService {
                     }
                     Map<String, Object> aggregators = new HashMap<>();
                     aggregators.put(DocumentService.AGGREGATOR_MATCH, query);
-                    aggregators.put(DocumentService.AGGREGATOR_DISTINCT, group);
-                    aggregators.put(DocumentService.AGGREGATOR_GROUP, group);
-                    aggregators.put(DocumentService.AGGREGATOR_SORT, sort);
-                    aggregators.put(DocumentService.AGGREGATOR_SKIP, skip);
-                    aggregators.put(DocumentService.AGGREGATOR_LIMIT, limit);
-                    aggregators.put(DocumentService.AGGREGATOR_PROJECT, project);
-                    List objects = datasetService.find(termName.getUuid(), aggregators);
-                    Object values;
-                    if (termName.getIsList()) {
-                        if (distinct != null && distinct instanceof Boolean) {
-                            values = DatasetUtils.extractField(termName.getAlias(), objects, (Boolean) distinct);
-                        } else {
-                            values = DatasetUtils.extractField(termName.getAlias(), objects);
-                        }
-                    } else {
-                        Map object = (Map) DatasetUtils.getOneOrNothing(objects);
-                        values = DatasetUtils.extractField(termName.getAlias(), object);
+                    if (distinct != null && distinct instanceof Map) {
+                        aggregators.put(DocumentService.AGGREGATOR_DISTINCT, distinct);
                     }
-                    value = DatasetUtils.serialize(values);
+                    aggregators.put(DocumentService.AGGREGATOR_GROUP, group);
+                    if (op != null && op.equalsIgnoreCase("count")) {
+                        long count = datasetService.count(termName.getUuid(), aggregators);
+                        value = "" + count;
+                    } else {
+                        aggregators.put(DocumentService.AGGREGATOR_SORT, sort);
+                        aggregators.put(DocumentService.AGGREGATOR_SKIP, skip);
+                        aggregators.put(DocumentService.AGGREGATOR_LIMIT, limit);
+                        aggregators.put(DocumentService.AGGREGATOR_PROJECT, project);
+                        List objects = datasetService.find(termName.getUuid(), aggregators);
+                        Object values;
+                        if (termName.getIsList()) {
+                            if (distinct != null && distinct instanceof Boolean) {
+                                values = DatasetUtils.extractField(termName.getAlias(), objects, (Boolean) distinct);
+                            } else {
+                                values = DatasetUtils.extractField(termName.getAlias(), objects);
+                            }
+                        } else {
+                            Map object = (Map) DatasetUtils.getOneOrNothing(objects);
+                            values = DatasetUtils.extractField(termName.getAlias(), object);
+                        }
+                        value = DatasetUtils.serialize(values);
+                    }
                 }
             } else {
                 value = Helper.serialize(getSystemValue(name, context));

@@ -65,11 +65,24 @@ public class VocabularyValidatorImpl implements VocabularyValidator {
             try {
                 isShow = evaluateJson(showExpression, scope, Boolean.class);
             } catch (ScriptException ex) {
-                isShow = true;
+                isShow = false;
             }
         }
 
         return isShow;
+    }
+
+    private boolean isRequired(String requiredExpression, Map<String, Object> scope) {
+        boolean isRequired = false;
+        if (StringUtils.isNotEmpty(requiredExpression)) {
+            try {
+                isRequired = evaluateJson(requiredExpression, scope, Boolean.class);
+            } catch (ScriptException ex) {
+                isRequired = false;
+            }
+        }
+
+        return isRequired;
     }
 
     private Object getObjectOnPath(String path, Map<String, Object> map) {
@@ -108,6 +121,7 @@ public class VocabularyValidatorImpl implements VocabularyValidator {
         boolean isValueList = (value != null && (value instanceof List || value instanceof Object[]));
 
         String sShowExpression = term.getShowExpression();
+        String sRequiredExpression = term.getRequiredExpression();
         Map<String, Object> scope;
         if (root instanceof Map) {
             scope = (Map<String, Object>) root;
@@ -115,6 +129,7 @@ public class VocabularyValidatorImpl implements VocabularyValidator {
             scope = null;
         }
         boolean isShow = show && isShow(sShowExpression, scope);
+        boolean isRequired = (term.isRequired() != null ? term.isRequired() : isRequired(sRequiredExpression, scope));
 
         HashMap<String, Object> wrappedMap = new HashMap<>();
         String alias = term.getAlias() == null ? term.getName() : term.getAlias();
@@ -125,7 +140,7 @@ public class VocabularyValidatorImpl implements VocabularyValidator {
                     value = new ArrayList();
                 }
 
-                if (term.isRequired() != null && term.isRequired() && isShow && ((List) value).isEmpty()) {
+                if (isRequired && isShow && ((List) value).isEmpty()) {
                     Errors errors = new Errors();
                     errors.add(ModuleCode.VOCABULARY, ErrorType.ERROR, ErrorCodes.ERR_VOCB_TEMPLATE_MISSING_REQUIRED_TERM, path, new Object[]{value.getClass().getName()});
                     errors.setValid(false);
@@ -196,7 +211,7 @@ public class VocabularyValidatorImpl implements VocabularyValidator {
 
             // validate the current term
             Object errorObject;
-            if (term.isRequired() != null && term.isRequired() && isShow) {
+            if (isRequired && isShow) {
                 // Value Validation becomes necessary
                 if (value != null) {
                     errorObject = validateValue(term, value, path);
@@ -227,9 +242,11 @@ public class VocabularyValidatorImpl implements VocabularyValidator {
         HashMap<String, Object> errorMap = new HashMap<>();
 
         String sShowExpression = attachTo.getShowExpression();
+        String sRequiredExpression = attachTo.getRequiredExpression();
         boolean isShow = show && isShow(sShowExpression, (Map<String, Object>) parent);
+        boolean isRequired = (attachTo.isRequired() != null ? attachTo.isRequired() : isRequired(sRequiredExpression, (Map<String, Object>) parent));
 
-        if (attachTo.isRequired() != null && attachTo.isRequired() == true && isShow) {
+        if (isRequired && isShow) {
             String alias = attachTo.getUseAlias();
             Boolean isList = attachTo.isList();
             if (value == null) {

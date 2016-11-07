@@ -107,4 +107,36 @@ public class Helper {
         return StringUtils.isEmpty(text) ? text : text.replaceAll("\\s", "_").replaceAll("\\W+", "_");
     }
 
+    /**
+     * merge two maps recursively
+     *
+     * @param map1: the map to be merged to
+     * @param map2: the map to be merged
+     * @return the merged map
+     */
+    public static Map<String, Object> mergeMaps(Map<String, Object> map1, Map<String, Object> map2) {
+        if (map2 != null) {
+            for (Map.Entry<String, Object> entry2 : map2.entrySet()) {
+                String key2 = entry2.getKey();
+                Object value1 = map1.get(key2);
+                Object value2 = entry2.getValue();
+                if (value1 == null) {
+                    map1.put(key2, value2);
+                } else if (value2 == null) {
+                    if (value1 instanceof Map) {
+                        // ignore merge null into composite type
+                    } else {
+                        // merge null into primitive type
+                        map1.put(key2, value2);
+                    }
+                } else if (!(value1 instanceof Map) || !(value2 instanceof Map)) {
+                    map1.put(key2, value2);
+                } else {
+                    mergeMaps((Map) value1, (Map) value2);
+                }
+            }
+        }
+        return map1;
+    }
+
 }

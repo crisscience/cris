@@ -4,14 +4,11 @@
  */
 package edu.purdue.cybercenter.dm.security;
 
-import edu.purdue.cybercenter.dm.domain.Permission;
 import edu.purdue.cybercenter.dm.domain.User;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 /**
@@ -19,6 +16,8 @@ import org.springframework.security.core.userdetails.UserDetails;
  * @author xu222
  */
 public class UserDetailsAdapter implements UserDetails {
+
+    private static final long serialVersionUID = 1L;
 
     private User user;
 
@@ -32,14 +31,6 @@ public class UserDetailsAdapter implements UserDetails {
     @Override
     public Collection<GrantedAuthority> getAuthorities() {
         Set<GrantedAuthority> gas = new HashSet<>();
-        List<Permission> permissions = Permission.findRoleTypeId(user);
-        for (Permission permission : permissions) {
-            GrantedAuthority ga = new SimpleGrantedAuthority(permission.getRoleTypeId().getName());
-            if (!gas.contains(ga)) {
-                gas.add(ga);
-            }
-        }
-
         return gas;
     }
 

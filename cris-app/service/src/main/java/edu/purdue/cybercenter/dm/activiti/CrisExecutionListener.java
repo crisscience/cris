@@ -103,17 +103,17 @@ public class CrisExecutionListener implements ExecutionListener {
                         Map<String, Object> queryOthers = new HashMap<>();
                         queryOthers.put(MetaField.JobId, jobId);
                         queryOthers.put(MetaField.State, queryNotEqual);
-                        datasetService.updateState(iFinalState, queryOthers, templateUuids);
+                        datasetService.updateStateUnsecured(iFinalState, queryOthers, templateUuids);
                     }
 
                     Map<String, Object> queryTemporary = new HashMap<>();
                     queryTemporary.put(MetaField.JobId, jobId);
                     queryTemporary.put(MetaField.State, temporaryState);
-                    datasetService.updateState(deprecatedState, queryTemporary, templateUuids);
+                    datasetService.updateStateUnsecured(deprecatedState, queryTemporary, templateUuids);
                 } else {
                     Map<String, Object> queryAllJobData = new HashMap<>();
                     queryAllJobData.put(MetaField.JobId, jobId);
-                    datasetService.updateState(deprecatedState, queryAllJobData, templateUuids);
+                    datasetService.updateStateUnsecured(deprecatedState, queryAllJobData, templateUuids);
                 }
             } else if (de.getEventName().equals(ExecutionListener.EVENTNAME_TAKE)) {
 

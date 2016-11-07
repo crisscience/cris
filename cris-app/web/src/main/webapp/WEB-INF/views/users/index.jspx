@@ -6,282 +6,260 @@
     <spring:url value="/users" var="url"/>
 
     <script type="text/javascript">
-
-        cris.require('dijit/form/FilteringSelect');
-        cris.require('dijit/form/Form');
-        cris.require("dijit/form/Button");
-        cris.require("dijit/form/RadioButton");
-        cris.require("dijit/form/DateTextBox");
-        cris.require("dijit/form/TextBox");
-        cris.require("dojox/data/JsonRestStore");
-
-        var AdminUsername = "administrator";
-
-        function updateUserDetail(item) {
-            dojo.byId("externalSource").innerHTML = item.externalSource || "";
-            dojo.byId("externalId").innerHTML = item.externalId || "";
-            dojo.byId("userId").innerHTML = item.id || "";
-            dijit.byId("username").setValue(item.username || "");
-            dijit.byId("username").set('readonly', true);
-            dojo.byId("firstName").innerHTML = item.firstName || "";
-            dojo.byId("middleName").innerHTML = item.middleName || "";
-            dojo.byId("lastName").innerHTML = item.lastName || "";
-            dojo.byId("email").innerHTML = item.email || "";
-            dijit.byId("enabled").setValue(item.enabled || false);
-            dojo.byId("timeCreated").innerHTML = item.timeCreated ? dateIsoToLocale(item.timeCreated.$date) : "";
-            dojo.byId("lastUpdated").innerHTML = item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
-
-            var enabled = dijit.byId("enabled");
-            var buttonSave = dijit.byId("buttonSave");
-            var buttonReset = dijit.byId("buttonReset");
-            if (item.username === AdminUsername) {
-                enabled.set("disabled", true);
-                buttonSave.set("disabled", true);
-                buttonReset.set("disabled", true);
-            } else {
-                enabled.set("disabled", false);
-                buttonSave.set("disabled", false);
-                buttonReset.set("disabled", false);
-            }
-        }
-
-        function isShowEnabled() {
-            var showEnabled = dijit.byId("idShowEnabled");
-            if (showEnabled.checked) {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        function updateUser(item) {
-            store.setValue(item, "enabled", dijit.byId("enabled").getValue() === "on");
-        }
-
-        cris.ready(function() {
-            dojo.style("idDetails", {
-                "display": "none"
-            });
-
-            showEnabled = true;
-            isNewUser = false;
-
-            store = createJsonRestStore("${url}");
-
-            var layoutUsers= [{cells: [
-                        { field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true },
-                        { field: 'lastName', name: 'Last Name', width: 'auto' },
-                        { field: 'firstName', name: 'First Name', width: 'auto' },
-                        { field: 'username', name: 'User Name', width: 'auto' }
-                    ]}];
-
-            var asc = true;
-            var args = {
-                query: {enabled: true},
-                sortFields: [{attribute: "lastName", descending: !asc}]
-            };
-
-            grid = createGrid(store, layoutUsers, "users", args);
-            grid.setSortIndex(1, asc);
-            if ("${filter}" !== "") {
-                grid.setQuery({filter: "${filter}"});
-            } else {
-                if (showEnabled === true) {
-                    grid.setQuery({enabled: true});
-                } else if (showEnabled === false) {
-                    grid.setQuery({enabled: false});
-                } else {
-                    grid.setQuery();
-                }
-            }
-
-            dojo.connect(grid, "onSelected", function(index){
-                if (grid.selection.getSelectedCount("row") >= 1) {
-                    isNewUser = false;
-                    dojo.style("idDetails", {
-                        "display": "block"
-                    });
-                    var item = grid.getItem(index);
-                    updateUserDetail(item);
-                } else {
-                    dojo.style("idDetails", {
-                        "display": "none"
-                    });
+    // <![CDATA[
+        angular.module('crisUser', ["angular-dojo"]).controller('userController', ['$scope', '$http', '$uibModal', function ($scope, $http, $uibModal) {
+            $scope.enabled = "true"; // by default show enabled users
+            $scope.url = "${url}" + '/?' + 'enabled=true&sort(+lastName)';
+            
+            $scope.gridColumnDefs = [
+                {field: 'id', name: 'id', displayName: 'ID', width: 60, visible: false},
+                {field: 'lastName', name: 'lastName', displayName: 'Last Name', minWidth: 120},
+                {field: 'firstName', name: 'firstName', displayName: 'First Name', minWidth: 120},
+                {field: 'username', name: 'username', displayName: 'User Name', minWidth: 160}
+            ];
+            
+            clearDetails();
+            $scope.$watch('enabled', function (newValue, oldValue) {
+                if (newValue !== oldValue) {
+                    if (newValue === '') { // all users
+                        $scope.url = "${url}" + '/?sort(+lastName)';
+                    } else if (newValue === 'true') { // enabled users
+                        $scope.url = "${url}" + '/?enabled=true&sort(+lastName)';
+                    } else { // disabled users
+                        $scope.url = "${url}" + '/?enabled=false&sort(+lastName)';
+                    }
+                    clearDetails();
+                    refreshGrid();
                 }
             });
-
-            dojo.connect(dijit.byId("buttonReset"), "onClick", function(evt){
-                if (grid.selection.getSelectedCount("row") >= 1) {
-                    var item = grid.selection.getSelected("row")[0];
-                    updateUserDetail(item);
+            
+            $scope.save = function () {
+                var data;
+                var method;
+                if ($scope.isNewUser) {
+                    if (!$scope.record.username) {
+                        showMessageModal({uibModal: $uibModal, message: "You must specify a username"});
+                        return;
+                    }
+                    data = $scope.record;
+                    method = "POST";
                 } else {
-                    updateUserDetail({});
-                }
-            });
-
-            var buttonSave = dijit.byId("buttonSave");
-            dojo.connect(buttonSave, "onClick", function(evt){
-                var modified = false;
-
-                if (isNewUser) {
-                    store.newItem({"username": dijit.byId("username").getValue(), "enabled": dijit.byId("enabled").getValue() === "on"});
-                    modified = true;
-                } else {
-                    if (grid.selection.getSelectedCount("row") >= 1) {
-                        modified = false;
-                        var item = grid.selection.getSelected("row")[0];
-
-                        var enabled = dijit.byId("enabled");
-                        if ((item.enabled || false) !== (enabled.getValue() === "on")) {
-                            modified = true;
-                            updateUser(item);
+                    if ($scope.selectedRecord) {
+                        if (!isModified()) {
+                            showMessageModal({uibModal: $uibModal, message: "No change is made"});
+                            return;
                         }
+                        data = $scope.selectedRecord;
+                        data.username = $scope.record.username;
+                        data.enabled = ($scope.record.enabled === true);
+                        method = "PUT";
+                    } else {
+                        showMessageModal({uibModal: $uibModal, message: "Please select a user"});
+                        return;
                     }
                 }
-
-                if (modified) {
-                    var pd = createProgressDialog();
-                    store.save({
-                        onComplete: function(data) {
-                            var xhr = data[0].deferred.ioArgs.xhr.response;
-                            var object = JSON.parse(xhr);
-                            if (object.error) {
-                                if (dijit.byId("enabled").getValue() === "on") {
-                                    dijit.byId("enabled").setValue(false);
-                                    store.setValue(item, "enabled",false);
-                                } else {
-                                    dijit.byId("enabled").setValue("on");
-                                    store.setValue(item, "enabled",true);
-                                }
-                                if (showEnabled === true) {
-                                    grid.setQuery({enabled: true});
-                                } else if (showEnabled === false) {
-                                    grid.setQuery({enabled: false});
-                                } else {
-                                    grid.setQuery();
-                                }
-
-                                pd.setContent("Failed to save changes. " + object["error"].message + ": " +object["error"].status);
-                            } else {
-                                updateUserDetail({});
-
-                                var query = {};
-                                if(isShowEnabled()){
-                                    query.enabled = true;
-                                }
-                                grid.setQuery(query);
-                                grid.selection.clear();
-
-                                pd.hide();
-                            }
-                        },
-                        onError: function(error) {
-                            var message;
-                            if (error.responseText) {
-                                var data = dojo.fromJson(error.responseText);
-                                message = data.exception.message;
-                            } else {
-                                message = error;
-                            }
-                            pd.setContent("Failed to save changes: " + message);
-                        }
-                    });
+                $scope.isNewUser = false;
+                
+                var progressModal = showProgressModal({uibModal: $uibModal});
+                $http({
+                    url: "${url}" + (method === "PUT" ? "/" + data.id : ""),
+                    method: method,
+                    data: data
+                }).then(function successCallback(data) {
+                    var response = data.data;
+                    if (response.hasError) {
+                        showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + response.message + " " + response.status});
+                        progressModal.close();
+                        return;
+                    }
+                    refreshGrid(true);
+                    progressModal.close();
+                }, function errorCallback(error) {
+                    var message;
+                    if (error.data && error.data.text) {
+                        message = dojo.fromJson(error.data.text).message;
+                    } else {
+                        message = error.data;
+                    }
+                    progressModal.close();
+                    showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + message})
+                });
+            };
+            
+            $scope.rowSelectCallback = function (rowData) {
+                $scope.isNewUser = false;
+                $scope.record = angular.copy(rowData);
+                $scope.selectedRecord = rowData;
+                $scope.toggleDetailsView(true);
+                $scope.currentAction = "Edit selected user";
+            };
+            
+            $scope.createNewUser = function () {
+                clearSelected();
+                clearDetails();
+                $scope.toggleDetailsView(true);
+                $scope.isNewUser = true;
+                $scope.currentAction = "Create a new user";
+            };
+            
+            $scope.reset = function () {
+                if ($scope.selectedRecord) {
+                    $scope.record = angular.copy($scope.selectedRecord);
                 } else {
-                    showMessage("No change is made");
-                    return;
+                    $scope.record = {};
                 }
-            });
-
-            var buttonNew = dijit.byId("buttonNew");
-            dojo.connect(buttonNew, "onClick", function(evt) {
-                isNewUser = true;
-                dojo.style(dojo.byId('idDetails'), 'display', 'block');
-                grid.selection.clear();
-
-                updateUserDetail({"enabled": true});
-                dijit.byId("username").set('readonly', false);
-
-            });
-
-            dojo.connect(dijit.byId("idShowEnabled"), "onClick", function(evt){
-                console.log("enabled");
-                grid.setQuery({enabled: true});
-            });
-
-            dojo.connect(dijit.byId("idShowAll"), "onClick", function(evt){
-                console.log("all");
-                grid.setQuery({});
-            });
-        });
-
+            };
+            
+            $scope.getTimeCreated = function (record) {
+                return record && record.timeCreated && record.timeCreated.$date ? dateIsoToLocale(record.timeCreated.$date) : "";
+            };
+            
+            $scope.getLastUpdated = function (record) {
+                return record && record.timeUpdated && record.timeUpdated.$date ? dateIsoToLocale(record.timeUpdated.$date) : "";
+            };
+            
+            $scope.isAdminUser = function () {
+                var result = false;
+                if ($scope.selectedRecord) { // only enable some buttons for administrators
+                    result = ($scope.selectedRecord.username === 'administrator');
+                }
+                return result;
+            };
+            
+            // On smaller screens toggle between projects view and details view
+            $scope.toggleDetailsView = function (doShow, clearSelection) {
+                if (doShow) {
+                    $('#detailsView').removeClass('hidden-xs hidden-sm');
+                    $('#usersView').addClass('hidden-xs hidden-sm');
+                } else {
+                    $('#detailsView').addClass('hidden-xs hidden-sm');
+                    $('#usersView').removeClass('hidden-xs hidden-sm');
+                    if (clearSelection) {
+                        clearSelected();
+                    }
+                }
+            };
+            
+            function refreshGrid (restoreSelection) {
+                if ($scope.gridRef) {
+                    if (restoreSelection && $scope.selectedRecord) {
+                        $scope.gridRef.refreshGrid(function () {
+                            $scope.gridRef.selectRow($scope.selectedRecord.id, "id");
+                        });
+                    } else {
+                        $scope.gridRef.refreshGrid();
+                    }
+                }
+            }
+            
+            function isModified () {
+                var modified = false;
+                if ($scope.record.enabled !== $scope.selectedRecord.enabled) {
+                    modified = true;
+                }
+                if ($scope.record.username !== $scope.selectedRecord.username) {
+                    modified = true;
+                }
+                return modified;
+            }  
+            
+            function clearSelected () {
+                if ($scope.gridRef) {
+                    $scope.gridRef.clearSelection();
+                }
+                $scope.selectedRecord = null;
+                $scope.isNewUser = false;
+                $scope.currentAction = "No user selected";
+            }
+            
+            function clearDetails () {
+                clearSelected();
+                $scope.record = {};
+            }
+            
+        }]);
+        cris.bootstrapAngular("idUser", "crisUser");
+        // ]]>
     </script>
-
-    <div class="halfMinus floatLeft">
-        <h2>Users</h2>
-            <div class="floatLeft">
-                <input id="buttonNew" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "New"'/>
+    
+    <div id="idUser" data-ng-controller="userController">
+        <div class="row">
+            <div id="usersView" class="col-xs-12 col-sm-10 col-md-6 col-sm-offset-1">
+                <h2>Users</h2>
+                <div class="row">
+                    <div class="col-md-5">
+                        <button type="button" class="btn btn-primary" ng-click="createNewUser()">New</button>
+                    </div>
+                    <div class="col-md-7 text-right">
+                        <br class="hidden-xs hidden-sm"/>
+                        Show:&amp;nbsp;
+                        <span style="display: inline-block;"><cris-radio-button-group name="usersStatus" orientation="horizontal" items="{'Show Enabled': 'true', 'Show Disabled': 'false', 'Show All': ''}" data-ng-model="enabled"><!-- --></cris-radio-button-group></span>
+                    </div>
+                </div>
+                <br />
+                <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>
             </div>
-
-            <div class="floatRightToButton">
-                <input id="idShowEnabled" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton" checked="checked"/><span>Show Enabled</span>
-                &amp;nbsp
-                <input id="idShowAll" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton"/><span>Show All</span>
-            </div>
-        <br class="clearBoth"/>
-
-        <div id="users"><!-- fix ff problem --></div>
-    </div>
-
-    <div id="idDetails" class="half floatRight">
-        <h2>Details</h2>
-        <div>
-            <form id="userForm" data-dojo-type="dijit.form.Form">
-                <div>
-                    <table class="form" style="width: 100%">
+            <div id="detailsView" class="col-xs-12 col-sm-10 col-md-4 hidden-xs hidden-sm">
+                <div class="hidden-md hidden-lg">
+                    <button type="button" class="btn btn-default" ng-click="toggleDetailsView(null, true)"><span class="glyphicon glyphicon-chevron-left"></span>&amp;nbsp;Back to Users List</button>
+                </div>
+                <h2>Details</h2>
+                <div class="text-center">{{currentAction}}</div>
+                <div ng-show="selectedRecord || isNewUser">
+                    <table class="table table-striped">
                         <tr>
-                            <td style="width: 30%">ID:</td><td id="userId" style="width: 70%"><!-- fix ff problem --></td>
+                            <td style="width: 30%">ID:</td>
+                            <td style="width: 70%">{{record.id}}</td>
                         </tr>
                         <tr>
-                            <td>External Source:</td><td id="externalSource"><!-- fix ff problem --></td>
+                            <td>External Source:</td>
+                            <td>{{record.externalSource}}</td>
                         </tr>
                         <tr>
-                            <td>External ID:</td><td id="externalId"><!-- fix ff problem --></td>
+                            <td>External ID:</td>
+                            <td>{{record.externalId}}</td>
                         </tr>
                         <tr>
-                            <td>Username:</td><td><input id="username" data-dojo-type="dijit/form/TextBox" readonly="true"/></td>
+                            <td>Username:</td>
+                            <td><input type="text" ng-model="record.username" class="form-control" /></td>
                         </tr>
                         <tr>
-                            <td>First Name:</td><td id="firstName"><!-- fix ff problem --></td>
+                            <td>First Name:</td>
+                            <td>{{record.firstName}}</td>
                         </tr>
                         <tr>
-                            <td>Middle Name:</td><td id="middleName"><!-- fix ff problem --></td>
+                            <td>Middle Name:</td>
+                            <td>{{record.middleName}}</td>
                         </tr>
                         <tr>
-                            <td>Last Name:</td><td id="lastName"><!-- fix ff problem --></td>
+                            <td>Last Name:</td>
+                            <td>{{record.lastName}}</td>
                         </tr>
                         <tr>
-                            <td>Email:</td><td id="email"><!-- fix ff problem --></td>
+                            <td>Email:</td>
+                            <td>{{record.email}}</td>
                         </tr>
                         <tr>
-                            <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
+                            <td>Time Created:</td>
+                            <td>{{getTimeCreated(record)}}</td>
                         </tr>
                         <tr>
-                            <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                            <td>Last Updated:</td>
+                            <td>{{getLastUpdated(record)}}</td>
                         </tr>
                         <tr>
-                            <td>Enabled?</td><td class="center"><input id="enabled" data-dojo-type="dijit.form.CheckBox"/></td>
+                            <td>Enabled?</td>
+                            <td class="text-center"><input type="checkbox" ng-model="record.enabled" ng-true-value="true" ng-false-value="false" class="checkbox-inline" ng-disabled="isAdminUser()" /></td>
                         </tr>
                     </table>
+                    <div class="pull-right">
+                        <button type="button" class="btn btn-primary" ng-click="save()" ng-disabled="isAdminUser()">Save</button>
+                        &amp;nbsp;
+                        <button type="button" class="btn btn-primary" ng-click="reset()" ng-disabled="isAdminUser()">Reset</button>
+                    </div>
                 </div>
-                <p></p>
-                <div style="float: right">
-                    <button id="buttonSave" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Save"' type="button"><!-- fix ff problem --></button>
-                    <button id="buttonReset" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Reset"' type="button"><!-- fix ff problem --></button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
-
-    <br style="clear: both"/>
 
 </jsp:root>

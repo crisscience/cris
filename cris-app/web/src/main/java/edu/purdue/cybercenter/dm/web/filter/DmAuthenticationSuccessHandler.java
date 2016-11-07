@@ -4,11 +4,11 @@
  */
 package edu.purdue.cybercenter.dm.web.filter;
 
+import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.Session;
 import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.domain.UserSession;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -52,16 +52,11 @@ public class DmAuthenticationSuccessHandler extends SavedRequestAwareAuthenticat
         httpSession.setAttribute("userId", user.getId());
         httpSession.setAttribute("firstName", user.getFirstName());
 
-        // figure out the views the user allowed to use. Right now just user and admin
-        List<String> views = new ArrayList<>();
-        if (user.isAdmin()) {
-            views.add("admin");
-            views.add("user");
-        } else {
-            views.add("user");
+        List<Group> groups = user.getMemberGroups();
+        if (groups != null && groups.size() == 1) {
+            // set the current group
+            httpSession.setAttribute("groupId", groups.get(0).getId());
         }
-        httpSession.setAttribute("views", views);
-        httpSession.setAttribute("currentView", "user");
 
         super.onAuthenticationSuccess(request, response, authentication);
 

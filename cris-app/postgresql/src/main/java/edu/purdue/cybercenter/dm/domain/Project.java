@@ -44,6 +44,17 @@ public class Project extends AbstractCrisAsset {
     @Column(name = "email", length = 250)
     private String email;
 
+    @Column(name = "is_public")
+    private Boolean isPublic;
+
+    public Boolean getIsPublic() {
+        return isPublic;
+    }
+
+    public void setIsPublic(Boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+
     public Set<Experiment> getExperiments() {
         return experiments;
     }

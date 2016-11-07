@@ -28,7 +28,7 @@ function WorkFlow(id, name, key, uuid, documentation, tasks, flows, startTaskId,
         if (t.taskType === "User Task") {
             task = new UserTask(t.taskType, t.name, t.documentation, t.ui_page, t.jsonIn, t.users, t.groups, t.datasetState, t.files, t.orientation, t.top, t.left);
         } else if (t.taskType === "System Task") {
-            task = new ServiceTask(t.taskType, t.name, t.documentation, t.syncTask, t.filesToPlace, t.jsonIn, t.prefilter, t.commandline, t.postfilter, t.jsonOut, t.filesToCollect, t.datasetState, t.files, t.orientation, t.top, t.left);
+            task = new ServiceTask(t.taskType, t.name, t.documentation, t.syncTask, t.filesToPlace, t.jsonIn, t.prefilter, t.commandline, t.postfilter, t.clearWorkingDirectory, t.jsonOut, t.filesToCollect, t.datasetState, t.files, t.orientation, t.top, t.left);
         } else if (t.taskType === "Report Task") {
             task = new ReportTask(t.taskType, t.name, t.documentation, t.syncTask, t.command, t.reportId, t.templateId, t.parameters, t.outputType, t.datasetState, t.files, t.orientation, t.top, t.left);
         } else {
@@ -293,7 +293,7 @@ ReceiveTask.prototype = {
     }
 };
 
-function ServiceTask(taskType, name, documentation, isSyncTask, filesToPlace, jsonIn, prefilter, commandline, postfilter, jsonOut, filesToCollect, datasetState, files, orientation, top, left) {
+function ServiceTask(taskType, name, documentation, isSyncTask, filesToPlace, jsonIn, prefilter, commandline, postfilter, clearWorkingDirectory, jsonOut, filesToCollect, datasetState, files, orientation, top, left) {
     this.taskType = taskType;
 
     this.name = name ? name : "";
@@ -331,6 +331,7 @@ function ServiceTask(taskType, name, documentation, isSyncTask, filesToPlace, js
     this.prefilter = prefilter ? prefilter : "";
     this.commandline = commandline ? commandline : "";
     this.postfilter = postfilter ? postfilter : "";
+    this.clearWorkingDirectory = ((clearWorkingDirectory === false || typeof clearWorkingDirectory === 'undefined' || clearWorkingDirectory === null)  ? false : true);
     this.jsonOut = jsonOut ? jsonOut : "";
     this.filesToCollect = filesToCollect ? filesToCollect : "";
 }

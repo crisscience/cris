@@ -6,6 +6,7 @@ package edu.purdue.cybercenter.dm.service;
 
 import edu.purdue.cybercenter.dm.domain.CrisEntity;
 import edu.purdue.cybercenter.dm.security.CustomPermission;
+import java.io.Serializable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.acls.domain.CumulativePermission;
 import org.springframework.security.acls.domain.GrantedAuthoritySid;
@@ -49,6 +50,9 @@ public class PermissionService {
                 break;
             case "execute":
                 cumulativePermission.set(CustomPermission.EXECUTE);
+                break;
+            case "owner":
+                cumulativePermission.set(CustomPermission.OWNER);
                 break;
             default:
                 cumulativePermission = null;
@@ -152,4 +156,12 @@ public class PermissionService {
         aclService.updateAcl(aclEntity);
     }
 
+    public void deleteAcl(CrisEntity entity, boolean deleteChildren) {
+        deleteAcl(entity.getClass(), entity.getId(), deleteChildren);
+    }
+
+    public void deleteAcl(Class type, Serializable id, boolean deleteChildren) {
+        ObjectIdentity oId = new ObjectIdentityImpl(type, id);
+        aclService.deleteAcl(oId, deleteChildren);
+    }
 }

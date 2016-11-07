@@ -24,32 +24,32 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonNames1() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/names").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/names").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
 
         List<Map> expectedContents = Helper.deserialize("[{\"id\":\"85833b40-73d3-11e2-bcfd-0800200c9a66\",\"name\":\"HPLC Instrument Collection 2\",\"version\":\"bf7b1cd0-cfab-11e2-8b8b-0800200c9a66\"}]", List.class);//{\"id\":\"305b0f27-e829-424e-84eb-7a8a9ed93e28\",\"name\":\"GLB\",\"version\":\"db719406-f665-45cb-a8fb-985b6082b654\"}
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         List<Map> contents = Helper.deserialize(resultActions.andReturn().getResponse().getContentAsString(), List.class);
         assertTrue(contents.equals(expectedContents));
     }
 
     @Test
     public void templatesJsonNames2() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder1 = get("/templates/json/names/?projectId=5001&experimentId=0&jobId=0&showAll=false").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder1 = get("/templates/json/names/?projectId=5001&experimentId=0&jobId=0&showAll=false").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions1 = mockMvc.perform(mockHttpServletRequestBuilder1);
         resultActions1.andExpect(status().isOk());
-        resultActions1.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions1.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents1 = resultActions1.andReturn().getResponse().getContentAsString();
 
         List list1 = Helper.deserialize(contents1, List.class);
         assertEquals("number of templates", 1, list1.size());
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder2 = get("/templates/json/names/?projectId=5001&experimentId=0&jobId=0&showAll=true").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder2 = get("/templates/json/names/?projectId=5001&experimentId=0&jobId=0&showAll=true").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions2 = mockMvc.perform(mockHttpServletRequestBuilder2);
         resultActions2.andExpect(status().isOk());
-        resultActions2.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions2.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents2 = resultActions2.andReturn().getResponse().getContentAsString();
         List list2 = Helper.deserialize(contents2, List.class);
@@ -58,10 +58,10 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonNames3() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder1 = get("/templates/json/names/?projectId=0&experimentId=0&jobId=0&name=*&showAll=false").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder1 = get("/templates/json/names/?projectId=0&experimentId=0&jobId=0&name=*&showAll=false").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder1);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents1 = resultActions.andReturn().getResponse().getContentAsString();
         List list2 = Helper.deserialize(contents1, List.class);
         assertEquals(1, list2.size());
@@ -69,21 +69,21 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonNames4() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/names/?projectId=25&experimentId=0&jobId=0&name=*&showAll=false").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/names/?projectId=25&experimentId=0&jobId=0&name=*&showAll=false").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
 
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         assertEquals("[]", contents);
     }
 
     @Test
     public void templatesJsonDataset1() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/dataset").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/dataset").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         List listContents = Helper.deserialize(contents, List.class);
         assertFalse("Dataset is empty", listContents.isEmpty());
@@ -91,10 +91,10 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonDataset2() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/dataset/?experimentId=0&jobId=0&projectId=0&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/dataset/?experimentId=0&jobId=0&projectId=0&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         List list = Helper.deserialize(contents, List.class);
@@ -107,10 +107,10 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonLayout1() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         List listContents = Helper.deserialize(contents, List.class);
         assertEquals(1, listContents.size());
@@ -118,10 +118,10 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonLayout2() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=0&jobId=0&projectId=0&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=0&jobId=0&projectId=0&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         List list = Helper.deserialize(contents, List.class);
@@ -142,10 +142,10 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonLayout3() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=0&jobId=0&projectId=999&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=0&jobId=0&projectId=999&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         List list = Helper.deserialize(contents, List.class);
@@ -165,10 +165,10 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonLayout4() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=999&jobId=0&projectId=0&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=999&jobId=0&projectId=0&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         List list = Helper.deserialize(contents, List.class);
@@ -188,10 +188,10 @@ public class TemplateControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void templatesJsonLayout5() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=999&jobId=999&projectId=999&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/templates/json/layout/?experimentId=999&jobId=999&projectId=999&templateUuid=85833b40-73d3-11e2-bcfd-0800200c9a66").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         List list = Helper.deserialize(contents, List.class);

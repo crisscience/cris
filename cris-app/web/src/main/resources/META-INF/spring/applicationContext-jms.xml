@@ -20,6 +20,7 @@
 
     <amq:queue id="queueTaskEngine" name="queueTaskEngine" physicalName="queueTaskEngine"/>
     <amq:queue id="queueUserEngine" name="queueUserEngine" physicalName="queueUserEngine"/>
+    <amq:queue id="queueLoginFailure" name="queueLoginFailure" physicalName="queueLoginFailure"/>
 
     <!-- JMS ConnectionFactory to use for Spring JMS template -->
     <bean class="org.springframework.jms.connection.CachingConnectionFactory" id="cachingConnectionFactory">
@@ -36,6 +37,7 @@
     </bean>
 
     <!-- Spring JMS listener and Container -->
+    <!-- on queueUserEngine -->
     <bean id="userJobListener" class="org.springframework.jms.listener.adapter.MessageListenerAdapter">
         <constructor-arg>
             <bean class="edu.purdue.cybercenter.dm.jms.UserJobMessageDelegate"/>
@@ -44,6 +46,17 @@
 
     <jms:listener-container connection-factory="jmsFactory" destination-type="queue">
         <jms:listener destination="queueUserEngine" ref="userJobListener"/>
+    </jms:listener-container>
+
+    <!-- on queueLoginFailure -->
+    <bean id="loginFailureListener" class="org.springframework.jms.listener.adapter.MessageListenerAdapter">
+        <constructor-arg>
+            <bean class="edu.purdue.cybercenter.dm.jms.LoginFailureMessageDelegate"/>
+        </constructor-arg>
+    </bean>
+
+    <jms:listener-container connection-factory="jmsFactory" destination-type="queue">
+        <jms:listener destination="queueLoginFailure" ref="loginFailureListener"/>
     </jms:listener-container>
 
 </beans>

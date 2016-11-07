@@ -59,15 +59,10 @@ public class Workflow extends AbstractCrisAsset {
     public static Map<Class, ObjectFactory> getUseClasses(String ctxPath) {
         Map<Class, ObjectFactory> useClasses = new HashMap<>();
         JsonRestRef fjr = new JsonRestRef(ctxPath);
-        useClasses.put(Resource.class, fjr);
         useClasses.put(User.class, fjr);
         useClasses.put(Tenant.class, fjr);
         return useClasses;
     }
-
-    @ManyToOne
-    @JoinColumn(name = "resource_id", referencedColumnName = "id")
-    private Resource resourceId;
 
     @Column(name = "email", length = 250)
     private String email;
@@ -82,14 +77,6 @@ public class Workflow extends AbstractCrisAsset {
 
     @Column(name = "content")
     private String content;
-
-    public Resource getResourceId() {
-        return resourceId;
-    }
-
-    public void setResourceId(Resource resourceId) {
-        this.resourceId = resourceId;
-    }
 
     public String getEmail() {
         return email;

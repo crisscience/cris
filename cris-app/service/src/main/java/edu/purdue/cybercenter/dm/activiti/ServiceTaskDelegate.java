@@ -13,14 +13,22 @@ import edu.purdue.cybercenter.dm.util.ConstDatasetState;
 import edu.purdue.cybercenter.dm.util.DatasetUtils;
 import edu.purdue.cybercenter.dm.util.JsonTransformer;
 import edu.purdue.cybercenter.dm.service.WorkflowService;
+import edu.purdue.cybercenter.dm.util.Helper;
 import java.io.File;
+import java.io.IOException;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.activiti.engine.delegate.DelegateExecution;
 import org.activiti.engine.delegate.Expression;
 import org.activiti.engine.delegate.JavaDelegate;
 import org.activiti.engine.impl.persistence.entity.ExecutionEntity;
 import org.activiti.engine.repository.ProcessDefinition;
+import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Configurable;
 
@@ -34,6 +42,7 @@ public class ServiceTaskDelegate implements JavaDelegate {
     static final private String IsValid = "isValid";
     static final private String ErrorMessage = "errorMessage";
 
+    private Expression clearWorkingDir;
     private Expression filesToPlace;
     private Expression jsonIn;
     private Expression preFilter;
@@ -64,10 +73,30 @@ public class ServiceTaskDelegate implements JavaDelegate {
     @Override
     public void execute(DelegateExecution de) throws Exception {
         Map<String, Object> context = buildContext(de);
+        clearWorkingDirectory(context);
         placeFiles(context, de);
 
         Map<String, Object> mergedJsonOut = execute(context);
-        collectFiles(context);
+        Map<String, Object> filesJsonOut = collectFiles(context);
+        if (filesJsonOut != null) {
+            for (Map.Entry<String, Object> entry : filesJsonOut.entrySet()) {
+                Object existing = mergedJsonOut.get(entry.getKey());
+                if (existing != null) {
+                    if (existing instanceof Map) {
+                        Helper.mergeMaps((Map) existing, (Map) entry.getValue());
+                    } else if (existing instanceof List) {
+                        List<Map> existingList = (List) existing;
+                        for (Map m : existingList) {
+                            Helper.mergeMaps(m,  (Map) entry.getValue());
+                        }
+                    } else {
+                        throw new RuntimeException("Invalid dataset: " + existing.toString());
+                    }
+                } else {
+                    mergedJsonOut.putAll(filesJsonOut);
+                }
+            }
+        }
 
         saveResult(mergedJsonOut, context, de, null);
     }
@@ -105,6 +134,28 @@ public class ServiceTaskDelegate implements JavaDelegate {
         return context;
     }
 
+    protected void clearWorkingDirectory(Map<String, Object> context) {
+        String sClearWorkingDir = clearWorkingDir != null ? clearWorkingDir.getExpressionText() : null;
+        if ("true".equals(sClearWorkingDir)) {
+            Integer jobId = (Integer) context.get(MetaField.JobId);
+            String dirPath = AppConfigConst.getJobTmpPath() + AppConfigConst.FILE_SEPARATOR + jobId + "/";
+            if (dirPath.endsWith(jobId + "/")) {
+                // just make sure
+                Collection jobFiles = FileUtils.listFiles(new File(dirPath), null, false);
+                Iterator itJobFile = jobFiles.iterator();
+                while (itJobFile.hasNext()) {
+                    File jobFile = (File) itJobFile.next();
+                    try {
+                        FileUtils.forceDelete(jobFile);
+                    } catch (IOException ex) {
+                        Logger.getLogger(ServiceTaskDelegate.class.getName()).log(Level.SEVERE, "unable to remove job file: " + jobFile.getName(), ex);
+                    }
+                }
+
+            }
+        }
+    }
+
     protected void placeFiles(Map<String, Object> context, DelegateExecution de) throws Exception {
         Job job = (Job) context.get(MetaField.Job);
         Integer jobId = (Integer) context.get(MetaField.JobId);
@@ -136,16 +187,21 @@ public class ServiceTaskDelegate implements JavaDelegate {
         return mergedJsonOut;
     }
 
-    protected void collectFiles(Map<String, Object> context) {
+    protected Map<String, Object> collectFiles(Map<String, Object> context) {
         Job job = (Job) context.get(MetaField.Job);
         Integer jobId = (Integer) context.get(MetaField.JobId);
         String sFilesToCollect = cqlService.eval(filesToCollect != null ? filesToCollect.getExpressionText() : null, context);
         String dirPath = AppConfigConst.getJobTmpPath() + AppConfigConst.FILE_SEPARATOR + jobId + "/";
         String activityId = (String) context.get(MetaField.TaskId);
 
+        Map<String, Object> filesJsonOut;
         if (sFilesToCollect != null && !sFilesToCollect.isEmpty()) {
-            workflowService.collectFiles(sFilesToCollect, dirPath, job, activityId, context);
+            filesJsonOut = workflowService.collectFiles(sFilesToCollect, dirPath, job, activityId, context);
+        } else {
+            filesJsonOut = null;
         }
+
+        return filesJsonOut;
     }
 
     protected void saveResult(Map<String, Object> mergedJsonOut, Map<String, Object> context, DelegateExecution de, String processInstanceId) {

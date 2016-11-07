@@ -7,36 +7,50 @@
     >
 
     <jsp:output omit-xml-declaration="yes"/>
+    
+    <style type="text/css">
+        label {
+            min-width: 100px;
+        }
+        input.form-control {
+            min-width: 300px !important;
+        }
+    </style>
 
     <script type="text/javascript">
-        cris.require([
-            "dijit/form/Form",
-            "dijit/form/ValidationTextBox",
-            "dijit/form/Button"
-        ]);
+        angular.module("crisSignInProblem", []);
+        angular.module("crisSignInProblem").controller("crisSignInProblemController", function($scope) {
+            $scope.email = "";
+        });
 
         cris.ready(function() {
+            cris.bootstrapAngular("idCrisSignInProblem", "crisSignInProblem");
         });
     </script>
 
-    <div class="half">
+    <div class="col-xs-12 col-md-6" id="idCrisSignInProblem" data-ng-controller="crisSignInProblemController" >
         <h2>Password Reset Request</h2>
 
-        <div class="instruction">
+        <div>
             ${wsAuthProblem}
         </div>
         <br/>
 
         <spring:url value="/auth/problem" var="url"/>
-        <form action='${url}' method='POST' data-dojo-type="dijit.form.Form">
-            <label for="email">Email Address:</label>
-            <input id="email" name="email" value="${email}" placeholder="your registered email address" required="" data-dojo-type="dijit.form.ValidationTextBox" data-dojo-props='regExp: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}"'/>
+        <form action='${url}' name="form" method='POST' class="form-inline">
+            
+            <div class="form-group">
+                <label for="email">Email Address:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <input type="text" name="email" id="email" value="${email}" placeholder="your registered email address" ng-model="email" ng-required="true" ng-pattern="/^[A-Za-z0-9\._%\+\-]+@[A-Za-z0-9\.\-]+\.[A-Za-z]{2,4}$/" class="form-control" />
+            </div>
+            
             <br/>
             <form:errors cssClass="errors" path="user"/>
             <p><!-- --></p>
             <div>
-                <input type="submit" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Submit'"/>&amp;nbsp;
-                <input type="reset" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Reset'"/>
+                <input type="submit" class="btn btn-primary" value="Submit" ng-disabled="form.$invalid" />
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+                <input type="reset" class="btn btn-primary" value="Reset" />
             </div>
         </form>
     </div>

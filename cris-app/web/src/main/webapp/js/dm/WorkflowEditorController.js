@@ -117,17 +117,14 @@ angular.module("crisWorkflow").directive("crisWorkflowTask", function ($compile)
     };
 });
 
-angular.module("crisWorkflow").controller("WorkflowEditorController", function ($scope, $rootScope, workflowBuilderService) {
+angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",  "$http", "$rootScope", "$compile", "$timeout", "$uibModal", "workflowBuilderService", function ($scope, $http, $rootScope, $compile, $timeout, $uibModal, workflowBuilderService) {
     console.log("++++++++ editor init called");
-
+    
     this.errorMessage = null;
     this.isDirty = false;
     this.newTaskPosition = {top: 100, left: 100};
 
     this.workflow = null;
-    this.storeWorkflows = createJsonRestStore(cris.baseUrl + "workflows");
-
-    this.storeTemplates = createJsonRestStore(cris.baseUrl + "templates");
 
     this.uploaders = {};
     this.uploaders.tasks = {};
@@ -136,6 +133,9 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
     this.currentEditST = {};
     this.currentEditRT = {};
     this.currentEditCF = {};
+    
+    this.filesToUpload = {}; // holds files to "POST" to server
+    this.currentZoom = 1;
 
     var _this = this;
 
@@ -182,7 +182,16 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         }
 
         if (yes) {
-            openWorkflowDialog.show();
+            $uibModal.open({
+                template: '<div ng-include="\'view_open_workflow_modal\'"></div>',
+                size: 'md',
+                scope: $scope,
+                controller: function ($scope, $uibModalInstance) {
+                    $scope.cancel = function () {
+                        $uibModalInstance.dismiss();
+                    };
+                }
+            });
         }
     };
 
@@ -196,12 +205,42 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         }
 
         if (yes) {
-            importWorkflowDialog.show();
+            $uibModal.open({
+                template: '<div ng-include="\'view_import_workflow_modal\'"></div>',
+                size: 'md',
+                scope: $scope,
+                controller: function ($scope, $uibModalInstance) {
+                    $scope.cancel = function () {
+                        $uibModalInstance.dismiss();
+                    };
+                }
+            });
         }
     };
+    
+    // Event emitted by file uploader. Get file-to-upload here
+    $scope.$on('FilesToUpload', function (event, data) {
+        if (data.uploaderName === 'workflowToUpload') {
+            $scope.workflowToUpload = data.fileList[0];
+        } else {
+            if (data.isMultiple) {
+                _this.filesToUpload[data.uploaderName] = data.fileList;
+            } else {
+                _this.filesToUpload[data.uploaderName] = data.fileList[0];
+            }
+        }
+    });
+    
+    // Event emitted by file uploader when file(s) to upload are delete
+    $scope.$on('FilesRemoved', function (event, data) {
+        if (data.uploaderName === 'workflowToUpload') {
+            $scope.workflowToUpload = null;
+        } else {
+            delete _this.filesToUpload[data.uploaderName];
+        }
+    });
 
     this.fetchAndInitWorkflow = function(id) {
-        openWorkflowDialog.hide();
         require(["dojo/request/xhr"], function(xhr){
             xhr(cris.baseUrl + "workflows/load/" + id, {
                 handleAs: "json",
@@ -230,13 +269,15 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
 
     this.initWorkflow = function (workflow) {
         console.log("-------- init workflow");
-
+        
         // clear the drawing area
         jsPlumb.deleteEveryEndpoint();
         angular.forEach(dijit.findWidgets(dojo.byId('container')), function(w) {
             w.destroyRecursive();
         });
         dojo.empty("container");
+       // TODO: This will replace above cleanup code after we've removed all dojo/dijit references from page
+       //$('#container').empty();
 
         // ... and uploaders
         if (_this.uploaders.theEndPage) {
@@ -244,6 +285,10 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
                 w.destroyRecursive();
             });
             dojo.destroy(_this.uploaders.theEndPage);
+            
+            // TODO: This will replace above cleanup code after we've removed all dojo/dijit references from page
+            //angular.element(_this.uploaders.theEndPage).remove();
+            
             _this.uploaders.theEndPage = null;
         }
         if (_this.uploaders.tasks) {
@@ -252,9 +297,15 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
                     w.destroyRecursive();
                 });
                 dojo.destroy(task);
+                
+                // TODO: This will replace above cleanup code after we've removed all dojo/dijit references from page
+                //angular.element(task).remove();
             });
             _this.uploaders.tasks = {};
         }
+        
+        _this.filesToUpload = {}; // Reset file uploader container
+        _this.resetZoom(); // reset zoom
 
         _this.workflow = new WorkFlow(workflow.id, workflow.name, workflow.key, workflow.uuid, workflow.documentation, workflow.tasks, workflow.flows, workflow.startTaskId, workflow.endTaskIds, 1, workflow.initialDatasetState, workflow.finalDatasetStates, workflow.theEndFile);
         console.dir(_this.workflow);
@@ -263,15 +314,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         drawStartAndEndNodes();
 
         // TheEnd page file
-        var uploader = new dojox.form.Uploader({name: "theEndFile", label: "Browse ...", multiple: false, force: "html"});
-        uploader.startup();
-        var fileList = new dojox.form.uploader.FileList({uploader: uploader});
-        fileList.startup();
-
-        var node = dojo.create("div");
-        node.appendChild(uploader.domNode);
-        node.appendChild(fileList.domNode);
-        _this.uploaders.theEndPage = node;
+        _this.uploaders.theEndPage = $compile('<cris-file-uploader ng-model="dummyFile" path="theEndFile" is-multiple="false"></cris-file-uploader>')($scope);
 
         var key;
 
@@ -348,71 +391,126 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         }
 
         this.isDirty = true;
+        this.repaintWorkflow();
+    };
+    
+    this.repaintWorkflow = function () {
+        $timeout(function () {
+            jsPlumb.repaintEverything();
+        });
     };
 
     this.saveAsWorkflow = function () {
         console.log("======== save as workflow");
-        saveAsWorkflowDialog.show();
+        $uibModal.open({
+            template: '<div ng-include="\'view_save-as_modal\'"></div>',
+            size: 'md',
+            scope: $scope,
+            controller: function ($scope, $uibModalInstance) {
+                $scope.cancel = function () {
+                    $uibModalInstance.dismiss();
+                };
+            }
+        });
     };
 
     this.saveWorkflow = function () {
         console.log("======== save workflow");
-        fixUploadFiles();
         updateWorkflow(_this.workflow);
         console.dir(_this.workflow);
-
-        require(["dojo/request/iframe"], function(iframe){
-            iframe(cris.baseUrl + "workflows/save", {
-                method: "POST",
-                handleAs: "json",
-                form: "idFormEditor",
-                data: {
-                    workflow: dojox.json.ref.toJson(_this.workflow)
+        
+        $http({
+            method: 'POST',
+            url: cris.baseUrl + "workflows/save",
+            headers: {'Content-Type': undefined}, // This is needed because we are manually appending file data to the request payload
+            transformRequest: function (data) {
+                // We need to manually append file data to request data since server handling of file is expecting submission of a form containing the file.
+                var formData = new FormData();
+                formData.append('workflow', data.workflow);
+                for (var name in data.filesToUpload) {
+                    if (data.filesToUpload[name].length) {
+                        for (var i = 0; i < data.filesToUpload[name].length; i++) {
+                            formData.append(name, data.filesToUpload[name][i]);
+                        }
+                    } else {
+                        formData.append(name, data.filesToUpload[name]);
+                    }
                 }
-            }).then(function(data) {
-                if (data.error) {
-                    _this.isDirty = true;
-                    _this.errorMessage = "Error: " + data.error;
-                } else {
-                    _this.errorMessage = "Workflow: " + data.name + ": saved successfully";
-                    console.log("Data received");
-                    console.log(data);
-                    _this.fetchAndInitWorkflow(data.id);
-                    _this.isDirty = false;
+                return formData;
+            },
+            // json repsonse is wrapped in <html><body><textarea> tags (I think to support use of the dojo iframe uploader).
+            // We need to extract the json from the html tags.
+            transformResponse: function (data) {
+                if (typeof data === 'string' && data.startsWith('<html><body><textarea>')) {
+                    data = JSON.parse(data.replace('<html><body><textarea>', '').replace('</textarea></body></html>', ''));
                 }
-                $scope.$apply();
-            }, function(error) {
-                console.log("Failed to save changes: " + error);
+                return data;
+            },
+            data: {
+                filesToUpload: _this.filesToUpload,
+                workflow: angular.toJson(_this.workflow)
+            }
+        }).then(function(success){
+            var response = success.data;
+            if (response.error) {
                 _this.isDirty = true;
-                _this.errorMessage = "Failed to save changes: " + error;
-                $scope.$apply();
-            });
+                _this.errorMessage = "Error: " + response.error;
+            } else {
+                _this.errorMessage = "Workflow: " + response.name + ": saved successfully";
+                console.log("Data received");
+                console.log(response);
+                _this.fetchAndInitWorkflow(response.id);
+                _this.isDirty = false;
+                
+                //reset files-to-upload container
+                _this.filesToUpload = {};
+            }
+        }, function(error){
+            console.log("Failed to save changes: " + error.data.message);
+            console.dir(error)
+             _this.isDirty = true;
+            _this.errorMessage = "Failed to save changes: " + error.data.message;
         });
     };
 
     this.saveWorkflowArchive = function () {
-        importWorkflowDialog.hide();
-
         // send item + file to the backend using PUT/POST
-        require(["dojo/request/iframe"], function(iframe){
-            iframe(cris.baseUrl + "workflows/import", {
-                method: "POST",
-                handleAs: "json",
-                form: "idFormImportWorkflow"
-            }).then(function(data) {
-                if (data.error) {
-                    _this.errorMessage = "Error: " + data.error;
-                } else {
-                    console.log("Data received");
-                    console.log(data);
-                    _this.fetchAndInitWorkflow(data.id);
-                    _this.isDirty = false;
+        $http({
+            method: 'POST',
+            url: cris.baseUrl + "workflows/import",
+            headers: {'Content-Type': undefined}, // This is needed because we are manually appending file data to the request payload
+            transformRequest: function (data) {
+                // We need to manually append file data to request data since server handling of file is expecting submission of a form containing the file.
+                var formData = new FormData();
+                formData.append('file', data.file);
+                return formData;
+            },
+            // json repsonse is wrapped in <html><body><textarea> tags (I think to support use of the dojo iframe uploader).
+            // We need to extract the json from the html tags.
+            transformResponse: function (data) {
+                if (typeof data === 'string' && data.startsWith('<html><body><textarea>')) {
+                    data = JSON.parse(data.replace('<html><body><textarea>', '').replace('</textarea></body></html>', ''));
                 }
-                $scope.$apply();
-            }, function(error) {
-                _this.errorMessage = "Error: " + error;
-                $scope.$apply();
-            });
+                return data;
+            },
+            data: {
+                file: $scope.workflowToUpload
+            }
+        }).then(function(success){
+            var response = success.data;
+            if (response.error) {
+                _this.errorMessage = "Error: " + response.error;
+            } else {
+                console.log("Data received");
+                console.log(response);
+                _this.fetchAndInitWorkflow(response.id);
+                _this.isDirty = false;
+                
+                // reset workflow-to-upload reference
+                _this.workflowToUpload = null;
+            }
+        }, function(error){
+            _this.errorMessage = "Error: " + error.data.message;
         });
     };
 
@@ -422,8 +520,6 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         console.log("description: " + description);
         console.dir(_this.workflow);
 
-        saveAsWorkflowDialog.hide();
-
         _this.workflow.id = null;
         _this.workflow.uuid = null;
         _this.workflow.key = null;
@@ -431,15 +527,24 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         _this.workflow.description = description;
         _this.saveWorkflow();
     };
+    
+    this.initEndFileUploader = function () { // load task end-file
+        angular.element('#idTheEndPageFile').html(_this.uploaders.theEndPage);
+    };
 
     this.editWorkflowMetadata = function () {
         console.log("******** entering editWorkflowMetadata...");
-
-        var node = dojo.byId("idTheEndPageFile");
-        dojo.empty(node);
-        node.appendChild(_this.uploaders.theEndPage);
-
-        workflowMetadataDialog.show();
+        
+        $uibModal.open({
+            template: '<div ng-include="\'view_edit_metadata_modal\'"></div>',
+            size: 'md',
+            scope: $scope,
+            controller: function ($scope, $uibModalInstance) {
+                $scope.cancel = function () {
+                    $uibModalInstance.dismiss();
+                };
+            }
+        });
     };
 
     this.newUserTask = function () {
@@ -458,7 +563,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
 
         cris.workflow.app.topIncrement = cris.workflow.app.topIncrement + 15;
 
-        var task = new ServiceTask("System Task", "Please provide a name", "Please provide documentation", true, "", "", "", "", "", "", "", "0", [], "normal", 70 + cris.workflow.app.topIncrement, 70 + cris.workflow.app.topIncrement);
+        var task = new ServiceTask("System Task", "Please provide a name", "Please provide documentation", true, "", "", "", "", "", false, "", "", "0", [], "normal", 70 + cris.workflow.app.topIncrement, 70 + cris.workflow.app.topIncrement);
         _this.workflow.addTask(task);
         this.initTask(task);
 
@@ -499,31 +604,15 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
     };
 
     this.editUserTask = function (task) {
-        console.log("******** edit user task...");
 
-        var node = dojo.byId("idUserTaskCustomHtmlFile");
-        dojo.empty(node);
-        node.appendChild(_this.uploaders.tasks[key]);
-
-        userTaskDialog.set("title", "New User Task");
-        userTaskDialog.show();
     };
 
     this.editServiceTask = function (task) {
-        console.log("******** edit service task...");
 
-        var node = dojo.byId("idServiceTaskFiles");
-        dojo.empty(node);
-        node.appendChild(_this.uploaders.tasks[key]);
-
-        serviceTaskDialog.set("title", "New System Task");
-        serviceTaskDialog.show();
     };
 
     this.editConditionalBranch = function (task) {
-        console.log("******** edit condition branch...");
-        conditionBranchDialog.set("title", "New Condition Branch");
-        conditionBranchDialog.show();
+
     };
 
     this.editCaseBranch = function (task) {
@@ -549,15 +638,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
             }
 
             // for custom html file
-            var uploader = new dojox.form.Uploader({id: key + "_html", name: key, label: "Browse ...", multiple: false, force: "html"});
-            uploader.startup();
-            var fileList = new dojox.form.uploader.FileList({uploader: uploader});
-            fileList.startup();
-
-            var node = dojo.create("div");
-            node.appendChild(uploader.domNode);
-            node.appendChild(fileList.domNode);
-            _this.uploaders.tasks[key + "_html"] = node;
+            _this.uploaders.tasks[key + "_html"] = $compile('<cris-file-uploader ng-model="dummyFile" path="' + key + '_html" is-multiple="false"></cris-file-uploader>')($scope)[0];
         } else if (task.taskType === "exclusiveGateway") {
             if (!task.conditionExpression) {
                 task.conditionExpression = "isValid == true";
@@ -569,15 +650,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         }
 
         // file(s) used by the task
-        var uploader = new dojox.form.Uploader({id: key, name: key, label: "Browse ...", multiple: true, force: "html"});
-        uploader.startup();
-        var fileList = new dojox.form.uploader.FileList({uploader: uploader});
-        fileList.startup();
-
-        var node = dojo.create("div");
-        node.appendChild(uploader.domNode);
-        node.appendChild(fileList.domNode);
-        _this.uploaders.tasks[key] = node;
+        this.uploaders.tasks[key] = $compile('<cris-file-uploader ng-model="dummyFile" path="' + key + '" is-multiple="true"></cris-file-uploader>')($scope)[0];
     };
 
     this.deleteTask = function (task) {
@@ -598,6 +671,10 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
             w.destroyRecursive();
         });
         dojo.destroy(domNode);
+
+        // TODO: This will replace above cleanup code after we've removed all dojo/dijit references from page
+        // var domNode = document.getElementById(task.id);
+        // angular.element(domNode).remove();
 
         if (taskType !== "exclusiveGateway") {
             // user task and service task
@@ -660,12 +737,12 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         } else if (taskType === "System Task") {
             dojo.setStyle(dojo.byId('serviceTaskDetails'), 'display', 'none');
         } else if (taskType === "Report Task") {
-            reportTaskDialog.hide();
+            
         } else if (taskType === "exclusiveGateway") {
             if (!task.isMultiCondition) {
-                conditionBranchDialog.hide();
+                
             } else {
-                multiConditionBranchDialog.hide();
+                
             }
         }
     };
@@ -708,14 +785,21 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
             // template page: get from json store
             var templateId = task.templateId;
             if (templateId) {
-                _this.storeTemplates.fetchItemByIdentity({identity: +templateId, onItem: function(item) { task.ui_page = item.uuid.$uuid; }, onError: function(error) { _this.errorMessage = error; }});
+                $http({
+                    url: cris.baseUrl + "templates/" + +templateId,
+                    method: "GET"
+                }).then(function (success) {
+                   var response = success.data;
+                   task.ui_page = response.uuid.$uuid;
+                }, function (error) {
+                    _this.errorMessage = error;
+                });
             }
         } else {
             // custome page: get from upload file name
-            var uploader = dijit.byId(task.id + "_html");
-            var files = uploader.getFileList();
-            if (files.length === 1) {
-                task.ui_page = files[0].name;
+            var customFile = _this.filesToUpload[task.id + "_html"];
+            if (customFile) {
+                task.ui_page = customFile.name;
             }
         }
 
@@ -727,7 +811,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
 
         dojo.setStyle(dojo.byId('userTaskDetails'), 'display', 'none');
     };
-
+    
     this.closeServiceTaskDetails = function (task) {
         console.dir(task);
 
@@ -742,8 +826,6 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
 
         // refresh UI
         drawTask(task.id, task);
-
-        reportTaskDialog.hide();
     };
 
     this.closeConditionBranchDialog = function (task) {
@@ -751,8 +833,6 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
 
         // refresh UI
         drawTask(task.id, task);
-
-        conditionBranchDialog.hide();
     };
 
     this.closeMultiConditionBranchDialog = function (task) {
@@ -798,8 +878,54 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         dojo.query('._jsPlumb_endpoint_anchor_', dojo.byId(task.id)).forEach(function(ele){
             jsPlumb.repaint(ele);
         });
-
-        multiConditionBranchDialog.hide();
+    };
+    
+    this.resetZoom = function () {
+        _this.currentZoom = 1;
+        $("#container").css({
+                            "-webkit-transform":"scale(1) translateY(0)",
+                            "-moz-transform":"scale(1) translateY(0)",
+                            "-ms-transform":"scale(1) translateY(0)",
+                            "-o-transform":"scale(1) translateY(0)",
+                            "transform":"scale(1) translateY(0)"
+                        });
+        jsPlumb.setZoom(_this.currentZoom);
+    }
+    
+    this.zoomIn = function () {
+        if (_this.currentZoom < 1) {
+            _this.currentZoom += 0.05;
+            
+            // We need traslate to maintain the zoomed-out container's top position
+            var translate = Math.round((1 - _this.currentZoom) * 100) / 2;
+            
+            $("#container").css({
+                            "-webkit-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)",
+                            "-moz-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)",
+                            "-ms-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)",
+                            "-o-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)",
+                            "transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)"
+                        });
+            jsPlumb.setZoom(_this.currentZoom);
+        }
+    };
+    
+    this.zoomOut = function () {
+        if (_this.currentZoom > 0.7) {
+            _this.currentZoom -= 0.05;
+            
+            // We need traslate to maintain the zoomed-out container's top position
+            var translate = Math.round((1 - _this.currentZoom) * 100) / 2;
+            
+            $("#container").css({
+                                "-webkit-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)",
+                                "-moz-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)",
+                                "-ms-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate+ "%)",
+                                "-o-transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)",
+                                "transform":"scale(" + _this.currentZoom + ") translateY(-" + translate + "%)"
+                            });
+        }
+        jsPlumb.setZoom(_this.currentZoom);
     };
 
     $scope.$watch('weCtrl.currentEditCF.expressionCount', function(value){
@@ -905,17 +1031,6 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         return orientation;
     }
 
-    function fixUploadFiles() {
-        var files = dojo.byId("idUploaderFiles");
-        dojo.empty(files);
-
-        files.appendChild(_this.uploaders.theEndPage);
-
-        for (var key in _this.uploaders.tasks) {
-            files.appendChild(_this.uploaders.tasks[key]);
-        }
-    }
-
     function updateWorkflow(workflow) {
         console.dir(workflow);
 
@@ -941,10 +1056,12 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
             if (_task.jsonIn) {
                 _task.jsonIn = _task.jsonIn.replace(/\n/g, '');
                 _task.jsonIn = workflowBuilderService.removeUnsafeSpaceCharacters(_task.jsonIn);
+                _task.jsonIn = workflowBuilderService.setJsonOptions(_task.jsonIn, _task, 'jsonIn');
             }
             if (_task.jsonOut) {
                 _task.jsonOut = _task.jsonOut.replace(/\n/g, '');
                 _task.jsonOut = workflowBuilderService.removeUnsafeSpaceCharacters(_task.jsonOut);
+                _task.jsonOut = workflowBuilderService.setJsonOptions(_task.jsonOut, _task, 'jsonOut');
             }
         }
         for (flowID in workflow.flows) {
@@ -976,10 +1093,6 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
             "className": "shape",
             "data-shape": "Circle"
         }, "container");
-        dojo.style(node, {
-            'top': "10px",
-            'left': "20px"
-        });
         dojo.place(node, dojo.byId("container"));
         jsPlumb.addEndpoint(node, sourceEndpoint, {anchor: "RightMiddle", uuid: "Start"});
 
@@ -989,10 +1102,6 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
             "className": "shape",
             "data-shape": "CircleEnd"
         }, "container");
-        dojo.style(node, {
-            'top': "10px",
-            'left': "870px"
-        });
         dojo.place(node, dojo.byId("container"));
         jsPlumb.addEndpoint(node, targetEndpoint, {anchor: "LeftMiddle", uuid: "End"});
     }
@@ -1353,22 +1462,45 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
                             _this.currentEditRT = task;
                             $scope.$apply();
 
-                            reportTaskDialog.set("title", "Edit Report Task: " + task.name);
-                            reportTaskDialog.show();
+                            $uibModal.open({
+                                template: '<div ng-include="\'view_report_edit_modal\'"></div>',
+                                size: 'md',
+                                scope: $scope,
+                                controller: function ($scope, $uibModalInstance) {
+                                    $scope.modalTitle = "Edit Report Task: " + task.name;
+                                    $scope.cancel = function () {
+                                        $uibModalInstance.dismiss();
+                                    };
+                                }
+                            });
                             break;
                         case "exclusiveGateway":
                             _this.currentEditCF = task;
                             $scope.$apply();
-
+                            
+                            var modalTitle = "";
+                            var modalTtemplate = "";
                             if (task.isMultiCondition) {
-                                multiConditionBranchDialog.set("title", "Edit Switch Branch: " + task.name);
-                                multiConditionBranchDialog.show();
+                                modalTitle = "Edit Switch Branch: " + task.name;
+                                modalTtemplate = '<div ng-include="\'view_multi-condition_branch_modal\'"></div>';
                             }else if (task.isSubCondition) {
                                 return;
                             } else {
-                                conditionBranchDialog.set("title", "Edit Condition Branch: " + task.name);
-                                conditionBranchDialog.show();
+                                modalTitle = "Edit Condition Branch: " + task.name;
+                                modalTtemplate = '<div ng-include="\'view_condition_branch_modal\'"></div>';
                             }
+                            
+                            $uibModal.open({
+                                template: modalTtemplate,
+                                size: 'md',
+                                scope: $scope,
+                                controller: function ($scope, $uibModalInstance) {
+                                    $scope.modalTitle = modalTitle;
+                                    $scope.cancel = function () {
+                                        $uibModalInstance.dismiss();
+                                    };
+                                }
+                            });
                             break;
                         default:
                             console.log("Unknown task/flow type: \"" + type + "\";");
@@ -1744,7 +1876,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
                     }]
             ]
         });
-
+        
         jsPlumb.bind("connection", function (info, originalEvent) {
             // add a flow
             //console.log("******** a connection is made");
@@ -1808,8 +1940,15 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", function (
         });
 
         jsPlumb.draggable(jsPlumb.getSelector(".window"), {grid: [20, 20]});
+        
+        require(["dojo/on"], function(on){
+            on(window, 'resize', function() {
+                jsPlumb.repaintEverything();
+            });
+        });
+        
     });
-});
+}]);
 
 angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($compile, $timeout, $rootScope) {
     return {
@@ -1822,6 +1961,7 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
         },
         template: '<div ng-include="\'view_builder_json\'"></div>',
         link: function (scope, element, attrs) {
+            scope.jsonViewType = {};
             scope.$watch("task.id", function (newValue, oldValue) {
                 if (newValue && newValue !== oldValue) {
                     scope.deserializeJson();
@@ -1832,11 +1972,9 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             });
             
             $rootScope.$on('onTaskDetailsOpened', function (event, taskId) {
-                console.log('************* BROADCAST HANDLING - onTaskDetailsOpened *************')
                 $timeout(function () {
-                    var json = scope.task[scope.type];
-                    // If no newline character in json string (due to a recent save), deserialize and reserialize json to create readable well-formatted json.
-                    if (scope.task.id === taskId && !scope.error && !(/\n/.test(json))) {
+                    if (scope.task.id === taskId && !scope.error) {
+                        console.log('************* BROADCAST HANDLING - onTaskDetailsOpened *************');
                         scope.deserializeJson();
                         scope.serializeToJson();
                     }
@@ -1849,6 +1987,10 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             scope.$on('onJsonTextEdit', function (event, data) {
                 console.log('********** EMIT HANDLING - onJsonTextEdit ***************');
                 scope.deserializeJson();
+                var jsonStr = scope.task[scope.type];
+                if (!(/\n/.test(jsonStr))) { // If no \n character, prettify the json
+                    scope.serializeToJson();
+                }
                 scope.$broadcast('refreshQueries');
             });
 
@@ -1893,13 +2035,27 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             $scope.deserializeJson = function () {
                 $scope.queries = [];
                 var json = $scope.task[$scope.type]; // type = jsonIn or jsonOut
-                var val = workflowBuilderService.deserializeJson(json, $scope.queries);
+                var val = workflowBuilderService.deserializeJson(json, $scope.queries, $scope.task, $scope.type);
                 if (val.error) {
                     $scope.error = val.error;
                 } else {
                     $scope.error = ""; // Clear previous error
                 }
                 $scope.item = val.result;
+                
+                // Get the view type (advanced or builder) from the $options object
+                // Default = builder. If no $options object but json exists, default = advanced
+                if ((val.$options && val.$options._advanced) || ((!val.$options || typeof val.$options._advanced === 'undefined') && $scope.task[$scope.type])) {
+                    $scope.jsonViewType[$scope.type] = 'advanced';
+                } else {
+                    $scope.jsonViewType[$scope.type] = 'builder';
+                }
+                
+                // Let task remember $options like view type
+                if (!$scope.task[$scope.type + '_$options']) {
+                    $scope.task[$scope.type + '_$options'] = {};
+                }
+                $scope.task[$scope.type + '_$options']._advanced = ($scope.jsonViewType[$scope.type] === 'advanced');
 
                 $scope.queryAliases = [];
                 dojo.forEach($scope.queries, function (q) {
@@ -1907,21 +2063,99 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
                 });
             };
             
-            $scope.getTermNames = function(templateUUID) {
+            $scope.viewTypeChange = function (viewType) {
+                $scope.jsonViewType[$scope.type] = viewType;
+                $scope.task[$scope.type + '_$options']._advanced = (viewType === 'advanced');
+            };
+            
+            $scope.getTermNames = function(templateUUID, parentTerm) {
                 var termNames = [];
-                for (var i = 0; i < $scope.templates.length; i++) {
-                    if ($scope.templates[i].id === templateUUID) {
-                        termNames = termNames.concat($scope.templates[i].termNames);
-                        for (var j = termNames.length - 1; j > -1; j--) {
-                            if (['_job_id', '_experiment_id', '_project_id'].indexOf(termNames[j].id) !== -1) {
-                                termNames.splice(j, 1);
+                if ($scope.termsByTemplate && $scope.termsByTemplate[templateUUID]) {
+                    termNames = $scope.termsByTemplate[templateUUID];
+                } else {
+                    for (var i = 0; i < $scope.templates.length; i++) {
+                        if ($scope.templates[i].id === templateUUID) {
+                            termNames = termNames.concat($scope.templates[i].termNames);
+                            for (var j = termNames.length - 1; j > -1; j--) {
+                                if (['_job_id', '_experiment_id', '_project_id'].indexOf(termNames[j].id) !== -1) {
+                                    termNames.splice(j, 1);
+                                }
                             }
+                            termNames.unshift({id: '_id', name: '_id'});
+                            
+                            if (!$scope.termsByTemplate) {
+                                $scope.termsByTemplate = {};
+                            }
+                            $scope.termsByTemplate[templateUUID] = termNames
+                            
+                            break;
                         }
-                        termNames.unshift({id: '_id', name: '_id'});
-                        break;
                     }
                 }
+                
+                if (parentTerm) { // Get sub terms of composite term
+                    var subTerms = [];
+                    for (var h = 0; h < termNames.length; h++) {
+                        
+                        if (termNames[h].id === parentTerm && termNames[h].dataType !== 'Composite') { // data-type must be "Composite" for term to have sub-terms
+                            return null;
+                            break;
+                        }
+                        
+                        if (termNames[h].id.startsWith(parentTerm + '.')) {
+                            var termName = termNames[h].id.substring(parentTerm.length + 1, termNames[h].id.length); // +1 accounts for '.'
+                            var o = {id: termName, name: termName};
+                            workflowBuilderService.setTermProperties(o, termNames[h]);
+                            subTerms.push(o);
+                        }
+                    }
+                    return subTerms;
+                }
+                
                 return termNames;
+            };
+            
+            $scope.getAttachToData = function (templateUUID, term) {
+                var data = {};
+                if ($scope.attachToDataByTemplate && $scope.attachToDataByTemplate[templateUUID]) {
+                    data = $scope.attachToDataByTemplate[templateUUID][term];
+                } else {
+                    for (var i = 0; i < $scope.templates.length; i++) {
+                        if ($scope.templates[i].id === templateUUID && $scope.templates[i].attachToData) {
+                            data = $scope.templates[i].attachToData;
+                            break;
+                        }
+                    }
+                }
+                return data;
+            };
+            
+            $scope.termIsValid = function (term, templateUUID) {
+                var isInvalidTerm = true;
+                if (term.itemType === "Term" && $scope.termsByTemplate && $scope.termsByTemplate[templateUUID]) {
+                    var termNames = $scope.termsByTemplate[templateUUID];
+                    for (var j = 0; j < termNames.length; j++) {
+                        if (termNames[j].id === term.variable) {
+                            isInvalidTerm = false;
+                        }
+                    }
+                }
+                return isInvalidTerm;
+            };
+            
+            $scope.templateIsValid = function (templateUUID) {
+                var result = false;
+                if (templateUUID && $scope.templates && $scope.templates.length) {
+                    for (var i = 0; i < $scope.templates.length; i++) {
+                        if ($scope.templates[i].id === templateUUID) {
+                            result = true;
+                            break;
+                        }
+                    }
+                } else {
+                    result = true;
+                }
+                return result;
             };
             
             $scope.getTemplates = function(index) {
@@ -1954,7 +2188,13 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             };
             
             $scope.serializeToJson = function () {
-                workflowBuilderService.fromBuilderToJson($scope.item, $scope.task, $scope.type, $scope.queries);
+                // If deserialization error exists, do not serialize again. This prevents json string from being automatically.
+                // (Any existing json strings, with errors or not, should not be deleted)
+                //.....
+                // Only serialize if view is not advanced. In advanced view it is up to user to manage json
+                if ($scope.error === "" && !$scope.task[$scope.type + '_$options']._advanced) {
+                    workflowBuilderService.fromBuilderToJson($scope.item, $scope.task, $scope.type, $scope.queries);
+                }
             };
 
             // notify json builder after json text edit (onBlur)
@@ -1967,22 +2207,39 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             };
 
             // notify to refresh json textarea after builder edit (queries or json builder)
-            $scope.onJsonBuilderEdit = function (index) {
+            $scope.onJsonBuilderEdit = function (index, termItem, templateUUID) {
                 $timeout(function () { // timeout needed because after onBlur event, updated value is not yet available
                     if (typeof index === 'number') {
-                        if ($scope.item[index].value || $scope.item[index].staticDataType === "Null") {
+                        var value = $scope.item[index].value;
+                        var termsToMerge = $scope.item[index].termsToMerge;
+                        if ((value !== null && typeof value !== 'undefined') || $scope.item[index].staticDataType === "Null" || ($scope.item[index].variableType === 'template' && termsToMerge && termsToMerge.length)) {
                             $scope.$emit('onJsonBuilderEdit');
                         }
                     } else {
+                        
+                        // Set edited record's term properties
+                        if (termItem && templateUUID && termItem.variable) {
+                            var terms = $scope.termsByTemplate[templateUUID];
+                            if (terms) {
+                                for (var t = 0; t < terms.length; t++) {
+                                    if (terms[t].id === termItem.variable) {
+                                        workflowBuilderService.setTermProperties(termItem, terms[t]);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
                         $scope.$emit('onJsonBuilderEdit');
                     }
                 }, 300);
             };
 
             $scope.fetchTemplates = function () {
-                workflowBuilderService.getTemplateData().then(function (res) {
-                    $scope.templates = res;
-                }, function (err) {
+                var t = workflowBuilderService.getTemplateData();
+                t.promise.then(function(result){
+                    t.thenCallback(result, $scope); // Templates array will be added to $scope in the callback
+                }, function (error) {
                     $scope.templates = [];
                 });
             };
@@ -1990,57 +2247,299 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
     }
 });
 
-angular.module("crisWorkflow").directive("crisWorkflowVariableTypes", function ($compile) {
+angular.module("crisWorkflow").directive("crisWorkflowVariableTypes", ["$uibModal", function ($uibModal) {
     return {
         restrict: "E",
         replace: true,
         scope: {
             item: '=',
-            queries: '@'
+            queries: '@',
+            subTerms: '@', // child terms of a composite term
+            checkValidity: '&',
+            attachToData: '@'
         },
         template: '<div ng-include="\'view_builder_variable_types\'"></div>',
         link: function (scope, element, attrs) {
             scope.fetchSystemVariables();
+            
+            scope.$watch('item', function(newValue, oldValue){
+                scope.previousValue = oldValue.value;
+                scope.previousValueType = oldValue.valueType;
+                scope.previousStaticDataType = oldValue.staticDataType;
+                
+                if (scope.objectToPreview && (typeof scope.item.value === 'object')) { // If value is object or Array, generate json to preview
+                    scope.convertObjectValueToJson();
+                }
+            }, true);
+            
+            // update staticDataType when switching terms (within same template). Each term in template has an index.
+            scope.$watchCollection('[item.index, item.template]', function (newValue, oldValue) {
+                if (newValue[0] !== oldValue[0] && newValue[1] === oldValue[1]) {
+                    //console.log(newValue[0] + '-' + oldValue[0] + ' >>>> ' + newValue[1] + '-' + oldValue[1])
+
+                    if (['_experiment_id', '_job_id', '_project_id'].indexOf(scope.item.term) !== -1) {
+                        scope.item.valueType = "systemVariable";
+                    } else {
+                        scope.item.valueType = "static";
+                    }
+                    
+                    var staticDataType = scope.getStaticDataType();
+                    
+                    if (staticDataType !== scope.item.staticDataType) {
+                        scope.item.value = null;
+                        scope.item.subValue = null;
+                    }
+                    scope.item.staticDataType = staticDataType;
+                }
+            });
         },
         controller: function($scope, $timeout, workflowBuilderService) {
             $scope.fetchSystemVariables = function () {
                 $scope.systemVariables = workflowBuilderService.getSystemVariables();
             };
+            
             $scope.onJsonBuilderEdit = function (type) {
                 $timeout(function () {
-                    if ($scope.item.value || ($scope.item.termsToMerge && $scope.item.termsToMerge.length) || $scope.item.staticDataType === "Null") {
-                        if (type === 'valueType') {
-                            $scope.item.value = null;
-                            $scope.item.staticDataType = null;
-                            $scope.item.subValue = null;
-                        } else if (type === 'value') {
-                            $scope.item.subValue = null;
-                        } else if (type === 'staticDataType') {
-                            $scope.item.value = null;
-                        }
-                        $scope.$emit('onJsonBuilderEdit');
+                    if (type === 'valueType' && $scope.item.valueType !== $scope.previousValueType) {
+                        $scope.item.value = null;
+                        $scope.item.staticDataType = $scope.item.dataType ? $scope.getStaticDataType() : null;
+                        $scope.item.subValue = null;
+                    } else if (type === 'value' && $scope.item.value !== $scope.previousValue) {
+                        $scope.item.subValue = null;
+                    } else if (type === 'staticDataType' && $scope.item.staticDataType !== $scope.previousStaticDataType) {
+                        $scope.item.value = null;
                     }
+                    
+                    $scope.$emit('onJsonBuilderEdit');
                 }, 300);
             };
+            
+            $scope.getStaticDataType = function () {
+                // A List term (dropdown) could be a Multi-Select...therefore staticDataType should be an Array of List values
+                // Likewise, a File term could be a Multi-File, and therefore staticDataType should be an Array of File values
+                // And...any term could be a list term. In that case staticDataType will be an Array. Array will contain instances of term.
+                var staticDataType = null;
+                if (($scope.item.dataType === 'List' && $scope.item.listItemProps && $scope.item.listItemProps.isMultiSelect) || ($scope.item.dataType === 'File' && $scope.item.isMultiFile) || $scope.item.isListTerm) {
+                    staticDataType = 'Array';
+                } else {
+                    staticDataType = $scope.item.dataType;
+                }
+                return staticDataType;
+            };
+            
             $scope.termNames = function () {
                 var termNames = [];
-                var queries = eval($scope.queries);
-                for (var i = 0; i < queries.length; i++) {
-                    if (queries[i].id === $scope.item.value) {
-                        dojo.forEach(queries[i].query.termNames, function (term) {
-                            if (['_job_id', '_experiment_id', '_project_id'].indexOf(term.id) === -1) { // Only template terms
-                                termNames.push(term);
-                            }
-                        });
-                        // termNames.unshift({id: '_id', name: '_id'});
-                        break;
+                if ($scope.queries) {
+                    var queries = eval($scope.queries);
+                    for (var i = 0; i < queries.length; i++) {
+                        if (queries[i].id === $scope.item.value) {
+                            dojo.forEach(queries[i].query.termNames, function (term) {
+                                if (['_job_id', '_experiment_id', '_project_id'].indexOf(term.id) === -1) { // Only template terms
+                                    termNames.push(term);
+                                }
+                            });
+                            // termNames.unshift({id: '_id', name: '_id'});
+                            break;
+                        }
                     }
                 }
                 return termNames;
             };
+            
+            // Edit/View object or array value
+            $scope.editValue = function (objectType) {
+                if (!$scope.item.value || !($scope.item.value instanceof Array)) {
+                    $scope.item.value = [];
+                }
+                
+                $scope.item.objectType = objectType; // Array or Object
+                $scope.convertObjectValueToJson();
+                $uibModal.open({
+                    template: '<div ng-include="\'view_builder_edit_value\'"></div>',
+                    size: 'lg',
+                    scope: $scope,
+                    controller: function ($scope, $uibModalInstance) {
+                        $scope.close = function () {
+                            $uibModalInstance.close();
+                        };
+                    }
+                });
+            };
+            
+            $scope.addObjectItem = function () {
+                $scope.item.value.push({variable: null, value: {}});
+            };
+            
+            $scope.addArrayItem = function () {
+                if (!$scope.item.value) {
+                    $scope.item.value = [];
+                }
+                
+                var o = {};
+                if ($scope.item.dataType === 'List' || $scope.item.dataType === 'File' || $scope.item.isListTerm) {
+                    if ($scope.item.dataType === 'List') {
+                        o.listItemProps = {items: $scope.item.listItemProps.items};
+                    }
+                    o.dataType = $scope.item.dataType;
+                    o.staticDataType = $scope.item.dataType;
+                    o.valueType = 'static';
+                    o.isReadOnly = true;
+                    o.term = ($scope.item.term || $scope.item.variable);
+                }
+                
+                $scope.item.value.push(o);
+            };
+            
+            $scope.removeObjectItem = function ($index) {
+                $scope.item.value.splice($index, 1);
+            };
+            
+            $scope.convertObjectValueToJson = function () { // Convert object/array to json for preview
+                $scope.objectToPreview = workflowBuilderService.objectToJson($scope.item.value, $scope.item.objectType);
+            };
+            
+            // Get child terms of composite term (parentTerm)
+            $scope.getSubTerms = function (parentTerm) {
+                if ($scope.subTerms) {
+                    var subTerms = [];
+                    var terms = eval($scope.subTerms);
+                    angular.forEach(terms, function (t) {
+                        if (t.id.startsWith(parentTerm + '.')) {
+                            var termName = t.id.substring(parentTerm.length + 1, t.id.length); // +1 accounts for '.'
+                            var o = {id: termName, name: termName};
+                            workflowBuilderService.setTermProperties(o, t);
+                            subTerms.push(o);
+                        }
+                    });
+                    return subTerms;
+                } else {
+                    return null;
+                }
+            };
+            
+            // On Object Edit, set the value properties based on properties of selected term
+            $scope.onObjectEdit = function (record) {
+                $timeout(function () { // timeout necessary since onBlur values haven't yet updated
+                    if ($scope.subTerms) {
+                        var terms = eval($scope.subTerms);
+                        for (var y = 0; y < terms.length; y++) {
+                            if (terms[y].id === record.variable) {
+                                workflowBuilderService.setTermProperties(record.value, terms[y]);
+                                break;
+                            }
+                        }
+                    }
+                    $scope.$emit('onJsonBuilderEdit');
+                }, 500);
+            }
+            
+            $scope.termIsValid = function (termName) {
+                var isValid = false;
+                if (termName) {
+                    var terms = eval($scope.subTerms);
+                    for (var y = 0; y < terms.length; y++) {
+                        if (terms[y].id === termName) {
+                            isValid = true;
+                            break;
+                        }
+                    }
+                }
+                return isValid;
+            }
+            
+            // For term object values each record needs a reference to the selected record term
+            $scope.objectTermChanged = function (recordValue, variable) {
+                //recordValue.term = ($scope.item.variable ? $scope.item.variable + '.' + variable : variable);
+                recordValue.term = ($scope.item.term ? $scope.item.term + '.' + variable : variable);
+            };
+            
+            $scope.getAttachToData = function (itemId) {
+                var attachToData = [];
+                if ($scope.attachToData) {
+                    var data = JSON.parse($scope.attachToData);
+                    if (data[itemId]) {
+                        attachToData = data[itemId];
+                    }
+                }
+                return attachToData;
+            };
+            
+            $scope.getStaticDataTypes = function () {
+                var types = [{id: 'Boolean', name: 'Boolean'},
+                            {id: 'Date', name: 'Date'},
+                            {id: 'Numeric', name: 'Numeric'},
+                            {id: 'Text', name: 'Text'},
+                            {id: 'Array', name: 'Array'},
+                            {id: 'Object', name: 'Object'},
+                            {id: 'Time', name: 'Time'},
+                            {id: 'Null', name: 'Null'}];
+                
+                // Term specific types
+                if ($scope.item.dataType === 'List') {
+                    types.push({id: 'List', name: 'List'});
+                } else if ($scope.item.dataType === 'Composite') {
+                    types.push({id: 'Composite', name: 'Composite'});
+                } else if ($scope.item.dataType === 'AttachTo') {
+                    types.push({id: 'AttachTo', name: 'AttachTo'});
+                } else if ($scope.item.dataType === 'File') {
+                    types.push({id: 'File', name: 'File'});
+                }
+                
+                return types;
+            };
+            
+            // Check if value has wrong data type that doesn't match term definition data type
+            $scope.valueDataTypeIsValid = function (value, termStaticDataType) {
+                var isValid = false;
+                if (typeof value !== 'undefined' && value !== null && termStaticDataType) {
+                    var dataType = "";
+                    if (typeof value === 'number' && !isNaN(value)) {
+                        dataType = 'Numeric|AttachTo';
+                    } else if (typeof value !== 'object' && isNaN(value) && !isNaN(Date.parse(value))) {
+                        dataType = 'Date|Time';
+                    } else if (typeof value === 'boolean') {
+                        dataType = 'Boolean';
+                    } else if (value === null) {
+                        dataType = "Null";
+                    } else if (typeof value === 'string') {
+                        dataType = "Text|List|File|AttachTo";
+                    } else if (value instanceof Array) {
+                        dataType = 'Array|List|File|Object|Composite';
+                    }
+                    isValid = (dataType.indexOf(termStaticDataType) !== -1);
+                    
+                    if (!isValid) {
+                        //$scope.item.value = null;
+                    }
+                }
+                return isValid;
+            };
+            
+            // Check variable (term, system variables, etc.) against list of valid values
+            $scope.valueIsValid = function (value, list) {
+                var isValid = false;
+                if (value && list && list instanceof Array) {
+                    angular.forEach(list, function(item) {
+                        if (item.id === value) {
+                            isValid = true;
+                        }
+                    });
+                } else {
+                    isValid = true;
+                }
+                // update parent's isValid flag
+                $scope.item.isValid = isValid;
+                
+                // Tell parent to check if all children are valid
+                if ($scope.checkValidity) {
+                    $scope.checkValidity();
+                }
+                
+                return isValid;
+            };
         }
     }
-});
+}]);
 
 angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile, $timeout) {
     return {
@@ -2053,58 +2552,66 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
         template: '<div ng-include="\'view_builder_query\'"></div>',
         link: function (scope, element, attrs) {
             scope.selectedQuery = {};
-            scope.$watch('queries.length', function (val) {
+            scope.queryValidator = {}; // Holds validation flags for the query
+            
+            scope.$watchCollection('queries', function (val) {
                 if (val) {
                     scope.queryAliases = [];
                     dojo.forEach(scope.queries, function (q) {
                         scope.queryAliases.push({id: q.key, name: q.key, query: q});
                     });
-                }
-            });
-
-            scope.$watch('taskId', function (newValue, oldValue) {
-                if (newValue && newValue !== oldValue) {
-                    scope.isQuerySelected = false;
+                    if (val.length === 0 || !scope.queryAdded) { // only hide query details section when switching between tasks
+                        scope.isQuerySelected = false;
+                    }
+                    scope.queryAdded = false;
+                    
+                    // Reset selected query color when switching between tasks
                     if (scope.previousSelection) {
                         scope.previousSelection.style.backgroundColor = '#FFF';
                     }
+                    scope.validateQueries();
                 }
             });
-
+            
             scope.$watch('selectedQuery.templateUUID', function (newValue, oldValue) {
-                if (newValue) {
-                    dojo.forEach(scope.templates, function (template) {
-                        if (template.id === scope.selectedQuery.templateUUID) {
-                            scope.selectedQuery.termNames = template.termNames;
-                        }
-                    });
-                    scope.validateSelectedQueryWhere();
-                }
-            });
-
-            scope.$watch('selectedQuery.addCurrentJobFilter', function (newValue, oldValue) {
                 if (scope.selectedQuery && newValue) {
-                    var hasCurrentJobFilter = false;
-                    dojo.forEach(scope.selectedQuery.where, function (where) {
-                        if (where.term === '_job_id') {
-                            hasCurrentJobFilter = true;
-                        }
-                    });
-                    if (!hasCurrentJobFilter) {
-                        scope.selectedQuery.where.push({term: '_job_id' ,
-                                                        value: 'current_job.id' ,
-                                                        valueType: 'systemVariable' ,
-                            queryOperator: '$eq'});
-                        scope.onQueryEdit(); // Notify json builder of update
-                    }
-                } else if (scope.selectedQuery && !newValue && oldValue) {
-                    for (var i = 0; i < scope.selectedQuery.where.length; i++) {
-                        if (scope.selectedQuery.where[i].term === '_job_id') {
-                            scope.selectedQuery.where.splice(i, 1);
-                            scope.onQueryEdit(); // Notify json builder of update
+                    var templateIsValid = false;
+                   
+                    for (var i = 0; i < scope.templates.length; i++) {
+                        if (scope.templates[i].id === scope.selectedQuery.templateUUID) {
+                            scope.selectedQuery.termNames = scope.templates[i].termNames;
+                            scope.selectedQuery.attachToData = scope.templates[i].attachToData;
+                            templateIsValid = true;
                             break;
                         }
                     }
+                   
+                    if (!templateIsValid) {
+                        scope.invalidTemplateError = "*The referenced template is invalid";
+                    } else {
+                        scope.invalidTemplateError = "";
+                    }
+                }
+            });
+
+            scope.$watch('selectedQuery.addCurrentJobFilter', function (newValue, oldValue) { // current job toggle
+                if (scope.selectedQuery && newValue) {
+                    if (!scope.hasCurrentJobTerm()) { // Add current job term if non exists
+                        scope.addQueryWhere({term: '_job_id', value: 'current_job.id', valueType: 'systemVariable', queryOperator: '$eq'});
+                    }
+                } else if (scope.selectedQuery && !newValue && oldValue) { // toggle off. Remove current job term
+                    for (var i = scope.selectedQuery.where.length - 1; i >= 0; i--) {
+                        var orGroup = scope.selectedQuery.where[i].orGroup;
+                        for (var j = orGroup.length - 1; j >= 0; j--) {
+                            if (orGroup[j].term === '_job_id' && orGroup[j].value === 'current_job.id') {
+                                orGroup.splice(j, 1);
+                            }
+                        }
+                        if (orGroup.length === 0) { // If group is empty, also remove where item (remember, actual where records are contained in the group array)
+                            scope.selectedQuery.where.splice(i, 1);
+                        }
+                    }
+                    scope.onQueryEdit(); // Notify json builder of update
                 }
             });
 
@@ -2113,10 +2620,11 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                 $timeout(function () {
                     if (scope.isQuerySelected && scope.queries[scope.selectedQueryIndex]) {
                         scope.selectedQuery = scope.queries[scope.selectedQueryIndex];
-                        scope.validateSelectedQueryWhere();
                     }
+                    scope.validateQueries();
                 }, 300);
             });
+            
             scope.fetchTemplates();
         },
         controller: function($scope, $timeout, workflowBuilderService) {
@@ -2125,7 +2633,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                 $scope.isQuerySelected = true;
                 $scope.selectedQueryIndex = index;
                 $scope.selectedQuery = $scope.queries[index];
-
+                
                 if ($scope.previousSelection) {
                     $scope.previousSelection.style.backgroundColor = $scope.previousBackgroundColor;
                 }
@@ -2136,18 +2644,20 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
             };
 
             $scope.removeWhereItem = function (index) {
-                if ($scope.selectedQuery.where[index].term === '_job_id') {
+                if (!$scope.hasCurrentJobTerm()) {
                     $scope.selectedQuery.addCurrentJobFilter = false;
                 }
                 $scope.selectedQuery.where.splice(index, 1);
                 $scope.onQueryEdit();
             };
 
-            $scope.addQueryWhere = function () {
-                $scope.selectedQuery.where.push({});
+            $scope.addQueryWhere = function (item) {
+                $scope.selectedQuery.where.push({orGroup: [item ? item : {term: null, value: null}]});
+                if (item) {
+                    $scope.onQueryEdit(); // Notify json builder of update
+                }
             };
 
-            ///******
             $scope.getQueryAliases = function () {
                 var item = [];
                 dojo.forEach($scope.queryAliases, function (val) {
@@ -2163,6 +2673,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                     $scope.queries = [];
                 }
                 var queryKey = 'QUERY__' + ($scope.queries.length + 1);
+                $scope.queryAdded = true;
                 $scope.queries.push({key: queryKey, templateUUID: '', where: []});
             };
 
@@ -2176,44 +2687,182 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                     }
                 }
             };
+            
+            $scope.validateQueries = function () {
+                angular.forEach($scope.queries, function(query) {
+                    $scope.queryValidator[query.key] = {isValid: true};
 
-            // Make sure where condition has valid terms
-            $scope.validateSelectedQueryWhere = function () {
-                // Make sure where condition has valid terms
-                dojo.forEach($scope.selectedQuery.where, function (item) {
-                    var valid = false;
-                    dojo.forEach($scope.selectedQuery.termNames, function (term) {
-                        if (item.term === term.id) {
-                            valid = true;
-                        }
+                    // Initialize validator objects for all query sections: sort, distinct, operators (e.g. $gt, $eq, etc.) termnames, etc.
+                    $scope.queryValidator[query.key].queryOperatorValidator = {};
+                    $scope.queryValidator[query.key].termNameValidator = {};
+                    $scope.queryValidator[query.key].projectionTermNameValidator = {};
+                    $scope.queryValidator[query.key].projectionValueValidator = {};
+                    $scope.queryValidator[query.key].distinctTermNameValidator = {};
+                    $scope.queryValidator[query.key].distinctValueValidator = {};
+                    $scope.queryValidator[query.key].sortTermNameValidator = {};
+                    $scope.queryValidator[query.key].sortValueValidator = {};
+                    $scope.queryValidator[query.key].groupItemTermNameValidator = {};
+                    $scope.queryValidator[query.key].groupItemValueValidator = {};
+
+                    // validate all sections of query: operators, termnames, etc.
+                    var allTermsValid = true;
+                    var allWhereItemsValid = true;
+                    var allQueryOperatorsValid = true;
+                    var allProjectionItemsValid = true;
+                    var allDistinctItemsValid = true;
+                    var allSortItemsValid = true;
+                    var allGroupItemsValid = true;
+
+                    // validate term names and query operators in the where section
+                    angular.forEach(query.where, function (item, parentIndex) {
+                        angular.forEach(item.orGroup, function (groupItem, index) {
+                            var valid = $scope.termNameIsValid(query.termNames, groupItem.term);
+
+                            if (!valid) {
+                                allTermsValid = false;
+                            }
+
+                            // isValid is set in  crisWorkflowVariableTypes for each whereItem value
+                            if (groupItem.isValid === false) {
+                                allWhereItemsValid = false;
+                            }
+
+                            // validate term names
+                            $scope.queryValidator[query.key].termNameValidator[parentIndex + '-' + index] = {};
+                            $scope.queryValidator[query.key].termNameValidator[parentIndex + '-' + index].isValid = valid;
+
+                            // validate query operators
+                            //var operatorIsValid = (['$eq','$gt','$gte','$lt','$lte','$ne','$in','$nin'].indexOf(groupItem.queryOperator) !== -1);
+                            var operatorList = $scope.getQueryOperators(groupItem.dataType);
+                            var validOperators = [];
+                            for (var k in operatorList) {
+                                validOperators.push(operatorList[k].id)
+                            }
+                            var operatorIsValid = (validOperators.indexOf(groupItem.queryOperator) !== -1);
+                            
+                            if (!operatorIsValid) {
+                                allQueryOperatorsValid = false;
+                            }
+                            $scope.queryValidator[query.key].queryOperatorValidator[parentIndex + '-' + index] = {};
+                            $scope.queryValidator[query.key].queryOperatorValidator[parentIndex + '-' + index].isValid = operatorIsValid;
+
+                            if (groupItem.term === '_job_id' && groupItem.value === 'current_job.id') {
+                                query.addCurrentJobFilter = true;
+                            }
+                        });
                     });
-                    if (!valid) {
-                        item.term = "";
-                    }
-                    if (item.term === '_job_id') {
-                        $scope.selectedQuery.addCurrentJobFilter = true;
-                    }
+
+                    // validate projection items
+                    dojo.forEach(query.projectionItems, function (item, $index) {
+                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+
+                        // validate term names
+                        $scope.queryValidator[query.key].projectionTermNameValidator[$index] = {};
+                        $scope.queryValidator[query.key].projectionTermNameValidator[$index].isValid = valid;
+
+                        // validate values
+                        var valueIsValid = ([true,false].indexOf(item.project) !== -1);
+                        $scope.queryValidator[query.key].projectionValueValidator[$index] = {};
+                        $scope.queryValidator[query.key].projectionValueValidator[$index].isValid = valueIsValid;
+
+                        allProjectionItemsValid = (allProjectionItemsValid && valid && valueIsValid);
+                    });
+
+                    // validate distinct items
+                    dojo.forEach(query.distinctItems, function (item, $index) {
+                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+
+                        // validate term names
+                        $scope.queryValidator[query.key].distinctTermNameValidator[$index] = {};
+                        $scope.queryValidator[query.key].distinctTermNameValidator[$index].isValid = valid;
+
+                        // validate values
+                        var valueIsValid = ([true,false].indexOf(item.isDistinct) !== -1);
+                        $scope.queryValidator[query.key].distinctValueValidator[$index] = {};
+                        $scope.queryValidator[query.key].distinctValueValidator[$index].isValid = valueIsValid;
+
+                        allDistinctItemsValid = (allDistinctItemsValid && valid && valueIsValid);
+                    });
+
+                    // validate sort items
+                    dojo.forEach(query.sortItems, function (item, $index) {
+                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+
+                        // validate term names
+                        $scope.queryValidator[query.key].sortTermNameValidator[$index] = {};
+                        $scope.queryValidator[query.key].sortTermNameValidator[$index].isValid = valid;
+
+                        // validate values
+                        var valueIsValid = ([1,-1].indexOf(item.order) !== -1);
+                        $scope.queryValidator[query.key].sortValueValidator[$index] = {};
+                        $scope.queryValidator[query.key].sortValueValidator[$index].isValid = valueIsValid;
+
+                        allSortItemsValid = (allSortItemsValid && valid && valueIsValid);
+                    });
+
+                    // validate group items
+                    dojo.forEach(query.groupItems, function (item, $index) {
+                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+
+                        // validate term names
+                        $scope.queryValidator[query.key].groupItemTermNameValidator[$index] = {};
+                        $scope.queryValidator[query.key].groupItemTermNameValidator[$index].isValid = valid;
+
+                        // validate values
+                        var valueIsValid = (['$sum','$avg','$first','$last','$max','$min','$stdDevPop','$stdDevSamp'].indexOf(item.operator) !== -1);
+                        $scope.queryValidator[query.key].groupItemValueValidator[$index] = {};
+                        $scope.queryValidator[query.key].groupItemValueValidator[$index].isValid = valueIsValid;
+
+                        allGroupItemsValid = (allGroupItemsValid && valid && valueIsValid);
+                    });
+
+                    // Set the global isValid flag for the query. Any invalid section marks the entire query as invalid
+                    $scope.queryValidator[query.key].isValid = (allTermsValid && allWhereItemsValid && allQueryOperatorsValid && allProjectionItemsValid && allDistinctItemsValid && allSortItemsValid && allGroupItemsValid);
                 });
             };
 
             // Notify json builder of changes.....
-            $scope.onQueryEdit = function (index) {
+            $scope.onQueryEdit = function (groupItem) {
                 $timeout(function () {
-                    if (((typeof index === 'number') && $scope.selectedQuery.where[index] && $scope.selectedQuery.where[index].value) || !index) {
+                    if ((groupItem && groupItem.value) || !groupItem) {
                         $scope.$emit('onQueryEdit');
-
-                        // Uncheck current-job checkbox if _job_id term is switched to another term
-                        var hasCurrentJobFilter = false;
-                        dojo.forEach($scope.selectedQuery.where, function (item) {
-                            if (item.term === '_job_id') {
-                                hasCurrentJobFilter = true;
-                            }
-                        });
-                        if (!hasCurrentJobFilter && $scope.selectedQuery.addCurrentJobFilter) {
+                        
+                        // Toggle current job checkbox based on whether a current job term (_job_id) exists
+                        if ($scope.hasCurrentJobTerm()) {
+                            $scope.selectedQuery.addCurrentJobFilter = true;
+                        } else {
                             $scope.selectedQuery.addCurrentJobFilter = false;
                         }
                     }
+                    $scope.validateQueries();
                 }, 300);
+            };
+            
+            $scope.getQueryOperators = function (dataType) {
+                if (dataType === "Numeric") {
+                    return [{id: '$eq', name: 'Equal To'},
+                            {id: '$gt', name: 'Greater Than'},
+                            {id: '$gte', name: 'Greater Than or Equal To'},
+                            {id: '$lt', name: 'Less Than'},
+                            {id: '$lte', name: 'Less Than or Equal To'},
+                            {id: '$ne', name: 'Not Equal To'}];
+                } else if (["Text", "Boolean", "Date", "Time", "Object", "Composite", "AttachTo", "File", "List"].indexOf(dataType) !== -1) {
+                    return [{id: '$eq', name: 'Equal To'},{id: '$ne', name: 'Not Equal To'}];
+                } else if (dataType === "Array") {
+                    return [{id: '$eq', name: 'Equal To'},
+                            {id: '$ne', name: 'Not Equal To'},
+                            {id: '$in', name: 'In'},
+                            {id: '$nin', name: 'Not In'}];
+                } else {
+                    return [{id: '$eq', name: 'Equal To'},
+                            {id: '$gt', name: 'Greater Than'},
+                            {id: '$gte', name: 'Greater Than or Equal To'},
+                            {id: '$lt', name: 'Less Than'},
+                            {id: '$lte', name: 'Less Than or Equal To'},
+                            {id: '$ne', name: 'Not Equal To'},
+                            {id: '$in', name: 'In'},
+                            {id: '$nin', name: 'Not In'}];
+                }
             };
 
             $scope.previewQuery = function () {
@@ -2221,38 +2870,135 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
             };
 
             $scope.fetchTemplates = function () {
-                workflowBuilderService.getTemplateData().then(function (res) {
-                    $scope.templates = res;
-                }, function (err) {
+                var t = workflowBuilderService.getTemplateData();
+                t.promise.then(function(result){
+                    t.thenCallback(result, $scope);
+                }, function (error) {
                     $scope.templates = [];
                 });
             };
-
-            $scope.getTermNames = function (index) {
-                // A term can only be used once in the where
-                var usedTermNames = [];
-                dojo.forEach($scope.selectedQuery.where, function (whereItem, idx) {
-                    //if (index  !== idx && ['_job_id', '_experiment_id', '_project_id'].indexOf(whereItem.term) !== -1) {
-                    if (index !== idx) {
-                        usedTermNames.push(whereItem.term);
+            
+            $scope.addSortItem = function () {
+                if (!$scope.selectedQuery.sortItems) {
+                    $scope.selectedQuery.sortItems = [];
+                }
+                $scope.selectedQuery.sortItems.push({});
+            };
+            
+            $scope.removeSortItem = function (index) {
+                $scope.selectedQuery.sortItems.splice(index, 1);
+                $scope.onQueryEdit();
+            };
+            
+            $scope.addDistinctItem = function () {
+                if (!$scope.selectedQuery.distinctItems) {
+                    $scope.selectedQuery.distinctItems = [];
+                }
+                $scope.selectedQuery.distinctItems.push({});
+            };
+            
+            $scope.removeDistinctItem = function (index) {
+                $scope.selectedQuery.distinctItems.splice(index, 1);
+                $scope.onQueryEdit();
+            };
+            
+            $scope.addProjectionItem = function () {
+                if (!$scope.selectedQuery.projectionItems) {
+                    $scope.selectedQuery.projectionItems = [];
+                }
+                $scope.selectedQuery.projectionItems.push({});
+            };
+            
+            $scope.removeProjectionItem = function (index) {
+                $scope.selectedQuery.projectionItems.splice(index, 1);
+                $scope.onQueryEdit();
+            };
+            
+            $scope.addGroupItem = function (index) {
+                if (!$scope.selectedQuery.groupItems) {
+                    $scope.selectedQuery.groupItems = [];
+                }
+                $scope.selectedQuery.groupItems.push({});
+            }
+            $scope.removeGroupItem = function (index) {
+                $scope.selectedQuery.groupItems.splice(index, 1);
+                $scope.onQueryEdit();
+            };
+            
+            $scope.termNameIsValid = function (termList, termName) {
+                var valid = false;
+                if (termList) {
+                    for (var i = 0; i < termList.length; i++) {
+                        if (termList[i].id === termName) {
+                            valid = true;
+                            break;
+                        }
                     }
-                });
-
-                var item = [];
-                dojo.forEach($scope.selectedQuery.termNames, function (termName) {
-                    if (usedTermNames.indexOf(termName.id) === -1) {
-                        item.push(termName);
+                }
+                return valid;
+            };
+            
+            $scope.getTermNames = function (groupItem) {
+                var terms = [];
+                dojo.forEach($scope.selectedQuery.termNames, function (term) {
+                    if (groupItem && (groupItem.term === term.id)) {
+                        workflowBuilderService.setTermProperties(groupItem, term);
                     }
+                    terms.push(term);
                 });
-                return item;
+                return terms;
+            };
+            
+            // Get child terms of composite term
+            $scope.getSubTerms = function (parentTerm) {
+                var subTerms = []; // child terms of composite term (parentTerm)
+                if ($scope.selectedQuery.termNames) {
+                    for (var g = 0; g < $scope.selectedQuery.termNames.length; g++) {
+                        var term = $scope.selectedQuery.termNames[g];
+
+                        if (term.id === parentTerm && term.dataType !== 'Composite') { // data-type must be "Composite"
+                            return null;
+                            break;
+                        }
+
+                        if (parentTerm && term.id.startsWith(parentTerm + '.')) {
+                            var _termName = term.id.substring(parentTerm.length + 1, term.id.length); // +1 accounts for '.'
+                            var o = {id: _termName, name: _termName};
+                            workflowBuilderService.setTermProperties(o, term);
+                            subTerms.push(o);
+                        }
+                    }
+                }
+                return subTerms;
+            };
+            
+            $scope.hasCurrentJobTerm = function () {
+                var hasCurrentJobFilter = false;
+                angular.forEach($scope.selectedQuery.where, function (item) {
+                    angular.forEach(item.orGroup, function (groupItem) {
+                        if (groupItem.term === '_job_id' && groupItem.value === 'current_job.id') {
+                            hasCurrentJobFilter = true;
+                        }
+                    })
+                });
+                return hasCurrentJobFilter;
+            };
+            
+            $scope.addToGroup = function (group) {
+                group.push({value: null, term: null});
+            };
+            
+            $scope.deleteGroupItem = function (group, index) {
+                group.splice(index, 1);
+                $scope.onQueryEdit();
             };
         }
     }
 });
 
-angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compile", function($q, $compile) {
-    var templateData;
-    var deferred = $q.defer();
+angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "$http", function($uibModal, $http) {
+    var templatesHttpPromise; // promise when fetching template data
+    var cachedTemplates;
 
     var balancedMatcher = function (source, patternStart, patternEnd) {
         var patternBegin = patternStart;
@@ -2357,7 +3103,9 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
 
                 var queryKey = null;
                 for (var i = 0; i < queryItems.length; i++) {
-                    if (queryItems[i].rawQuery === val) {
+                    var q1 = queryItems[i].rawQuery.replace(/\s/g, '');
+                    var q2 = val.replace(/\s/g, '');
+                    if (q1 === q2) {
                         queryKey = queryItems[i].key;
                         break;
                     }
@@ -2419,78 +3167,104 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                 var queryStr = queryItem.rawQuery;
 
                 if (queryStr.indexOf('(') !== -1 && queryStr.endsWith(')')) {
+                    var queryFrom = queryStr.substring(0, queryStr.indexOf('('));
+                    var REGEX_UUID = /([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/i;
+                    queryItem.templateUUID = REGEX_UUID.exec(queryFrom)[0];
+                    
                     var queryParams = queryStr.substring(queryStr.indexOf('(') + 1, queryStr.length - 1);
                     var deserializedParams = angular.fromJson(queryParams);
                     for (var key in deserializedParams) {
                         var paramValue = deserializedParams[key];
-                        if (key === '$skip' || key === '$limit' || key === '$orderby') {
-                            if (key === '$orderby' && typeof paramValue === 'object') {
-                                queryItem[key] = Object.keys(paramValue)[0];
-                                queryItem.orderbyOrder = paramValue[queryItem[key]];
-                            } else {
-                                queryItem[key] = paramValue;
+                        if (key === '$skip' || key === '$limit') {
+                            if (typeof paramValue !== 'number') {
+                                throw 'invalid value for $limit or $skip in the query';
+                            }
+                            queryItem[key] = paramValue;
+                        } else if (key === '$sort' || key === '$orderby') {
+                            if (typeof paramValue === 'object') {
+                                queryItem.sortItems = [];
+                                for (var k in paramValue) {
+                                    var obj = {term: k, order: paramValue[k]};
+                                    queryItem.sortItems.push(obj);
+                                }
+                            }
+                        } else if (key === '$distinct') {
+                            if (typeof paramValue === 'object') {
+                                queryItem.distinctItems = [];
+                                for (var k in paramValue) {
+                                    var obj = {term: k, isDistinct: paramValue[k]};
+                                    queryItem.distinctItems.push(obj);
+                                }
+                            }
+                        } else if (key === '$project') {
+                            if (typeof paramValue === 'object') {
+                                queryItem.projectionItems = [];
+                                for (var k in paramValue) {
+                                    var obj = {term: k, project: paramValue[k]};
+                                    queryItem.projectionItems.push(obj);
+                                }
+                            }
+                        } else if (key === '$group') {
+                            if (typeof paramValue === 'object') {
+                                queryItem.groupItems = [];
+                                for (var k in paramValue) {
+                                    if (paramValue[k] === null) {
+                                        continue;
+                                    }
+                                    if ((paramValue[k] !== null && typeof paramValue[k] !== 'object') || (paramValue[k] instanceof Array)) {
+                                        throw 'invalid group sytax';
+                                    }
+                                    var operator = Object.keys(paramValue[k])[0];
+                                    var term = paramValue[k][operator];
+                                    term = (typeof term === 'string' && term.startsWith('$')) ? term.substring(1, term.length) : term;
+                                    var obj = {groupAlias: k, term: term, operator: operator};
+                                    queryItem.groupItems.push(obj);
+                                }
                             }
                         } else {
-                            var whereItem = {};
                             var whereItems = [];
-                            if (key === '$and') {
-                                dojo.forEach(paramValue, function (item) {
-                                    var term = Object.keys(item)[0];
-                                    var _whereItem = {};
-                                    _whereItem.term = term;
-                                    if (typeof item[term] === 'object' && !(item[term] instanceof Array)) {
-                                        var operator = Object.keys(item[term])[0]; // Mongo operator. E.g. $lt, $gt, $gte, etc.
-                                        if (operator && operator.trim().startsWith('$')) {
-                                            _whereItem.queryOperator = operator;
-                                            _whereItem.value = item[term][operator];
-                                        }
-                                    } else {
-                                        _whereItem.queryOperator = '$eq';
-                                        _whereItem.value = item[term];
-                                    }
-                                    if (!_whereItem.queryOperator && typeof item[term] === 'object') { // object or array value
-                                        _whereItem.queryOperator = '$eq';
-                                        _whereItem.value = item[term];
-                                    }
-                                    whereItems.push(_whereItem);
-                                });
-                            } else { // all other properties are implicitly 'AND' conditions
-                                whereItem.term = key;
-                                if (typeof paramValue === 'object' && paramValue !== null && !(paramValue instanceof Array)) {
-                                    var operator = Object.keys(paramValue)[0]; // Mongo operator. E.g. $lt, $gt, $gte, etc.
-                                    if (operator && operator.trim().startsWith('$')) {
-                                        whereItem.queryOperator = operator;
-                                        whereItem.value = paramValue[operator];
-                                    }
-                                } else {
-                                    whereItem.queryOperator = '$eq';
-                                    whereItem.value = paramValue;
+                            if (key === '$query' && typeof paramValue === 'object' && !(paramValue instanceof Array)) {
+                                for (var k in paramValue) {
+                                    deserializeValue(paramValue[k], k, whereItems);
                                 }
-                                if (!whereItem.queryOperator && typeof paramValue === 'object') { // object or array value
-                                    whereItem.queryOperator = '$eq';
-                                    whereItem.value = paramValue;
-                                }
+                            } else {
+                                deserializeValue(paramValue, key, whereItems);
                             }
-
-                            if (whereItems.length) {
-                                whereItem = whereItems.pop();
-                            }
-                            while (whereItem) {
-                                var valueProperties = setValueProperties(whereItem.value);
-                                dojo.mixin(whereItem, valueProperties);
-                                queryItem.where.push(whereItem);
-                                whereItem = whereItems.pop();
-                            }
+                            
+                            queryItem.where = queryItem.where.concat(whereItems);
                         }
                     }
-
-                    var queryFrom = queryStr.substring(0, queryStr.indexOf('('));
-
-                    var REGEX_UUID = /([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/i;
-                    queryItem.templateUUID = REGEX_UUID.exec(queryFrom)[0];
-
-                    for (var r = 0; r < templateData.length; r++) {
-                        var template = templateData[r];
+                    
+                    (function initValues (items) {
+                        for (var i = 0; i < items.length; i++) {
+                            var whereItem = items[i];
+                            if (whereItem.orGroup) {
+                                initValues(whereItem.orGroup);
+                            } else {
+                                var valueProperties = setValueProperties(whereItem.value, queryItem.templateUUID, whereItem.term);
+                                dojo.mixin(whereItem, valueProperties);
+                            }
+                        }
+                    })(queryItem.where);
+                    
+                    // All where items must be in "or" group array for easy management in view. Group those without a group
+                    var newGroups = [];
+                    var len = queryItem.where.length;
+                    while (len--) {
+                        if (!queryItem.where[len].orGroup) {
+                            var group = {orGroup: []};
+                            group.orGroup.push(queryItem.where[len]);
+                            newGroups.push(group);
+                            queryItem.where.splice(len, 1);
+                        }
+                    }
+                    
+                    if (newGroups.length) {
+                        queryItem.where = queryItem.where.concat(newGroups);
+                    }
+                    
+                    for (var r = 0; r < cachedTemplates.length; r++) {
+                        var template = cachedTemplates[r];
                         if (template.id === queryItem.templateUUID) {
                             queryItem.termNames = template.termNames;
                             break;
@@ -2502,9 +3276,62 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                 queryItem.isDeserialized = true;
             }
         }
+        
+        function deserializeValue (value, _key, whereItems) {
+            if (_key === '$and' || _key === '$or') {
+                var orItems = []
+                dojo.forEach(value, function (item, $index) {
+                    var term = Object.keys(item)[0];
+                    var _whereItem = {};
+                    
+                    if (term === '$or') {
+                        var res = [];
+                        deserializeValue(item[term], term, res);
+                        _whereItem = res.length ? res[0] : {};
+                    } else {
+                        _whereItem = setWhereItemValue(term, item[term]);
+                    }
+                    
+                    if (_key === '$or') {
+                        orItems.push(_whereItem);
+                    } else {
+                        whereItems.push(_whereItem);
+                    }
+                });
+                
+                if (orItems.length) {
+                    var _whereItem = {};
+                    _whereItem.orGroup = orItems;
+                    whereItems.push(_whereItem);
+                }
+            } else { // all other properties are implicitly 'AND' conditions
+                var whereItem = setWhereItemValue(_key, value);
+                whereItems.push(whereItem);
+            }
+            
+            function setWhereItemValue (term, value) {
+                var whereItem = {term: term};
+                if (typeof value === 'object' && value !== null && !(value instanceof Array)) {
+                    var operator = Object.keys(value)[0]; // Mongo operator. E.g. $lt, $gt, $gte, etc.
+                    if (operator && operator.trim().startsWith('$')) {
+                        whereItem.queryOperator = operator;
+                        whereItem.value = value[operator];
+                    }
+                } else {
+                    whereItem.queryOperator = '$eq';
+                    whereItem.value = value;
+                }
+                if (!whereItem.queryOperator && typeof value === 'object') { // object or array value
+                    whereItem.queryOperator = '$eq';
+                    whereItem.value = value;
+                }
+                return whereItem;
+            }
+        }
     };
 
     var serializeToJson_ = function (builderRecords, queries, queryId) {
+        console.log('******************* Serialize-to-Json *****************************');
         var newJsonStr = '';
         updateRawQueries(queries); // deserialze all queries to their raw versions
         if (builderRecords) {
@@ -2513,103 +3340,82 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                 
                 var termsToMerge = {};
                 var newJsonObj = sanitizeJsonRecords(records, termsToMerge);
+                
+                // Add $merge directive if at least one item requires merging
+                var doMerge = false;
+                var multipleMergePaths;
+                for (var r in termsToMerge) {
+                    for (var j in termsToMerge[r]) {
+                        var value = termsToMerge[r][j];
+                        if (typeof value === 'string' && value.startsWith('QUERY_') && Object.keys(termsToMerge[r]).length > 1) {
+                            doMerge = true;
+                        }
+                    }
+                }
+                if (doMerge && Object.keys(newJsonObj).length > 1) {
+                    multipleMergePaths = true;
+                } else if (doMerge && Object.keys(newJsonObj).length === 1) {
+                    multipleMergePaths = false;
+                }
+                
+                var finalJsonObj = {};
+                if (typeof multipleMergePaths !== 'undefined') {
+                    if (multipleMergePaths) {
+                        finalJsonObj['$directive'] = [];
+                        finalJsonObj['$data'] = {};
+                    } else {
+                        finalJsonObj['$directive'] = {$merge:{}};
+                        finalJsonObj['$data'] = [];
+                    }
+                }
+                
                 for (var key in newJsonObj) {
-                    var value = newJsonObj[key];
                     var terms = termsToMerge[key];
                     if (terms && Object.keys(terms).length) {
-                        var existingDirective = newJsonObj['$directive'];
-                        if (existingDirective) {
-                            if (!(existingDirective instanceof Array)) {
-                                var mergePath = Object.keys(newJsonObj['$data'][0])[0];
-                                newJsonObj['$directive'] = [{$merge: {$path: mergePath}}];
-                                var n = [];
-                                for (var k in newJsonObj['$data']) {
-                                    n.push(newJsonObj['$data'][k][mergePath]);
-                                }
-                                var m = {};
-                                m[mergePath] = n;
-                                newJsonObj['$data'] = m;
+                        for (var k in terms) {
+                            var o;
+                            if (k.startsWith('QUERY__') && terms[k].startsWith('QUERY__')) {
+                                o = terms[k];
+                            } else {
+                                o = {};
+                                o[k] = terms[k];
                             }
-                            newJsonObj['$directive'].push({$merge: {$path: key}});
-                            newJsonObj['$data'][key] = [value, terms];
-                        } else {
-                            var mergeObj = {};
-                            mergeObj['$directive'] = {$merge:{}};
-                            mergeObj['$data'] = [];
-
-                            var v1 = {};
-                            v1[key] = value;
-                            mergeObj['$data'].push(v1);
-
-                            var v2 = {};
-                            v2[key] = terms;
-                            mergeObj['$data'].push(v2);
-
-                            dojo.mixin(newJsonObj, mergeObj);
-                        }
-                        delete newJsonObj[key];
-                    }
-                    
-                    /*
-                     * TODO: Add support for non-template merge objects
-                     * 
-                     * This if makes sure non-template merge objects in the advanced editor aren't lost 
-                     */
-                    if (typeof value === 'object' && value.mergeValues) {
-                        var existingDirective = newJsonObj['$directive'];
-                        if (existingDirective) {
-                            if (!(existingDirective instanceof Array)) {
-                                var mergePath = Object.keys(newJsonObj['$data'][0])[0];
-                                newJsonObj['$directive'] = [{$merge: {$path: mergePath}}];
-                                var n = [];
-                                for (var k in newJsonObj['$data']) {
-                                    n.push(newJsonObj['$data'][k][mergePath]);
+                            var mergeItem = {};
+                            mergeItem[key] = o;
+                            if (finalJsonObj['$data']) {
+                                if (finalJsonObj['$data'] instanceof Array) {  // single merge.....
+                                    finalJsonObj['$data'].push(mergeItem);
+                                } else { // for multiple merge paths.....
+                                    if (!finalJsonObj['$data'][key]) {
+                                        finalJsonObj['$data'][key] = [];
+                                    }
+                                    finalJsonObj['$data'][key].push(o);
                                 }
-                                var m = {};
-                                m[mergePath] = n;
-                                newJsonObj['$data'] = m;
+                            } else {
+                                if (!finalJsonObj[key]) {
+                                    finalJsonObj[key] = {};
+                                }
+                                if (k.startsWith('QUERY_')) {
+                                    finalJsonObj[key] = terms[k];
+                                } else {
+                                    finalJsonObj[key][k] = terms[k];
+                                }
                             }
-                            newJsonObj['$directive'].push({$merge: {$path: key}});
-                            newJsonObj['$data'][key] = value.mergeValues;
-                        } else {
-                            var mergeObj = {};
-                            mergeObj['$directive'] = {$merge:{}};
-                            mergeObj['$data'] = [];
-                            
-                            dojo.forEach(value.mergeValues, function(val){
-                                var v = {};
-                                v[key] = val;
-                                mergeObj['$data'].push(v);
-                            });
-                            dojo.mixin(newJsonObj, mergeObj);
                         }
-                        delete newJsonObj[key];
+                        // Remember to add $path to $directive array when dealing with multiple merge paths.....
+                        if (finalJsonObj['$directive'] instanceof Array) {
+                            finalJsonObj['$directive'].push({$merge: {$path: key}});
+                        }
+                    } else {
+                        var value = newJsonObj[key];
+                        if (finalJsonObj['$data']) {
+                            finalJsonObj['$data'][key] = value;
+                        } else {
+                            finalJsonObj[key] = value;
+                        }
                     }
                 }
-                
-                // if $directive property exists, move all other properties into the "$data" array property. The top level of the json will only have $directive and $data)
-                if (newJsonObj['$directive']) {
-                    for (var key in newJsonObj) {
-                        if (key === '$directive' || key === '$data') {
-                            continue;
-                        }
-                        if (!(newJsonObj['$directive'] instanceof Array)) {
-                            var mergePath = Object.keys(newJsonObj['$data'][0])[0];
-                            newJsonObj['$directive'] = [{$merge: {$path: mergePath}}];
-                            var n = [];
-                            for (var k in newJsonObj['$data']) {
-                                n.push(newJsonObj['$data'][k][mergePath]);
-                            }
-                            var m = {};
-                            m[mergePath] = n;
-                            newJsonObj['$data'] = m;
-                        }
-                        newJsonObj['$data'][key] = newJsonObj[key];
-                        delete newJsonObj[key];
-                    }
-                }
-                
-                newJsonStr = JSON.stringify(newJsonObj, null, 4);
+                newJsonStr = JSON.stringify(finalJsonObj, null, 4);
             }
         } else if (queryId) {
             for (var j = 0; j < queries.length; j++) {
@@ -2673,57 +3479,153 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
         return newJsonStr;
     };
     
-    function setValueProperties (_value) {
-        var value = _value;
-        var valueType = 'static';
-        var staticDataType = null;
-        var subValue = null;
-        if (typeof value === 'string') {
-            if (value.endsWith(':$')) {
-                valueType = 'localVariable';
-                value = value.substring(0, value.length - 2);
-            } else if (value.endsWith(':#')) {
-                valueType = 'systemVariable';
-                value = value.substring(0, value.length - 2);
-            } else if (value.startsWith('QUERY__')) {
-                valueType = 'query';
-                // extract specific term to query (It's appended to query key using dot notation)
-                var idx = value.indexOf('.');
-                if (idx > 0 && idx !== value.length - 1) {
-                    subValue = value.substring(idx + 1, value.length);
-                    value = value.substring(0, idx);
+    function setValueProperties (_value, templateUUID, termName) {
+        // Get term definition in order to refer to term properties. E.g. list flag, multi-list flag, multi-file flag
+        var termDefinition = null;
+        if (templateUUID && termName && cachedTemplates) {
+            for (var t = 0; t < cachedTemplates.length; t++) {
+                if (cachedTemplates[t].id === templateUUID) { // locate template data
+                    var terms = cachedTemplates[t].termNames;
+                    for (var i = 0; i < terms.length; i++) {
+                        if (terms[i].id === termName) {
+                            termDefinition = terms[i];
+                            break;
+                        }
+                    }
+                    break;
                 }
             }
         }
-        if (typeof value === 'number' && !isNaN(value)) {
-            staticDataType = 'Numeric';
-        } else if (isNaN(value) && !isNaN(Date.parse(value))) {
-            staticDataType = 'Date';
-        } else if (typeof value === 'boolean') {
-            value = value.toString(); // make sure booleans are stringified (for boolean dropdown to work)
-            staticDataType = 'Boolean';
-        } else if (value === null) {
-            staticDataType = "Null";
-        } else {
-            if (typeof value === 'string') {
-                staticDataType = 'Text';
-            } else { // value is object or array. Item won't be editable in the builder, only in the Advanced section
-                valueType = 'object';
+        
+        // if term is list, staticDataType will be an array of term instances
+        if (termDefinition && termDefinition.isListTerm) {
+            // value must be array. Otherwise do not process it...user will be notified of invalid value in view
+            if (_value instanceof Array) {
+                var a = [];
+                for (var t in _value) {
+                    var o = processValue(_value[t], templateUUID, termName);
+                    o.term = termName; // Reference to term necessary to be able to extract term attributes, e.g. attach-to data
+                    a.push(o);
+                }
+                return {valueType: 'static', value: a, staticDataType: 'Array', isReadOnly: true, dataType: termDefinition.dataType, isListTerm: termDefinition.isListTerm};
+            } else {
+                return {valueType: 'static', value: _value, staticDataType: 'Array', isReadOnly: true};
             }
+        } else {
+            return processValue(_value, templateUUID, termName);
         }
-        return {valueType: valueType, value: value, staticDataType: staticDataType, subValue: subValue};                   
+        
+        function processValue (_value, templateUUID, termName) {
+            var value = _value;
+            var valueType = 'static';
+            var staticDataType = null;
+            var subValue = null;
+            if (typeof value === 'string') {
+                if (value.endsWith(':$')) {
+                    valueType = 'localVariable';
+                    value = value.substring(0, value.length - 2);
+                } else if (value.endsWith(':#')) {
+                    valueType = 'systemVariable';
+                    value = value.substring(0, value.length - 2);
+                } else if (value.startsWith('QUERY__')) {
+                    valueType = 'query';
+                    // extract specific term to query (It's appended to query key using dot notation)
+                    var idx = value.indexOf('.');
+                    if (idx > 0 && idx !== value.length - 1) {
+                        subValue = value.substring(idx + 1, value.length);
+                        value = value.substring(0, idx);
+                    }
+                }
+            }
+            if (typeof value === 'number' && !isNaN(value)) {
+                staticDataType = 'Numeric';
+            } else if (typeof value !== 'object' && isNaN(value) && !isNaN(Date.parse(value))) {
+                staticDataType = 'Date';
+            } else if (typeof value === 'boolean') {
+                staticDataType = 'Boolean';
+            } else if (value === null) {
+                staticDataType = "Null";
+            } else {
+                if (typeof value === 'string') {
+                    staticDataType = 'Text';
+                } else {  // value is object or array
+                    valueType = 'static';
+                    if (value instanceof Array) {
+                        staticDataType = 'Array';
+                        var v = [];
+                        for (var b = 0; b < value.length; b++) {
+                            v.push(setValueProperties(value[b], templateUUID, termName));
+                        }
+                        value = v;
+                    } else {
+                        staticDataType = 'Object';
+                        var v = [];
+                        for (var key in value) {
+                            var term = (termName ? termName + '.' + key : key);
+                            var oB = setValueProperties(value[key], templateUUID, term);
+                            oB.term = term; // Reference to term necessary to be able to extract term attributes in the view, e.g. attach-to data
+                            v.push({variable: key, value: oB});
+                        }
+                        value = v;
+                    }
+                }
+            }
+
+            var isReadOnly = false;
+            var dataType = null;
+            var listItemProps = null;
+            var isMultiFile = null;
+            if (termDefinition) {
+                var previousStaticDataType = staticDataType;
+                staticDataType = termDefinition.dataType;
+                dataType = termDefinition.dataType;
+                isReadOnly = true;
+                
+                if (termDefinition.dataType === 'List') {
+                    listItemProps = termDefinition.listItemProps; // dropdown list items from term definition
+
+                    // For multiSelect term, set each array item's staticDataType to match term data type
+                    if (value instanceof Array) {
+                        staticDataType = 'Array';
+                        for (var e = 0; e < value.length; e++) {
+                            value[e].staticDataType = dataType;
+                        }
+                    }
+                }
+                if (termDefinition.dataType === 'File') {
+                    isMultiFile = termDefinition.isMultiFile;
+
+                    // For multiFile term, set each array item's staticDataType to match term data type
+                    if (value instanceof Array) {
+                        staticDataType = 'Array';
+                        for (var e = 0; e < value.length; e++) {
+                            value[e].staticDataType = dataType;
+                        }
+                    }
+                }
+
+                // If term value doesn't match term data type, rollback processed value to original. User will be notified of invalid value.
+                if (previousStaticDataType === 'Array' && staticDataType !== 'Array') {
+                    value = _value;
+                }
+                if (previousStaticDataType === 'Object' && !(staticDataType === 'Object' || staticDataType === 'Composite')) {
+                    value = _value;
+                }
+            }
+
+            // dataType applies to template terms. Non term-variables rely on staticDataType.
+            return {valueType: valueType, value: value, staticDataType: staticDataType, subValue: subValue, dataType: dataType, listItemProps: listItemProps, isMultiFile: isMultiFile, isReadOnly: isReadOnly};
+        }
     }
     
     function prettifyQuery (queryStr) { // format the json part of a query
-        var REGEX_JSONPART = /[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}(?:\.\w+)?(?:\[\])?\((\{.*\})\)/i; // matches a the json part of query
+        var REGEX_JSONPART = /[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}(?:\.\w+)?(?:\[\])?\((\{.*\})\)/i; // matches the json part of query
         var queryParts = REGEX_JSONPART.exec(queryStr);
         if (queryParts && queryParts[1]) {
             var queryPart = queryParts[1];
             var objectified = angular.fromJson(queryPart);
             var prettified = JSON.stringify(objectified, null, 4); // angular's toJson skips property names starting with '$'
             queryStr = queryStr.replace(queryPart, prettified);
-            queryStr = queryStr.replace(/"((?:(?:\w+\.)*)?\w+):\$"/g, '${' + '$1' + '}'); // standardize local variables with ${...}. No quotes
-            queryStr = queryStr.replace(/"((?:\w+\.)?\w+):#"/g, '#{' + '$1' + '}'); // standardize system variables with #{...}. No quotes
             queryStr = queryStr.replace(/"(\$\w+)"(?=\s*\:)/g, '$1'); // No quotes on query operators (e.g. $gt)
             queryStr = queryStr.replace(/"(true|false)"/g, '$1'); // No quotes on booleans
         }
@@ -2748,37 +3650,114 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                 var obj = {};
                 for (var i = 0; i < query.where.length; i++) {
                     var item = query.where[i];
-                    if (item.term && (item.value || item.staticDataType === "Null") && item.queryOperator) {
-                        var value = item.value;
-
-                        // Add identifiers to system and localVariables
-                        if (item.valueType === 'systemVariable') {
-                            value += ':#';
-                        } else if (item.valueType === 'localVariable') {
-                            value += ':$';
-                        } else if (item.valueType === 'static' && item.staticDataType === 'Numeric') {
-                            value = parseInt(value, 10);
-                        } else if (item.valueType === 'query' && item.subValue) {
-                            value = value + (item.subValue ? '.' + item.subValue : '');
+                    var orGroup = item.orGroup;
+                    var valueList = processOrGroup(orGroup);
+                    
+                    if (valueList.length) {
+                        if (typeof obj['$query'] === 'undefined') {
+                            obj['$query'] = {};
                         }
-
-                        if (item.queryOperator === '$eq') {
-                            obj[item.term] = value;
+                        
+                        if (valueList.length === 1) {
+                            for (var alias in valueList[0]) {
+                                if (obj['$query'][alias]) { // If duplicate exists, group them in $and
+                                    if (!obj['$query']['$and']) {
+                                        obj['$query']['$and'] = [];
+                                    }
+                                    obj['$query']['$and'].push(valueList[0]);
+                                } else {
+                                    if (obj['$query']['$and']) {
+                                        obj['$query']['$and'].push(valueList[0]);
+                                    } else {
+                                        angular.extend(obj['$query'], valueList[0]);
+                                    }
+                                }
+                            }
+                            
+                            // If $and array exists, move all items outside it into it
+                            if (obj['$query']['$and']) {
+                                for (var alias in obj['$query']) {
+                                    if (alias !== '$and') {
+                                        var o = {};
+                                        o[alias] = obj['$query'][alias];
+                                        obj['$query']['$and'].push(o);
+                                        delete obj['$query'][alias];
+                                    }
+                                }
+                            }
                         } else {
-                            var nestedValue = {};
-                            nestedValue[item.queryOperator] = value;
-                            obj[item.term] = nestedValue;
+                            if (!obj['$query']['$and']) {
+                                var props = [];
+                                for (var y in obj['$query']) {
+                                    var o = {};
+                                    o[y] = obj['$query'][y]
+                                    props.push(o);
+                                    delete obj['$query'][y];
+                                }
+                                obj['$query']['$and'] = props;
+                            }
+                            
+                            var orGrpValue = {};
+                            orGrpValue['$or'] = valueList;
+                            obj['$query']['$and'].push(orGrpValue);
                         }
                     }
                 }
-
+                
+                // if only one item in $and array of query, move it to root of $query object and delete the $and array
+                if (obj['$query'] && obj['$query']['$and'] && obj['$query']['$and'].length === 1 && Object.keys(obj['$query']).length === 1) {
+                    var v = obj['$query']['$and'][0];
+                    delete obj['$query']['$and'];
+                    angular.extend(obj['$query'], v);
+                }
+                
+                if (query.projectionItems && query.projectionItems.length) {
+                    var projectionObj = {};
+                    for (var i = 0; i < query.projectionItems.length; i++) {
+                        var projectionItem = query.projectionItems[i];
+                        if (projectionItem.term && projectionItem.project !== null && typeof projectionItem.project !== 'undefined') {
+                            projectionObj[projectionItem.term] = projectionItem.project;
+                        }
+                    }
+                    obj['$project'] = projectionObj;
+                }
+                if (query.distinctItems && query.distinctItems.length) {
+                    var distinctObj = {};
+                    for (var i = 0; i < query.distinctItems.length; i++) {
+                        var distinctItem = query.distinctItems[i];
+                        if (distinctItem.term && distinctItem.isDistinct !== null && typeof distinctItem.isDistinct !== 'undefined') {
+                            distinctObj[distinctItem.term] = distinctItem.isDistinct;
+                        }
+                    }
+                    obj['$distinct'] = distinctObj;
+                }
+                if (query.sortItems && query.sortItems.length) {
+                    var sortObj = {};
+                    for (var i = 0; i < query.sortItems.length; i++) {
+                        var sortItem = query.sortItems[i];
+                        if (sortItem.term && sortItem.order) {
+                            sortObj[sortItem.term] = sortItem.order;
+                        }
+                    }
+                    obj['$sort'] = sortObj;
+                }
+                if (query.groupItems && query.groupItems.length) {
+                    var groupObj = {};
+                    for (var i = 0; i < query.groupItems.length; i++) {
+                        var groupItem = query.groupItems[i];
+                        if (groupItem.term && groupItem.groupAlias && groupItem.operator) {
+                            var o = {};
+                            o[groupItem.operator] = (typeof groupItem.term === 'string') ? '$' + groupItem.term : groupItem.term;
+                            groupObj[groupItem.groupAlias] = o;
+                        }
+                    }
+                    if (Object.keys(groupObj).length && !groupObj._id) {
+                        groupObj._id = null;
+                    }
+                    obj['$group'] = groupObj;
+                }
                 if (query['$limit']) {
                     obj['$limit'] = parseInt(query['$limit'], 10);
-                }
-                if (query['$orderby'] && query['orderbyOrder']) {
-                    var orderByObj = {};
-                    orderByObj[query['$orderby']] = query['orderbyOrder'];
-                    obj['$orderby'] = orderByObj;
                 }
                 if (query['$skip']) {
                     obj['$skip'] = parseInt(query['$skip'], 10);
@@ -2786,106 +3765,356 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                 query.rawQuery = rawQuery + dojo.toJson(obj) + ')';
             }
         }
+        
+        function processOrGroup (orGroup) {
+            var valueList = [];
+            for (var k = 0; k < orGroup.length; k++) {
+                var orItem = orGroup[k];
+                var valueObj = {};
+                if (orItem.term && ((typeof orItem.value !== 'undefined' && orItem.value !== null) || orItem.staticDataType === "Null") && orItem.queryOperator) {
+                    if (orItem.queryOperator === '$eq') {
+                        valueObj[orItem.term] = restoreValue(orItem);
+                    } else {
+                        var nestedValue = {};
+                        nestedValue[orItem.queryOperator] = restoreValue(orItem);
+                        valueObj[orItem.term] = nestedValue;
+                    }
+                }
+                
+                // In case of nested "or" group. Note that UI doesn't supported nested OR groups. Possibly mongo doesn't too.
+                // We still process them to maintain a user-typed query's original form
+                if (orItem.orGroup && orItem.orGroup.length)  { 
+                    var subValues = processOrGroup(orItem.orGroup);
+                    if (subValues.length) {
+                        valueObj['$or'] = subValues;
+                    }
+                }
+
+                if (Object.keys(valueObj).length) {
+                    valueList.push(valueObj);
+                }
+            }
+            return valueList;
+        }
     }
 
     function sanitizeJsonRecords(builderRecords, termsToMerge) {
         var newJsonObj = {};
         for (var i = 0; i < builderRecords.length; i++) {
             var record = builderRecords[i];
-            if (!record.variable || !record.valueType || (!record.value && record.staticDataType !== "Null")) {
-                if (record.variable && record.variableType === 'template' && record.termsToMerge && record.termsToMerge.length) {
-                    newJsonObj[record.variable] = sanitizeJsonRecords(record.termsToMerge);
+            
+            if (record.variable && record.variableType === 'template') {
+                newJsonObj[record.variable] = {};
+                if (record.termsToMerge && record.termsToMerge.length) {
+                    termsToMerge[record.variable] = sanitizeJsonRecords(record.termsToMerge);
                 }
+                continue;
+            }
+            
+            if (!record.variable || (!record.valueType && record.itemType !== 'Query') || ((record.value === null || typeof record.value === 'undefined' || (typeof record.value === 'string' && record.value.trim().length === 0)) && record.staticDataType !== "Null" && record.itemType !== 'Query')) {
                 continue; // ignore incomplete records
             }
-            var subValue = record.subValue ? '.' + record.subValue : '';
-            if (record.valueType === 'systemVariable') {
-                record.value = '#{' + record.value + '}';
-            }
-            if (record.valueType === 'localVariable') {
-                record.value = '${' + record.value + '}';
-            }
-            if (record.valueType === 'static' && record.staticDataType === 'Numeric') {
-                record.value = parseInt(record.value);  // Ensures Numerics aren't quoted after jsonifying
-            }
-            if (record.valueType === 'query' && subValue) {
-                record.value = record.value + subValue;
-            }
-            if (record.termsToMerge && record.termsToMerge.length) {
-                termsToMerge[record.variable] = sanitizeJsonRecords(record.termsToMerge);
-            }
+            record.value = restoreValue(record);
+            
             newJsonObj[record.variable] = record.value;
         }
         return newJsonObj;
     }
+    
+    function restoreValue (record) {
+        var value = record.value;
+        var subValue = record.subValue ? '.' + record.subValue : '';
+        if (record.valueType === 'systemVariable') {
+            value = '#{' + value + '}';
+        }
+        if (record.valueType === 'localVariable') {
+            value = '${' + value + '}';
+        }
+        if (record.valueType === 'static' && record.staticDataType === 'Numeric') {
+            value = parseInt(value);  // Ensures Numerics aren't quoted after jsonifying
+        }
+        if (record.valueType === 'query' && subValue) {
+            value = value + subValue;
+        }
+        if (record.itemType === 'Query') {
+            value = record.variable;
+        }
+        if (record.valueType === 'static' && (record.staticDataType === 'Object' || record.staticDataType === 'Composite')) {
+            value = restoreObjectOrArrayValue(value, 'Object');
+        }
+        if (record.valueType === 'static' && record.staticDataType === 'Array') {
+            value = restoreObjectOrArrayValue(value, 'Array');
+        }
+        return value;
+    }
+    
+    function restoreObjectOrArrayValue (value, type) {
+        if (type === 'Object' || type === 'Composite') {
+            return processObjectValue(value);
+        }
+        
+        if (type === 'Array') {
+            return processArrayValue(value);
+        }
+        
+        function processArrayValue (theArray) {
+            var originalArray = [];
+            if (theArray) {
+                for (var t = 0; t < theArray.length; t++) {
+                    var _val = theArray[t].value;
+                    if (theArray[t].staticDataType === "Object" || theArray[t].staticDataType === "Composite") {
+                        originalArray.push(processObjectValue(_val));
+                    } else if (theArray[t].staticDataType === "Array") {
+                        originalArray.push(processArrayValue(_val));
+                    } else {
+                        originalArray.push(decorateValue(_val, theArray[t].valueType));
+                    }
+                }
+            }
+            return originalArray;
+        }
+        
+        function processObjectValue (theObject) {
+            var originalObj = {};
+            if (theObject) {
+                for (var t = 0; t < theObject.length; t++) {
+                    if (theObject[t].value.staticDataType === "Object" || theObject[t].value.staticDataType === "Composite") {
+                        originalObj[theObject[t].variable] = processObjectValue(theObject[t].value.value);
+                    } else if (theObject[t].value.staticDataType === "Array") {
+                        originalObj[theObject[t].variable] = processArrayValue(theObject[t].value.value);
+                    } else {
+                        originalObj[theObject[t].variable] = decorateValue(theObject[t].value.value, theObject[t].value.valueType);
+                    }
+                }
+            }
+            return originalObj;
+        }
+        
+        function decorateValue (value, valueType) {
+            var _val = value;
+            if (valueType === 'systemVariable') {
+                _val = '#{' + _val + '}';
+            }
+            if (valueType === 'localVariable') {
+                _val = '${' + _val + '}';
+            }
+            return _val;
+        }
+    }
+    
+    function extractOptions (task, taskType) {
+        var json = task[taskType].trim();
+        (function findOptionsObj(jsonStr) {
+            var matcher = balancedMatcher(jsonStr, ['{'], ['}']);
+            while (matcher.find()) {
+                var startIndex = matcher.start();
+                var endIndex = matcher.end();
+                var str = jsonStr.substring(startIndex + 1, endIndex - 1);
 
+                var regEx = new RegExp('\\s*,?\\s*("\\$options"|\\$options)\\s*:\\s*\\{\\s*' + str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&") + '\\s*\\}', 'g');
+                if (regEx.test(json)) {
+                    var $options = JSON.parse('{' + str + '}');
+
+                    json = json.replace(regEx, ''); // Remove $options from json. User shouldn't see it
+                    if (task && taskType) {
+                        task[taskType] = json;
+                        task[taskType + '_$options'] = $options; // Remember options object after it's removed from json
+                    }
+                    // break or continue and ensure only one $options options is appended to json?
+                    //break;
+                }
+                findOptionsObj(str);
+            }
+        }(json));
+    }
+    
     return {
         removeUnsafeSpaceCharacters: function (jsonString) {
             return _removeUnsafeSpaceCharacters(jsonString);
         },
+        setJsonOptions: function (jsonStr, task, taskType) {
+            var result = jsonStr;
+            if (task && jsonStr) {
+                try {
+                    if (!task[taskType + '_$options']) {
+                        extractOptions(task, taskType);
+                    }
+                    if (!task[taskType + '_$options']) { // Still no options? set default.....
+                        // if json exists set advanced to true. For empty json, set advanced to true.
+                        task[taskType + '_$options'] = {_advanced: ((task[taskType] && task[taskType].length) > 0 ? true : false)};
+                    }
+                    jsonStr = task[taskType];
+                    var $options = task[taskType + '_$options'];
+                    result = jsonStr.trim().replace(/^\{(.+)\}$/, '{' + '$1' + ',"$options":' + JSON.stringify($options)  + '}');
+                } catch (e) {
+                    result = jsonStr;
+                }
+            }
+            return result;
+        },
         getTemplateData: function () {
-            if (templateData) {
-                deferred.resolve(templateData);
-            } else {
-                var requestUrl = cris.baseUrl + 'templates/?showAllStatus=true&filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":1,"isCol":false}]}&sort( name)';
-                dojo.xhrGet({
-                    url: requestUrl,
-                    handleAs: "text",
-                    load: function (data) {
-                        var results = dojo.fromJson(data);
-                        var templates_ = [];
-                        dojo.forEach(results, function (item) {
-                            var obj = {name: item.name, id: item['uuid']['$uuid']};
-                            var termsXML = dojox.xml.parser.parse(item.content);
+            if (!templatesHttpPromise) {
+                var requestUrl = cris.baseUrl + 'templates/?showAllStatus=true&filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":1,"isCol":false}]}&sort(+name)';
+                templatesHttpPromise =  $http({
+                                            method: 'GET',
+                                            url: requestUrl
+                                        });
+            }
+            
+            return ({
+                        promise: templatesHttpPromise, 
+                        thenCallback: function (result, templateStore) {
                             
-                            var docNode = termsXML.documentElement;
-                            var termNames = [];
-                            templateTerms(docNode, termNames);
-                            function templateTerms(node, termNames) {
-                                var name = arguments[2];
-                                dojo.forEach(node.getElementsByTagName('term'), function (element) {
-                                    if (element.parentNode === node) { // restrict to top level elements only. (getElementsByTagName is recursive)
-                                        var aliasAttr = element.getAttribute('alias');
-                                        if (aliasAttr) { // Reference or Composite Reference term
-                                            var termName = (name ? name + '.' + aliasAttr : aliasAttr);
-                                            if (element.getElementsByTagName('term').length) { // Composite Reference term
-                                                templateTerms(element, termNames, termName);
-                                            } else { // Reference term
-                                                termNames.push(termName);
-                                            }
-                                        } else { // Simple or Composite term
-                                            var n = element.getElementsByTagName('name');
-                                            if (n.length && n[0].parentNode === element) {
-                                                var termName = dojox.xml.parser.textContent(n[0]);
-                                                if (termName) {
-                                                    if (element.getElementsByTagName('term').length) { // Composite Term
-                                                        templateTerms(element, termNames, (name ? name + '.' + termName : termName));
-                                                    } else { // Simple Term
-                                                        termNames.push(name ? name + '.' + termName : termName);
-                                                    }
+                            if (cachedTemplates) { // return cached templates if true
+                                templateStore.templates = cachedTemplates;
+                                return;
+                            }
+                            
+                            var results = result.data;
+                            var templates_ = [];
+                            
+                            // For each template fetch its latest version of terms and/or any associated attach-to data
+                            angular.forEach(results, function (item) {
+                                var obj = {name: item.name, id: item['uuid']['$uuid']};
+                                var templateUUID = item.uuid.$uuid;
+                                var templateVersion = item.versionNumber.$uuid;
+                                $http({
+                                    method: 'GET',
+                                    url: cris.baseUrl + "templates/load/" + templateUUID + "/" + templateVersion
+                                }).then(function (resultData) {
+                                    
+                                    var termNames = [];
+                                    var termDataTypes = {};
+                                    var attachToRecords = {};
+                                    var isMultiFileFlags = {};
+                                    var listItemProps = {};
+                                    var isListTermFlags = {};
+                                    
+                                    (function extractTermNames(term, isTopLevel) {
+                                        var compositeTermName = arguments[2];
+                                        angular.forEach(term.term, function (term_) {
+                                            var _alias = term_.alias || term_.useAlias || term_.name;
+                                            var path = compositeTermName ? compositeTermName + '.' + _alias : _alias;
+                                            if (path) {
+                                                termDataTypes[path] = getType(term_.validation.validator[0].type, term_.validation.validator[0].property, path);
+                                                termNames.push(path);
+                                                isListTermFlags[path] = term_.list;
+                                                
+                                                for (var v = 0; v < term_.attachTo.length; v++) {
+                                                    var attachToAlias = (path + '.' + term_.attachTo[v].useAlias);
+                                                    termDataTypes[attachToAlias]  = "AttachTo";
+                                                    termNames.push(attachToAlias);
+                                                    isListTermFlags[attachToAlias] = term_.attachTo[v].list;
+                                                    getAttachToData(term_.attachTo[v], attachToAlias);
                                                 }
                                             }
+                                            if (term_.term && term_.term instanceof Array && term_.term.length) {
+                                                extractTermNames(term_, false, path);
+                                            }
+                                        });
+                                        
+                                        if (isTopLevel) { // get term names for attach-tos in template top-level
+                                            for (var v = 0; v < term.attachTo.length; v++) {
+                                                var attachToAlias = term.attachTo[v].useAlias;
+                                                termDataTypes[attachToAlias]  = "AttachTo";
+                                                termNames.push(attachToAlias);
+                                                isListTermFlags[attachToAlias] = term.attachTo[v].list;
+                                                getAttachToData(term.attachTo[v], attachToAlias);
+                                            }
+                                        }
+                                    })(resultData.data, true);
+                                    
+                                    termNames = termNames.sort().concat(['_experiment_id', '_job_id', '_project_id']);
+                                    var termsCollection = [];
+                                    dojo.forEach(termNames, function (termName, index) {
+                                        var termDataType = termDataTypes[termName];
+                                        if (['_experiment_id', '_job_id', '_project_id'].indexOf(termName) !== -1) {
+                                            termDataType = 'Numeric';
+                                        }
+                                        termsCollection.push({id: termName, name: termName, dataType: termDataType, listItemProps: listItemProps[termName], isMultiFile: isMultiFileFlags[termName], index: index, isListTerm: isListTermFlags[termName], template: templateUUID});
+                                    });
+                                    obj.termNames = termsCollection;
+                                    obj.attachToData = attachToRecords;
+                                    
+                                    function getAttachToData(term, termAlias) {
+                                        if (attachToRecords[termAlias]) { // attach-to data for term was previously extracted and cached
+                                            return;
+                                        }
+                                            
+                                        var uuid = term.uuid;
+                                        var idField = term.idField;
+                                        var nameField = term.nameField;
+
+                                        if (uuid && nameField && idField) {
+                                            var url = cris.baseUrl + "rest/objectus/" + uuid;
+                                            $http({
+                                                method: 'GET',
+                                                url: url
+                                            }).then(function (result){
+                                                var data = [];
+                                                for (var i = 0; i < result.data.length; i++) {
+                                                    if (result.data[i][nameField] && result.data[i][idField]) {
+                                                        data.push({id: result.data[i][idField], name: result.data[i][nameField]});
+                                                    }
+                                                }
+                                                attachToRecords[termAlias] = data;
+                                            }, function (error) {
+                                                
+                                            });
                                         }
                                     }
+                                    
+                                    function getType (validationType, properties, termAlias) {
+                                        var dataType = null;
+                                        if (validationType === "text" || validationType === "advanced") {
+                                            dataType = "Text";
+                                        } else if (validationType === "numeric") {
+                                            dataType = "Numeric";
+                                        } else if (validationType === "date-time") {
+                                            dataType = "Date";
+                                            if ((properties instanceof Array) && properties.length && properties[0].name === 'format' && properties[0].value === 'time') {
+                                                dataType = "Time";
+                                            }
+                                        } else if (validationType === "boolean") {
+                                            dataType = "Boolean";
+                                        } else if (validationType === "composite") {
+                                            dataType = "Composite";
+                                        } else if (validationType === "list") {
+                                            dataType = "List"
+                                            if (properties instanceof Array) {
+                                                var items = [];
+                                                for (var i = 0; i < properties.length; i++) {
+                                                    if (properties[i].name === 'item' && properties[i].value) {
+                                                        var id = properties[i].id ? properties[i].id : properties[i].value;
+                                                        items.push({id: id, name: properties[i].value});
+                                                    }
+                                                }
+                                                
+                                                listItemProps[termAlias] = {items: items};
+                                                if (properties.length && properties[0].name === 'isMultiSelect' && properties[0].value === 'true') {
+                                                    listItemProps[termAlias].isMultiSelect = true;
+                                                }
+                                            }
+                                        } else if (validationType === "file") {
+                                            dataType = 'File';
+                                            if (properties.length && properties[0].name === 'multiple' && properties[0].value === 'true') {
+                                                isMultiFileFlags[termAlias] = true;
+                                            }
+                                        }
+                                        return dataType;
+                                    }
+                                }, function (errorData) {
+                                    
                                 });
-                            }
-                            termNames = termNames.concat(['_job_id', '_experiment_id', '_project_id']).sort();
-                            var termsCollection = [];
-                            dojo.forEach(termNames, function (termName) {
-                                termsCollection.push({id: termName, name: termName});
+                                templates_.push(obj);
                             });
-                            obj.termNames = termsCollection;
-                            templates_.push(obj);
-                        });
-                        templateData = templates_;
-                        deferred.resolve(templates_);
-                    },
-                    error: function (error) {
-                        deferred.resolve('Error loading templates');
-                    }
-                });
-            }
-            return deferred.promise;
+                            templateStore.templates = templates_;
+                            cachedTemplates = templates_; // Cache templates for next retrieval
+                            
+                            console.log('************************* Templates Fetched ****************************');
+                            console.dir(templates_);
+                        }
+                    });
         },
         getSystemVariables: function () {
             return [{id: 'current_project.id', name: 'current_project.id'},
@@ -2912,112 +4141,135 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                 {id: 'current_user.firstName', name: 'current_user.firstName'},
                 {id: 'current_user.middleName', name: 'current_user.middleName'},
                 {id: 'current_user.lastName', name: 'current_user.lastName'},
+                {id: 'current_user.fullName', name: 'current_user.fullName'},
                 {id: 'current_user.email', name: 'current_user.email'},
                 {id: 'current_user.externalId', name: 'current_user.externalId'},
                 {id: 'current_user.enabled', name: 'current_user.enabled'},
                 {id: 'current_user.timeCreated', name: 'current_user.timeCreated'},
                 {id: 'current_user.timeUpdated', name: 'current_user.timeUpdated'},
-                {id: 'current_date', name: 'current_date'}, ];
+                {id: 'current_date', name: 'current_date'}];
         },
-        deserializeJson: function (json, queryItems) {
-            console.log('************Deserialize Json');
+        deserializeJson: function (json, queryItems, task, taskType) {
+            console.log('************Deserialize Json**********************');
             var result = [];
             var error = "";
-
+            var $options = null;
+            
             if (json) {
                 var _json = json.trim();
                 if (isJsonLike(_json)) {
                     try {
+                        // Extract the $options object from the json
+                        extractOptions(task, taskType);
+                        _json = task[taskType];
+                        $options = task[taskType + '_$options'];
+                        
+                        /*
+                        * Disable query or directive functionality: If json contains queries or directives, cancel parsing
+                        */
+                        /*
+                        var REGEXP_UUID = /\b([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/i;
+                        if (REGEXP_UUID.test(_json) || _json.indexOf('$directive') !== -1) {
+                           throw 'Unsuported features';
+                        }
+                        */
+                        //************************************************
+
                         var sanitizedJson = eval(_json, queryItems);
                         deserializeQueries(queryItems);
                         var jsonObj = dojo.fromJson(sanitizedJson);
                         
-                        var REGEX_TEMPLATE_VARIABLE = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/i
+                        var REGEX_TEMPLATE_VARIABLE = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/i;
+
                         var initializedValues = [];
                         if (jsonObj['$directive']) {
+                            
+                            /**************************************************************/
+                            // Currently Merge only supported for template data.....
+                            // Throw exception if Merge has a non-template variable 
+                            var allKeys = [];
+                            if (jsonObj['$data'] instanceof Array) {
+                                for (var k in jsonObj['$data']) {
+                                    var itemKey = Object.keys(jsonObj['$data'][k])[0];
+                                    allKeys.push(itemKey);
+                                }
+                            } else {
+                                // For multiple merges get templateUUIDs to merge using the $path directive
+                                for (var k in jsonObj['$directive']) {
+                                    var itemKey = jsonObj['$directive'][k]['$merge']['$path'];
+                                    allKeys.push(itemKey);
+                                }
+                            }
+                            
+                            for (var t = 0; t < allKeys.length; t++) {
+                                // Test fails if variable is not templateUUID or if in case of [$data instancof Array] all Keys aren't the same
+                                if (!REGEX_TEMPLATE_VARIABLE.test(allKeys[t]) || (jsonObj['$data'] instanceof Array && allKeys[t] !== allKeys[0])) {
+                                    throw 'Invalid Merge directive';
+                                }
+                            }
+                            /********************************************************************/
+                            
                             if (jsonObj['$directive'] instanceof Array) {
                                 for (var key in jsonObj['$data']) {
                                     var value = jsonObj['$data'][key];
                                     if (value instanceof Array) {
-                                        initObjectVariables(value, key);
+                                        
+                                        var valProps = {};
+                                        valProps.variable = key;
+                                        valProps.variableType = 'template';
+                                        valProps.termsToMerge = [];
+                                        for (var y = 0; y < value.length; y++) {
+                                            var itemToMerge = value[y];
+                                            if (itemToMerge && typeof itemToMerge === 'object' && !(itemToMerge instanceof Array)) {
+                                                for (var termKey in itemToMerge) {
+                                                    var o = setValueProperties(itemToMerge[termKey], key, termKey);
+                                                    o.itemType = 'Term';
+                                                    o.variable = termKey;
+                                                    valProps.termsToMerge.push(o);
+                                                }
+                                            } else if (itemToMerge && itemToMerge.startsWith('QUERY_')) {
+                                                valProps.termsToMerge.push({itemType: 'Query', variable: itemToMerge})
+                                            }
+                                        }
+                                        initializedValues.push(valProps);
+                                        
                                     } else {
                                         var valueProperties = initVariableValue(value, key);
                                         initializedValues.push(valueProperties);
                                     }
                                 }
                             } else {
-                                initObjectVariables(jsonObj['$data']);
+                                
+                                if (jsonObj['$data'].length) {
+                                    
+                                    var variableId = Object.keys(jsonObj['$data'][0])[0];
+                                    var valProps = {};
+                                    valProps.termsToMerge = [];
+                                    valProps.variableType = 'template';
+                                    valProps.variable = variableId;
+                                    for (var h = 0; h < jsonObj['$data'].length; h++) {
+                                        var itemToMerge = jsonObj['$data'][h][variableId];
+                                        if (itemToMerge && typeof itemToMerge === 'object' && !(itemToMerge instanceof Array)) {
+                                            for (var termKey in itemToMerge) {
+                                                var o = setValueProperties(itemToMerge[termKey], variableId, termKey);
+                                                o.itemType = 'Term';
+                                                o.variable = termKey;
+                                                valProps.termsToMerge.push(o);
+                                            }
+                                        } else if (itemToMerge && itemToMerge.startsWith('QUERY_')) {
+                                            valProps.termsToMerge.push({itemType: 'Query', variable: itemToMerge})
+                                        }
+                                    }
+                                    initializedValues.push(valProps);
+                                }
                             }
                         } else {
                             for (var key in jsonObj) {
                                 var valueProperties = initVariableValue(jsonObj[key], key);
-                                initializedValues.push(valueProperties);
+                                initializedValues.push(valueProperties); 
                             }
                         }
                         result = result.concat(initializedValues);
-                        
-                        function initObjectVariables(variableObj, variableId) {
-                            var terms = {};
-                            var mergeObj= {mergeValues: []};
-                            var valProps = {};
-                            var noKey = typeof variableId === 'undefined';
-                            for (var h in variableObj) {
-                                var value = variableObj[h];
-                                if (noKey) {
-                                    variableId = Object.keys(value)[0];
-                                    value = variableObj[h][variableId];
-                                }
-                                if (REGEX_TEMPLATE_VARIABLE.test(variableId)) {
-                                    if (typeof value !== 'object') {
-                                        valProps = setValueProperties(value);
-                                        valProps.variable = variableId;
-                                        valProps.variableType = 'template';
-                                        valProps.termsToMerge = [];
-                                        initializedValues.push(valProps);
-                                    } else {
-                                        dojo.mixin(terms, value);
-                                    }
-                                } else {
-                                    /*
-                                     * TODO: Add support for non-template merge objects. Also see deserializeJson function
-                                     */
-                                    mergeObj.mergeValues.push(value);
-                                }
-                            }
-                            if (Object.keys(terms).length) {
-                                for (var y in terms) {
-                                    var props = setValueProperties(terms[y]);
-                                    props.variable = y;
-                                    valProps.termsToMerge.push(props);
-                                }
-                            }
-                            if (mergeObj.mergeValues.length) {
-                                var props = setValueProperties(mergeObj);
-                                props.variable = variableId;
-                                props.variableType = 'variable';
-                                initializedValues.push(props);
-                            }
-                        }
-                        
-                        function initVariableValue(value, variableId) {
-                            var variableType = 'variable';
-                            if (REGEX_TEMPLATE_VARIABLE.test(variableId)) {
-                                variableType = 'template';
-                            }
-                            var valueProperties = setValueProperties(value);
-                            if (variableType === 'template' && typeof value === 'object' && value !== null) {
-                                valueProperties.termsToMerge = [];
-                                for (var e in value) {
-                                    var props= setValueProperties(value[e]);
-                                    props.variable = e;
-                                    valueProperties.termsToMerge.push(props);
-                                }
-                                valueProperties.value = null;
-                                valueProperties.valueType = null;
-                            }
-                            dojo.mixin(valueProperties, {variableType: variableType, variable: variableId});
-                            return valueProperties;
-                        }
                     } catch (e) {
                         console.error('************************ JSON DESERIALIZE ERROR **********************');
                         console.error(e);
@@ -3028,18 +4280,66 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                 } else {
                     error = "Error: Invalid json format";
                 }
+                console.dir(result);
+                console.dir(queryItems);
             }
-            return {result: result, error: error};
+            
+            function initVariableValue(value, variableId) {
+                var REGEX_TEMPLATE_VARIABLE = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/i;
+                var variableType = 'variable';
+                if (REGEX_TEMPLATE_VARIABLE.test(variableId)) {
+                    variableType = 'template';
+                }
+                var valueProperties = setValueProperties(value);
+                if (variableType === 'template' && value !== null) {
+                    valueProperties.termsToMerge = [];
+                    if (typeof value === 'object') {
+                        for (var e in value) {
+                            var props = setValueProperties(value[e], variableId, e);
+                            props.variable = e;
+                            if (e.startsWith('QUERY_')) {
+                                props.itemType = 'Query';
+                            } else {
+                                props.itemType = 'Term';
+                            }
+                            valueProperties.termsToMerge.push(props);
+                        }
+                    } else if (value.startsWith('QUERY_')) {
+                        valueProperties.termsToMerge.push({itemType: 'Query', variable: value});
+                    }
+                }
+                dojo.mixin(valueProperties, {variableType: variableType, variable: variableId});
+                return valueProperties;
+            }
+            
+            return {result: result, error: error, $options: $options};
         },
         fromBuilderToJson: function (builderRecords, task, jsonType, queries) {
             console.log('************From builder to Json');
-            var newJsonStr = serializeToJson_(builderRecords, queries);
-            ;
-            if (jsonType === 'jsonIn') {
-                task.jsonIn = newJsonStr;
-            } else if (jsonType === 'jsonOut') {
-                task.jsonOut = newJsonStr;
+            try {
+                var newJsonStr = serializeToJson_(builderRecords, queries);
+
+                if (jsonType === 'jsonIn') {
+                    task.jsonIn = newJsonStr;
+                } else if (jsonType === 'jsonOut') {
+                    task.jsonOut = newJsonStr;
+                }
+            } catch (e) {
+                
             }
+        },
+        objectToJson: function (obj, objectType) {
+            var formattedStr = JSON.stringify(restoreObjectOrArrayValue(obj, objectType), null, 4);
+            return formattedStr;
+        },
+        setTermProperties: function (obj, term) {
+            obj.dataType = term.dataType;
+            obj.isMultiFile = term.isMultiFile;
+            obj.listItemProps = term.listItemProps;
+            obj.index = term.index;
+            obj.isReadOnly = true;
+            obj.isListTerm = term.isListTerm;
+            obj.template = term.template;
         },
         jsonPreview: function (_scope, jsonBuilderKeyValues, queries, queryId) {
             _scope.jsonToPreview = serializeToJson_(jsonBuilderKeyValues, queries, queryId);
@@ -3085,18 +4385,17 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$q", "$compil
                     }
                 }
             }, true);
-
-            var dialog = new dijit.Dialog({
-                title: "Json Preview",
-                content: '<div ng-include="\'view_json_preview\'"></div>',
-                style: "width: 750px;height:700px;padding-bottom:5px;",
-                onCancel: function () {
-                    watcher();
-                    _scope.$apply();
+            
+            $uibModal.open({
+                template: '<div ng-include="\'view_json_preview\'"></div>',
+                size: 'lg',
+                scope: _scope,
+                controller: function ($scope, $uibModalInstance) {
+                    $scope.close = function () {
+                        $uibModalInstance.close();
+                    };
                 }
             });
-            $compile(dialog.domNode)(_scope);
-            dialog.show();
         }
     }
 }]);

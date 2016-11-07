@@ -17,6 +17,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -46,6 +47,16 @@ public class VocabularyService {
     private static final String KEY_TERMS_DELETED = "deleted";
 
     private static final String VOCABULARY_SCHEMA_LOCATION = "http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd";
+
+    private JAXBContext context;
+
+    public VocabularyService() {
+        try {
+            context = JAXBContext.newInstance(Vocabulary.class);
+        } catch (JAXBException ex) {
+            throw new RuntimeException("failed to instantiate unmarshaller for Vocabulary: " + ex.getMessage());
+        }
+    }
 
     @Autowired
     private DomainObjectService domainObjectService;
@@ -326,16 +337,13 @@ public class VocabularyService {
      */
     public Vocabulary convertXmlToVocabulary(String xmlVocabulary) {
         Vocabulary vocabulary = null;
-        try {
-            JAXBContext context = JAXBContext.newInstance(Vocabulary.class);
+        try (InputStream is = new ByteArrayInputStream(xmlVocabulary.getBytes())) {
             Unmarshaller unMarshaller = context.createUnmarshaller();
-            InputStream is = new ByteArrayInputStream(xmlVocabulary.getBytes());
-            Object unmarshalled = unMarshaller.unmarshal(is);
-            if (unmarshalled instanceof Vocabulary) {
-                vocabulary = (Vocabulary) unmarshalled;
-            }
+            vocabulary = (Vocabulary) unMarshaller.unmarshal(is);
         } catch (JAXBException ex) {
             throw new RuntimeException("Unable to generate xml term definition", ex);
+        } catch (IOException ex) {
+            throw new RuntimeException("UUnable to read xml vocabulary definition", ex);
         }
         return vocabulary;
     }
@@ -348,16 +356,13 @@ public class VocabularyService {
      */
     public String convertVocabularyToXml(Vocabulary vocabulary) {
         String xmlVocabulary = null;
-        try {
-            JAXBContext writerContext = JAXBContext.newInstance(Vocabulary.class);
-            Marshaller marshaller = writerContext.createMarshaller();
+        try (OutputStream os = new ByteArrayOutputStream()) {
+            Marshaller marshaller = context.createMarshaller();
             marshaller.setProperty(CharacterEscapeHandler.class.getName(), CDataEscapeHandler.theInstance);
             marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
             marshaller.setProperty(Marshaller.JAXB_SCHEMA_LOCATION, VOCABULARY_SCHEMA_LOCATION);
-            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-                marshaller.marshal(vocabulary, bos);
-                xmlVocabulary = new String(bos.toByteArray());
-            }
+            marshaller.marshal(vocabulary, os);
+            xmlVocabulary = os.toString();
         } catch (JAXBException ex) {
             throw new RuntimeException("Unable to generate xml vocabulary definition", ex);
         } catch (IOException ex) {

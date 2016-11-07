@@ -2,11 +2,13 @@ package edu.purdue.cybercenter.dm.web;
 
 import edu.purdue.cybercenter.dm.domain.Configuration;
 import edu.purdue.cybercenter.dm.domain.Constant;
+import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.util.DomainObjectHelper;
 import edu.purdue.cybercenter.dm.util.DomainObjectUtils;
 import edu.purdue.cybercenter.dm.web.util.WebJsonHelper;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.naming.NamingException;
 import javax.naming.directory.Attributes;
@@ -46,13 +48,13 @@ public class UserController {
         return "users/index";
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.show(id, request, response, User.class);
     }
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
         Session session = DomainObjectHelper.getHbmSession();
@@ -70,18 +72,8 @@ public class UserController {
             }
         }
 
-        Filter enabledFilter = null;
-        if (request.getParameter("enabled") != null) {
-            Boolean enabled = Boolean.parseBoolean(request.getParameter("enabled"));
-            enabledFilter = session.enableFilter("enabledFilter");
-            enabledFilter.setParameter("enabled", enabled);
-        }
-
         String result = WebJsonHelper.list(request, response, User.class);
 
-        if (enabledFilter != null) {
-            session.disableFilter("enabledFilter");
-        }
         if (userNotInGroupFilter != null) {
             session.disableFilter("userNotInGroupFilter");
         }
@@ -92,7 +84,7 @@ public class UserController {
         return result;
     }
 
-    @RequestMapping(method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public ResponseEntity<User> createFromJson(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) throws NamingException {
         User user = DomainObjectUtils.fromJson(json, request.getContextPath(), User.class);
@@ -122,7 +114,7 @@ public class UserController {
         return responseEntity;
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object updateFromJson(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         User user = DomainObjectUtils.fromJson(json, request.getContextPath(), User.class);
@@ -146,6 +138,15 @@ public class UserController {
         }
 
         return result;
+    }
+
+    @RequestMapping(value = "/membergroups", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public String getMemberGroups(HttpServletRequest request, HttpServletResponse response) {
+        Integer userId = (Integer) request.getSession().getAttribute("userId");
+        User user = User.findUser(userId);
+        List<Group> groups = user.getMemberGroups();
+        return DomainObjectUtils.toJsonArray(groups, request.getContextPath());
     }
 
     private User createUser(User user) {

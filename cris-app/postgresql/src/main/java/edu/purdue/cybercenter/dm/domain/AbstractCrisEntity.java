@@ -69,23 +69,8 @@ public class AbstractCrisEntity implements CrisEntity {
 
     @Transactional
     @Override
-    public void persistAndFlush() {
-        this.entityManager.persist(this);
-        this.entityManager.flush();
-    }
-
-    @Transactional
-    @Override
     public <T extends CrisEntity> T merge() {
         T merged = (T) this.entityManager.merge(this);
-        return merged;
-    }
-
-    @Transactional
-    @Override
-    public <T extends CrisEntity> T mergeAndFlush() {
-        T merged = (T) this.entityManager.merge(this);
-        this.entityManager.flush();
         return merged;
     }
 
@@ -98,18 +83,6 @@ public class AbstractCrisEntity implements CrisEntity {
             CrisEntity attached = this.entityManager.find(this.getClass(), id);
             this.entityManager.remove(attached);
         }
-    }
-
-    @Transactional
-    @Override
-    public void removeAndFlush() {
-        if (this.entityManager.contains(this)) {
-            this.entityManager.remove(this);
-        } else {
-            CrisEntity attached = this.entityManager.find(this.getClass(), id);
-            this.entityManager.remove(attached);
-        }
-        this.entityManager.flush();
     }
 
     @Transactional

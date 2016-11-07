@@ -6,25 +6,25 @@ import flexjson.ObjectFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 import java.util.Set;
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EntityListeners;
 import javax.persistence.EntityManager;
 import javax.persistence.JoinColumn;
+import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.TypedQuery;
 import javax.validation.constraints.NotNull;
 import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.Filters;
 import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 import org.springframework.beans.factory.annotation.Configurable;
 
 @Filters({
-    @Filter(name = "enabledFilter"),
     @Filter(name = "tenantFilter")
 })
 @Entity
@@ -61,15 +61,34 @@ public class Group extends AbstractCrisEntity {
     @JoinColumn(name = "owner_id", referencedColumnName = "id")
     private User ownerId;
 
-    @OneToMany(mappedBy = "groupId", cascade = CascadeType.REMOVE)
-    private Set<GroupUser> groupUsers;
+    @ManyToMany(mappedBy = "memberGroups")
+    @NotAudited
+    private Set<User> users;
 
-    public Set<GroupUser> getGroupUsers() {
-        return groupUsers;
+    public Set<User> getUsers() {
+        return users;
     }
 
-    public void setGroupUsers(Set<GroupUser> groupUsers) {
-        this.groupUsers = groupUsers;
+    public void setUsers(Set<User> users) {
+        this.users = users;
+    }
+
+    public void addUser(User user) {
+        if (this.users == null) {
+            this.users = new HashSet<>();
+        }
+        this.users.add(user);
+    }
+
+    @Column(name = "is_group_owner")
+    private Boolean isGroupOwner;
+
+    public Boolean getIsGroupOwner() {
+        return isGroupOwner;
+    }
+
+    public void setIsGroupOwner(Boolean isGroupOwner) {
+        this.isGroupOwner = isGroupOwner;
     }
 
     public Classification getClassificationId() {

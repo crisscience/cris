@@ -2,166 +2,116 @@
 <jsp:root version="2.1" xmlns:c="http://java.sun.com/jsp/jstl/core" xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:spring="http://www.springframework.org/tags">
 
     <jsp:output omit-xml-declaration="yes"/>
+    <spring:url value='/projects/?execute=true&amp;filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":1,"isCol":false}]}&amp;sort(+name)' var="urlProjects"/>
+    <spring:url value="/experiments" var="urlExp"/>
+    <spring:url value="/workflows/?execute=true&amp;sort(+name)" var="urlWF"/>
+
+    <!-- Scripts for the TinyMCE Rich Text Editor -->
+    <script src="${jsRoot}/tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
+    <script src="${jsRoot}/tinymce/angular-ui-tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
 
     <script type="text/javascript">
-        cris.require([
-            "dojo/behavior",
-            "dijit/form/Button",
-            "dijit/form/FilteringSelect",
-            "dijit/form/Form",
-            "dijit/form/ValidationTextBox",
-            "dijit/Editor"
-        ]);
+        angular.module("crisCreateJob", ["angular-dojo","ui.tinymce"]);
+
+        angular.module("crisCreateJob").controller("jobCreateController", function($scope) {
+            // Set Experiments query string to filter based on the selected project
+            $scope.$watch('projectId', function(value) {
+                var queryStr = "/?sort(+name)&amp;projectId=" + (value ? value : 0);
+                if (queryStr !== $scope.experimentQueryStr) {
+                    $scope.experimentId = null;
+                    $scope.experimentQueryStr = queryStr;
+                }
+            });
+
+            // Settings for the TinyMCE text editor
+            $scope.tinymceOptions = {
+                menubar: false,
+                statusbar: false,
+                height:200
+            }
+
+            <c:forEach items="${projects}" var="item">
+                <c:choose>
+                <c:when test="${item.id eq job.projectId.id}">
+                    $scope.projectId = "${item.id}";
+                </c:when>
+                </c:choose>
+            </c:forEach>
+            $scope.experimentId = angular.fromJson("${experimentId}" ? "${experimentId}" : "null");
+            $scope.workflowId = angular.fromJson("${workflowId}" ? "${workflowId}" : "null");
+            $scope.name = "${name}" ? "${name}" : null;
+            $scope.description = "${description}" ? "${description}" : null;
+            $scope.initParams = "${initParams}" ? "${initParams}" : null;
+        });
 
         cris.ready(function() {
-            cris.job = {};
-            cris.job.create = {};
-            cris.job.create.app = {
-
-                storeExperiments: null,
-                storeWorkflows: null,
-                experimentList: null,
-                workflowList: null,
-                form: null,
-
-                behavior: {
-                    "#buttonSubmit": {
-                        onclick: function(evt) {
-                            dojo.byId("idHiddenDescription").innerHTML = dijit.byId("idDescription").get("value");
-                            if (cris.job.create.app.form.validate()) {
-                                cris.job.create.app.form.submit();
-                            }
-                        }
-                    }
-                },
-
-                updateExperimentList: function(projectId) {
-                   this.experimentList.query.projectId = projectId;
-                   this.experimentList.reset();
-                },
-
-                updateWorkflowList: function(resourceId) {
-                   this.workflowList.query.resourceId = resourceId;
-                   this.workflowList.reset();
-                },
-
-                init: function() {
-                    <spring:url value="/experiments" var="url"/>
-                    this.storeExperiments = createJsonRestStore("${url}");
-
-                    <spring:url value="/workflows" var="url"/>
-                    this.storeWorkflows = createJsonRestStore("${url}");
-
-                    var experimentId = dojo.fromJson("${experimentId}" ? "${experimentId}" : "null");
-                    this.experimentList = new dijit.form.FilteringSelect({
-                        id: "idSelectExperiment",
-                        name: "experimentId",
-                        value: experimentId,
-                        store: this.storeExperiments,
-                        fetchProperties: {
-                            sort: [{attribute: "name"}]
-                        },
-                        autoComplete: true
-                    }, "idSelectExperiment");
-                    this.updateExperimentList(dijit.byId("idSelectProject").getValue());
-
-                    var workflowId = dojo.fromJson("${workflowId}" ? "${workflowId}" : "null");
-                    this.workflowList = new dijit.form.FilteringSelect({
-                        id: "idSelectWorkflow",
-                        name: "workflowId",
-                        value: workflowId,
-                        store: this.storeWorkflows,
-                        fetchProperties: {
-                            sort: [{attribute: "name"}]
-                        },
-                        autoComplete: true
-                    }, "idSelectWorkflow");
-
-                    this.form = dijit.byId("formCreate");
-
-                    dojo.behavior.add(this.behavior);
-                    dojo.behavior.apply();
-
-                    dojo.connect(dijit.byId("idSelectProject"), "onChange", function(value) {
-                        cris.job.create.app.updateExperimentList(value);
-                    });
-                }
-            };
-
-            cris.job.create.app.init();
+            cris.bootstrapAngular("idJobCreate", "crisCreateJob");
         });
 
     </script>
 
-    <div class="sixTenths">
-        <h2>Create a New Job</h2>
+    <div id="idJobCreate" data-ng-controller="jobCreateController" class="container">
+        <h2 class="text-center">Create a New Job</h2>
 
         <spring:url value="/jobs/" var="url"/>
-        <div id="formCreate" data-dojo-type="dijit.form.Form" data-dojo-props="action: '${url}', method: 'POST'">
-            <table style="width: 100%">
-                <tr>
-                    <td style="width: 25%">Project:<span style="color:red;font-weight:bold;">&#160;*</span></td>
-                    <td class="tdTextBox" style="width: 75%">
-                        <select id="idSelectProject" name="projectId" data-dojo-type="dijit/form/FilteringSelect" data-dojo-props="required: 'true', placeHolder: 'select a project'">
-                            <c:forEach items="${projects}" var="item">
-                                <c:choose>
-                                <c:when test="${item.id eq job.projectId.id}">
-                                    <option value="${item.id}" selected="selected">${item.name}</option>
-                                </c:when>
-                                <c:otherwise>
-                                    <option value="${item.id}">${item.name}</option>
-                                </c:otherwise>
-                                </c:choose>
-                            </c:forEach>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Experiment:<span style="color:red;font-weight:bold;">&#160;*</span></td>
-                    <td class="tdTextBox" style="width: 75%">
-                        <input id="idSelectExperiment"/>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Workflow:<span style="color:red;font-weight:bold;">&#160;*</span></td>
-                    <td class="tdTextBox">
-                        <input id="idSelectWorkflow"/>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Name:<span style="color:red;font-weight:bold;">&#160;*</span></td>
-                    <td class="tdTextBox">
-                        <input id="idName" name="name" value="${name}" data-dojo-type="dijit/form/ValidationTextBox" data-dojo-props="required: 'true', promptMessage: 'Enter a name for your job', invalidMessage: 'You must enter a name for your project'" placeHolder="give your job a name" />
-                        <span class="error">${errorMessage.getModel()['org.springframework.validation.BindingResult.job'].hasFieldErrors('name') ? errorMessage.getModel()['org.springframework.validation.BindingResult.job'].getFieldError("name").defaultMessage : ""}</span>
-                    </td>
-                </tr>
-                <!-- maybe handy for debug purpose
-                <tr>
-                    <td>Init Params:</td>
-                    <td class="tdTextBox">
-                        <input id="idInitParams" name="initParams" value="${initParams}" data-dojo-type="dijit/form/SimpleTextarea" data-dojo-props="required: 'true', promptMessage: 'Enter a initParams for your job', invalidMessage: '', rows: 5" placeHolder="initial parameters" />
-                        <span class="error">${errorMessage.getModel()['org.springframework.validation.BindingResult.job'].hasFieldErrors('initParams') ? errorMessage.getModel()['org.springframework.validation.BindingResult.job'].getFieldError("initParams").defaultMessage : ""}</span>
-                    </td>
-                </tr>
-                -->
-                <tr>
-                    <td colspan="2" style="text-align: center">Description:</td>
-                </tr>
-                <tr>
-                    <td class="tdTextArea" colspan="2">
-                        <textarea id="idHiddenDescription" name="description" hidden="true"><!-- --></textarea>
-                        <div id="idDescription" data-dojo-type="dijit/Editor" data-dojo-props="rows: '8', name: 'description', value: '${description}'"><!-- --></div>
-                    </td>
-                </tr>
-            </table>
+        <form id="formCreate" name="form" action="${url}" method="POST">
+            <div class="form-group form-horizontal row">
+                <label class="control-label col-sm-3">Project:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-9 col-lg-6">
+                    <input type="hidden" name="projectId" value="{{projectId}}"/>
+                    <cris-url-dropdown url="${urlProjects}" ng-model="projectId" id-field="id" name-field="name" data-ng-required="true"></cris-url-dropdown>
+                </div>
+            </div>
+            <div class="form-group form-horizontal row">
+                <label class="control-label col-sm-3">Experiment:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-9 col-lg-6">
+                    <input type="hidden" name="experimentId" value="{{experimentId}}"/>
+                    <cris-url-dropdown url="${urlExp}{{experimentQueryStr}}" ng-model="experimentId" id-field="id" name-field="name" data-ng-required="true"></cris-url-dropdown>
+                </div>
+            </div>
+            <div class="form-group form-horizontal row">
+                <label class="control-label col-sm-3">Workflow:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-9 col-lg-6">
+                    <input type="hidden" name="workflowId" value="{{workflowId}}"/>
+                    <cris-url-dropdown url="${urlWF}" ng-model="workflowId" id-field="id" name-field="name" data-ng-required="true"></cris-url-dropdown>
+                </div>
+            </div>
+            <div class="form-group form-horizontal row">
+                <label class="control-label col-sm-3">Name:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-9 col-lg-6">
+                    <input type="hidden" name="name" value="{{name}}"/>
+                    <input type="text" class="form-control" ng-model="name" data-ng-required="true" placeHolder="give your job a name" />
+                    <span class="error">${errorMessage.getModel()['org.springframework.validation.BindingResult.job'].hasFieldErrors('name') ? errorMessage.getModel()['org.springframework.validation.BindingResult.job'].getFieldError("name").defaultMessage : ""}</span>
+                </div>
+            </div>
+            <div class="form-group form-horizontal row">
+                <label class="control-label col-sm-3">Description:</label>
+                <div class="col-sm-9 col-lg-6">
+                    <input type="hidden" name="description" value="{{description}}"/>
+                    <span ui-tinymce="tinymceOptions" ng-model="description"></span>
+                </div>
+            </div>
+            <!--
+            maybe handy for debug purpose
+            <div class="form-group form-horizontal row">
+                <label class="control-label col-sm-3 col-sm-offset-1">Init Params:</label>
+                <div class="col-sm-9 col-lg-6">
+                    <div ui-tinymce="tinymceOptions" ng-model="initParams"></div>
+                    <span class="error">${errorMessage.getModel()['org.springframework.validation.BindingResult.job'].hasFieldErrors('initParams') ? errorMessage.getModel()['org.springframework.validation.BindingResult.job'].getFieldError("initParams").defaultMessage : ""}</span>
+                    <input type="hidden" name="initParams" value="{{initParams}}"/>
+                </div>
+            </div>
+            -->
 
-            <p></p>
-            <div>
-                <input id="buttonSubmit" type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Submit'"/>
+            <div class="row">
+                <br /><br /><br /><br />
+                <div class="col-sm-9 col-lg-6 col-sm-offset-3">
+                    <input type="submit" class="btn btn-primary" value="Submit" ng-disabled="!form.$valid" />
+                </div>
             </div>
 
             <br/>
-        </div>
+        </form>
     </div>
 
 </jsp:root>

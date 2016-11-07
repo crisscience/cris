@@ -517,10 +517,12 @@ public class GlobusStorageFileManager extends AbstractStorageFileManager {
                 destFile.createNewFile();
             }
 
-            String link = getWorkareaDirectory() + GLOBUS + destFile.getName();
+            String location = storageFile.getLocation();
+            Path destLink = FileSystems.getDefault().getPath("../../" + location);
+            String link = getWorkareaDirectory() + GLOBUS + destLink.toFile().getName();
             Path linkPath = FileSystems.getDefault().getPath(link);
 
-            Path path = Files.createLink(linkPath, destPath);
+            Files.createSymbolicLink(linkPath, destLink);
             fileLinks.add(link);
         }
 

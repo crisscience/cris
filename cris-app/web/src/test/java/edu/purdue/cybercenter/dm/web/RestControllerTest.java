@@ -11,9 +11,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -22,6 +19,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 /**
  *
  * @author xu222
@@ -42,7 +42,7 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
     // List without template specified.
     @Test
     public void testFindWithoutTemplate() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.get(REST_OBJECTUS_URL).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.get(REST_OBJECTUS_URL).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isBadRequest());
         String sContent = resultActions.andReturn().getResponse().getContentAsString();
@@ -52,13 +52,13 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
     // Create or update without parameters.
     @Test
     public void testUpdateWithoutData() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.put(REST_OBJECTUS_URL).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.put(REST_OBJECTUS_URL).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isBadRequest());
         String sContent = resultActions.andReturn().getResponse().getContentAsString();
         Map<String, Object> content = Helper.deserialize(sContent, Map.class);
         String errorMessage = (String) content.get("message");
-        assertTrue("No InputStream specified", errorMessage.startsWith("Required request body content is missing"));
+        assertTrue("No InputStream specified", errorMessage.startsWith("Required request body is missing"));
     }
 
     // Update the existing record.
@@ -66,10 +66,10 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
     public void testUpdate() throws Exception {
         java.util.Random r = new java.util.Random();
         String val = "rand_update_" + r.nextInt(1000);
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.put(REST_OBJECTUS_URL).content("{'data':{'85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_name({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_owner({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_make({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_model({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_serialnum({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_description({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66._id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':{$oid: \"512660295d032b861cb64b06\"}}}").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.put(REST_OBJECTUS_URL).content("{'data':{'85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_name({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_owner({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_make({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_model({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_serialnum({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_description({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66._id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':{$oid: \"512660295d032b861cb64b06\"}}}").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         Map<String, Object> map = (Map<String, Object>) DatasetUtils.deserialize(contents);
@@ -100,11 +100,11 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
         java.util.Random r = new java.util.Random();
         String val = "rand_new_" + r.nextInt(1000);
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.post(REST_OBJECTUS_URL).content("{'data':{'85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_name({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_owner({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_make({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_model({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_serialnum({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_description({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "'}}").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.post(REST_OBJECTUS_URL).content("{'data':{'85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_name({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_owner({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_make({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_model({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_serialnum({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_description({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "'}}").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
 
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         Map<String, Object> map = (Map<String, Object>) DatasetUtils.deserialize(contents);
@@ -133,7 +133,7 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
     // Delete without parameters.
     @Test
     public void testDeleteWithoutTemplate() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.delete(REST_OBJECTUS_URL).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.delete(REST_OBJECTUS_URL).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isBadRequest());
         String sContent = resultActions.andReturn().getResponse().getContentAsString();
@@ -146,7 +146,7 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
     @Test
     public void testDeleteWithInvalidObjectId() throws Exception {
         // 999 should not a record id.
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.delete(INVALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.delete(INVALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isBadRequest());
         String sContent = resultActions.andReturn().getResponse().getContentAsString();
@@ -162,17 +162,17 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
         java.util.Random r = new java.util.Random();
 
         // Assure that the record exists.
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.get(VALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = MockMvcRequestBuilders.get(VALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         Map<String, Object> map = (Map<String, Object>) DatasetUtils.deserialize(contents);
         assertTrue("Number of fields must not be zero", map.size() > 0);
 
         // Delete the record.
-        mockHttpServletRequestBuilder = MockMvcRequestBuilders.delete(VALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = MockMvcRequestBuilders.delete(VALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         contents = resultActions.andReturn().getResponse().getContentAsString();
 
         // Check the received data.
@@ -182,7 +182,7 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
         assertNull(map.get("status"));
 
         // Assure that the record is not presented on the database.
-        mockHttpServletRequestBuilder = MockMvcRequestBuilders.get(VALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = MockMvcRequestBuilders.get(VALID_OBJECT_URL).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         contents = resultActions.andReturn().getResponse().getContentAsString();
         map = (Map<String, Object>) DatasetUtils.deserialize(contents);
@@ -190,11 +190,11 @@ public class RestControllerTest extends BaseWithAdminUserControllerTest {
 
         // Insert the record again.
         String val = "rand_update_" + r.nextInt(1000);
-        mockHttpServletRequestBuilder = MockMvcRequestBuilders.put(VALID_OBJECT_URL).content("{'data':{'85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_name({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_owner({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_make({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_model({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_serialnum({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_description({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66._id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':{'class':'org.bson.types.ObjectId','inc':481708806,'machine':1560488838,'new':false,'time':1361469481000,'timeSecond':1361469481}}}").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = MockMvcRequestBuilders.put(VALID_OBJECT_URL).content("{'data':{'85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_name({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_owner({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_make({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_model({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_serialnum({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66.hplc_description({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':'" + val + "','85833b40-73d3-11e2-bcfd-0800200c9a66._id({\"_template_version\":\"167822c0-c85a-11e2-8b8b-0800200c9a66\"})':{'class':'org.bson.types.ObjectId','inc':481708806,'machine':1560488838,'new':false,'time':1361469481000,'timeSecond':1361469481}}}").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
 
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         contents = resultActions.andReturn().getResponse().getContentAsString();
 
         // Check the received data.

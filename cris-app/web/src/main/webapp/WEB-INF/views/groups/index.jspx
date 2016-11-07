@@ -6,535 +6,423 @@
     <spring:url value="/groups" var="urlGroups"/>
     <spring:url value="/users" var="urlUsers"/>
     <spring:url value="/groupusers/" var="urlGroupUsers"/>
-
-    <div>
-        <div class="halfMinus floatLeft">
-            <h2>Groups</h2>
-
-            <div class="floatLeft">
-                <input id="buttonNew" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "New"'/>
-            </div>
-
-            <div class="floatRightToButton">
-                <input id="idShowEnabled" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton" checked="checked"/><span>Show Enabled</span>
-                &amp;nbsp
-                <input id="idShowAll" type="radio" name="showUser" data-dojo-type="dijit/form/RadioButton"/><span>Show All</span>
-            </div>
-            <br class="clearBoth"/>
-
-            <div id="groups"><!-- fix ff problem --></div>
-        </div>
-
-        <div id="groupDetail" class="half floatRight" style="display:none;">
-            <h2>Group Details</h2>
-
-            <form id="accountForm" data-dojo-type="dijit/form/Form">
-                <table class="form" style="width: 100%">
-                    <tr>
-                        <td style="width: 25%">ID:</td>
-                        <td id="groupId" style="width: 75%"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td>Name:</td>
-                        <td class="tdTextBox"><input id="name" data-dojo-type="dijit/form/TextBox"/></td>
-                    </tr>
-                    <tr>
-                        <td>Description:</td>
-                        <td><textarea id="description" rows="4" data-dojo-type="dijit/form/SimpleTextarea"><!-- --></textarea></td>
-                    </tr>
-                    <tr>
-                        <td>Enabled?</td><td class="center"><input id="enabled" data-dojo-type="dijit.form.CheckBox"/></td>
-                    </tr>
-                    <tr>
-                        <td>Time Created:</td>
-                        <td id="timeCreated"><!-- --></td>
-                    </tr>
-                    <tr>
-                        <td>Last Updated:</td>
-                        <td id="lastUpdated"><!-- --></td>
-                    </tr>
-                </table>
-                <p/>
-
-                <div style="float: right">
-                    <input id="buttonSave" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Save"'/>
-                    <input id="buttonReset" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Reset"'/>
+    
+    <style type="">
+        #idGroups h2 {
+            margin: 0;
+        }
+    </style>
+    
+    <div id="idGroups" data-ng-controller="groupsController">
+        <div class="row">
+            <div id="groupsView" class="col-sm-6 col-lg-5 col-lg-offset-1">
+                <h2>Groups</h2>
+                <div class="row">
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-primary" ng-click="createNewGroup()">New</button>
+                    </div>
+                    <div class="col-md-9 text-right">
+                        <br class="hidden-xs hidden-sm"/>
+                        Show:&amp;nbsp;
+                        <span style="display: inline-block;"><cris-radio-button-group name="groupStatus" orientation="horizontal" items="{'Show Enabled': 'true', 'Show Disabled': 'false', 'Show All': ''}" data-ng-model="enabledGroups"><!-- --></cris-radio-button-group></span>
+                    </div>
                 </div>
-
-            </form>
-
-        </div>
-    </div>
-
-    <br style="clear: both"/>
-    <p/>
-
-    <h2 style="text-align: center">Group Membership</h2>
-
-    <div id="users">
-        <div style="width: 44%; float: left; padding: 3px">
-            <h2>Users in the Group</h2>
-
-            <input id="buttonChangeOwner" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Change Owner"'/>
-
-            &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
-
-            <div style="display: inline">
-                Owner:&amp;nbsp;&amp;nbsp;<span id="ownerName"><!-- adfad --></span>
+                <br />
+                <cris-ui-grid column-defs="groupsColumnDefs" url="groupsUrl" grid-ref="groupsGridRef" enable-filtering="true" row-select-callback="groupRowSelectCallback(rowData)"><!----></cris-ui-grid>
             </div>
-
-            <div id="groupUsers"><!-- fix ff problem --></div>
+            <div id="detailsView" class="col-sm-6 col-lg-5 hidden-xs">
+                <div class="hidden-sm hidden-md hidden-lg">
+                    <button type="button" class="btn btn-default" ng-click="toggleDetailsView(null, true)"><span class="glyphicon glyphicon-chevron-left"></span>&amp;nbsp;Back to Groups List</button>
+                </div>
+                <h2>Details</h2>
+                <div class="text-center">{{currentAction}}</div>
+                <div ng-show="selectedGroup || isNewGroup">
+                    <table class="table table-striped">
+                        <tr>
+                            <td style="width: 15%">ID:</td>
+                            <td style="width: 85%">{{record.id}}</td>
+                        </tr>
+                        <tr>
+                            <td>Name:</td>
+                            <td><input type="text" ng-model="record.name" class="form-control" ng-disabled="isAdminUser()" /></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <div style="width:100%;" class="text-center">Description:</div>
+                                <textarea rows="5" class="form-control" ng-model="record.description" ng-disabled="isAdminUser()"><!----></textarea>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Dataset Owner:</td>
+                            <td>
+                                <span style="display: inline-block;"><cris-radio-button-group name="groupOwner" orientation="horizontal" items="{'Group': true, 'User': false, 'None': null}" read-only="{{isAdminUser()}}" data-ng-model="record.isGroupOwner"><!-- --></cris-radio-button-group></span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Enabled?</td>
+                            <td class="text-center"><input type="checkbox" ng-model="record.enabled" ng-true-value="true" ng-false-value="false" class="checkbox-inline" ng-disabled="isAdminUser()" /></td>
+                        </tr>
+                        <tr>
+                            <td>Time Created:</td>
+                            <td>{{getTimeCreated(record)}}</td>
+                        </tr>
+                        <tr>
+                            <td>Last Updated:</td>
+                            <td>{{getLastUpdated(record)}}</td>
+                        </tr>
+                    </table>
+                    <div class="pull-right">
+                        <button type="button" class="btn btn-primary" ng-click="save()" ng-disabled="isAdminUser() || (!selectedGroup &amp;&amp; !isNewGroup)">Save</button>
+                        &amp;nbsp;
+                        <button type="button" class="btn btn-primary" ng-click="reset()" ng-disabled="isAdminUser() || (!selectedGroup &amp;&amp; !isNewGroup)">Reset</button>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <div style="float: left; width: 10%; text-align: center">
-            <br/><br/><br/><br/><br/><br/><br/>
-            <br/><br/>
-            <input id="buttonAddToGroup" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "&lt;- Add"'/>
-            <br/><br/>
-            <input id="buttonRemoveFromGroup" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Remove -&gt;"'/>
-        </div>
-
-        <div style="width: 44%; float: right; padding: 3px">
-            <h2>Other Users</h2>
-
-            <div id="otherUsers"><!-- fix ff problem --></div>
+        
+        <div class="row" ng-show="selectedGroup">
+            <div class="col-xs-12 col-lg-10 col-lg-offset-1 text-center">
+                <h2>Group Membership</h2>
+                <div class="row">
+                    <div class="col-md-7">
+                        <h2>Users in the Group</h2>
+                        Group owner:&amp;nbsp;&amp;nbsp;{{selectedGroup.ownerId.firstName + ' ' + selectedGroup.ownerId.lastName}}
+                        <cris-ui-grid column-defs="groupUsersColumnDefs" url="groupUsersUrl" enable-row-select="false" grid-ref="groupUsersGridRef" enable-filtering="true"></cris-ui-grid>
+                    </div>
+                    <div class="col-md-5">
+                        <br class="hidden-md hidden-lg"/>
+                        <h2>Other Users</h2>
+                        <cris-ui-grid column-defs="usersColumnDefs" url="usersUrl" enable-row-select="false" grid-ref="usersGridRef" enable-filtering="true"><!----></cris-ui-grid>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script type="text/javascript">
         // <![CDATA[
-        cris.require('dijit/form/FilteringSelect');
-        cris.require('dijit/form/Form');
-        cris.require('dijit/form/SimpleTextarea');
-        cris.require("dijit/form/Button");
-        cris.require("dijit/form/RadioButton");
-        cris.require("dojox/data/JsonRestStore");
-        cris.require("dojox/grid/EnhancedGrid");
-        cris.require("dojox/grid/enhanced/plugins/Pagination");
-        cris.require("dojox/grid/enhanced/plugins/Selector");
-        cris.require("dojox/grid/enhanced/plugins/Filter");
-
-        var AdminGroupName = "Admin Group";
-
-        function isShowEnabled() {
-            var showEnabled = dijit.byId("idShowEnabled");
-            if (showEnabled.checked) {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        function updateGroupDetails(item) {
-            dojo.style(dojo.byId('groupDetail'), 'display', 'block');
-            if (item) {
-                var name = dijit.byId("name");
-                var description = dijit.byId("description");
-                var enabled = dijit.byId("enabled");
-                name.setValue(item.name);
-                description.setValue(item.description);
-                enabled.setValue(item.enabled || false);
-                dojo.byId("groupId").innerHTML = item.id;
-                dojo.byId("timeCreated").innerHTML = item.timeCreated ? dateIsoToLocale(item.timeCreated.$date) : "";
-                dojo.byId("lastUpdated").innerHTML = item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
-
-                var buttonSave = dijit.byId("buttonSave");
-                var buttonReset = dijit.byId("buttonReset");
-                var buttonChangeOwner = dijit.byId("buttonChangeOwner");
-
-                if (item.name === AdminGroupName) {
-                    name.set("disabled", true);
-                    description.set("disabled", true);
-                    enabled.set("disabled", true);
-
-                    buttonSave.set("disabled", true);
-                    buttonReset.set("disabled", true);
-                    buttonChangeOwner.set("disabled", true);
-                } else {
-                    name.set("disabled", false);
-                    description.set("disabled", false);
-                    enabled.set("disabled", false);
-
-                    buttonSave.set("disabled", false);
-                    buttonReset.set("disabled", false);
-                    buttonChangeOwner.set("disabled", false);
-                }
-            }
-        }
-
-        function updateGroupStore(item) {
-            var name = dijit.byId("name");
-            var description = dijit.byId("description");
-            var enabled = dijit.byId("enabled");
-
-            storeGroups.setValue(item, "name", name.getValue());
-            storeGroups.setValue(item, "description", description.getValue());
-            storeGroups.setValue(item, "enabled", enabled.getValue() === "on");
-        }
-
-        function isModyfiled(item) {
-            var modified = false;
-            var name = dijit.byId("name");
-            var description = dijit.byId("description");
-            var enabled = dijit.byId("enabled");
-
-            if (item.name !== name.getValue()) {
-                modified = true;
-            }
-            if (item.description !== description.getValue()) {
-                modified = true;
-            }
-            if ((item.enabled || false) !== (enabled.getValue() === "on")) {
-                modified = true;
-            }
-
-            return modified;
-        }
-
-        cris.ready(function() {
-
-            storeGroups = createJsonRestStore("${urlGroups}");
-            storeUsers = createJsonRestStore("${urlUsers}");
-            storeGroupUsers = createJsonRestStore("${urlGroupUsers}");
-
-            var layoutGroups = [{cells: [
-                        {field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true},
-                        {field: 'name', name: 'Name', width: 'auto'}
-                    ]}];
-
-            var layoutUsers = [{cells: [
-                        {field: 'id', name: 'ID', datatype: "number", width: '50px', hidden: true},
-                        {field: 'lastName', name: 'Last Name', width: 'auto'},
-                        {field: 'firstName', name: 'First Name', width: 'auto'},
-                        {field: 'username', name: 'User Name', width: 'auto'}
-                    ]}];
-
-            var asc = true;
-            var args = {
-                rowsPerPage: 10,
-                pageSizes: []
-            };
-
-            args.sortFields = [{attribute: "name", descending: !asc}];
-            args.query = {enabled: true};
-            gridGroups = createGrid(storeGroups, layoutGroups, "groups", args);
-            gridGroups.setSortIndex(1, asc);
-
-            args.sortFields = [{attribute: "lastName", descending: !asc}];
-            args.query = {enabled: true, groupId: 0};
-            gridGroupUsers = createGrid(storeUsers, layoutUsers, "groupUsers", args);
-            gridGroupUsers.setSortIndex(1, asc);
-
-            args.query = {enabled: true};
-            gridOtherUsers = createGrid(storeUsers, layoutUsers, "otherUsers", args);
-            gridOtherUsers.setSortIndex(1, asc);
-
-            dojo.connect(gridGroups, "onSelected", function(index) {
-                var item = gridGroups.getItem(index);
-
-                updateGroupDetails(item);
-                var query = {groupId: item.id};
-                if (isShowEnabled()) {
-                    query.enabled = true;
-                } else {
-                    delete query.enabled;
-                }
-                gridGroupUsers.setQuery(query);
-                var ownerName = dojo.byId("ownerName");
-                if (item.ownerId) {
-                    if (storeGroups.isItemLoaded(item.ownerId)) {
-                        ownerName.innerHTML = item.ownerId.firstName + ' ' + item.ownerId.lastName;
-                    } else {
-                        storeGroups.loadItem({item: item.ownerId, onItem: function(item) {
-                                ownerName.innerHTML = item.firstName + ' ' + item.lastName;
-                            }});
+        angular.module('crisGroups', ["angular-dojo"]).controller('groupsController', ['$scope', '$http', '$uibModal', function ($scope, $http, $uibModal) {
+            $scope.enabledGroups = "true"; // by default show enabled groups
+            
+            // groups grid properties
+            $scope.groupsUrl = "${urlGroups}" + '/?' + 'enabled=true&sort(+name)';
+            $scope.groupsColumnDefs = [
+                {field: 'id', name: 'id', displayName: 'ID', width: 60, visible: false},
+                {field: 'name', name: 'name', displayName: 'Name', minWidth: 120}
+            ];
+            
+             // group-users grid properties
+            $scope.groupUsersUrl = "${urlUsers}" + '/?' + 'enabled=true&groupId=0&sort(+lastName)';
+            $scope.groupUsersColumnDefs = [
+                {field: 'id', name: 'id', displayName: 'ID', width: 60, visible: false},
+                {field: 'lastName', name: 'Last Name', displayName: 'Last Name', minWidth: 100},
+                {field: 'firstName', name: 'First Name', displayName: 'First Name', minWidth: 100},
+                {field: 'username', name: 'User Name', displayName: 'User Name', minWidth: 100},
+                {field: '_makeGroupUser', name: '_makeGroupUser', displayName: '', minWidth: 120, enableFiltering: false, enableSorting: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP"><a ng-hide="row.entity.username===grid.appScope.gridRef.selectedGroup.ownerId.username" href="" ng-click="grid.appScope.gridRef.makeUserGroupOwner(row.entity.id)">Make Group Owner</a><span ng-show="row.entity.username===grid.appScope.gridRef.selectedGroup.ownerId.username">Group Owner</span></div>'},
+                {field: '_removeUser', name: '_removeUser', displayName: 'Remove', width: 65, enableFiltering: false, enableSorting: false, cellTemplate: '<div class="ui-grid-cell-contents text-center" title="TOOLTIP"><a ng-click="grid.appScope.gridRef.removeUser(row.entity.id)"><span class="glyphicon glyphicon-remove"></span></a></div>'}
+            ];
+            
+            // all-users grid properties
+            $scope.usersUrl = "${urlUsers}" + '/?' + 'enabled=true&sort(+lastName)';
+            $scope.usersColumnDefs = [
+                {field: 'id', name: 'id', displayName: 'ID', width: 60, visible: false},
+                {field: 'lastName', name: 'Last Name', displayName: 'Last Name', minWidth: 100},
+                {field: 'firstName', name: 'First Name', displayName: 'First Name', minWidth: 100},
+                {field: 'username', name: 'User Name', displayName: 'User Name', minWidth: 100},
+                {field: '_addUser', name: '_addUser', displayName: 'Add', width: 60, enableFiltering: false, enableSorting: false, cellTemplate: '<div class="ui-grid-cell-contents text-center" title="TOOLTIP"><a ng-click="grid.appScope.gridRef.addUser(row.entity.id)"><span class="glyphicon glyphicon-plus"></span></a></div>'}
+            ];
+            
+            $scope.currentAction = "No group selected";
+            
+            $scope.record = {};
+            $scope.$watch('enabledGroups', function (newValue, oldValue) {
+                if (newValue !== oldValue) {
+                    if (newValue === '') { // all groups
+                        $scope.groupsUrl = "${urlGroups}" + '/?sort(+name)';
+                    } else if (newValue === 'true') { // enabled groups
+                        $scope.groupsUrl = "${urlGroups}" + '/?enabled=true&sort(+name)';
+                    } else { // disabled groups
+                        $scope.groupsUrl = "${urlGroups}" + '/?enabled=false&sort(+name)';
                     }
-                } else {
-                    ownerName.innerHTML = "(none)";
+                    clearDetails();
+                    refreshGrid();
                 }
-
-                var query = {groupId: -item.id};
-                if (isShowEnabled()) {
-                    query.enabled = true;
-                }
-                gridOtherUsers.setQuery(query);
+                $scope.isNewGroup = false;
             });
-
-            var buttonSave = dijit.byId("buttonSave");
-            dojo.connect(buttonSave, "onClick", function(evt) {
-                if (gridGroups.selection.getSelectedCount("row") >= 1) {
-                    // existing group
-                    var item = gridGroups.selection.getSelected("row")[0];
-
-                    var modified = isModyfiled(item);
-                    if (modified) {
-                        updateGroupStore(item)
-                        var pd = createProgressDialog();
-                        storeGroups.save({
-                            onComplete: function(data) {
-                                var xhr = data[0].deferred.ioArgs.xhr.response;
-                                var object = JSON.parse(xhr);
-                                
-                                var query = {};
-                                if (isShowEnabled()) {
-                                    query.enabled = true;
-                                }
-                                
-                                if (object.error) {
-                                    gridGroups.setQuery(query);
-                                    pd.setContent("Failed to save changes. " + object["error"].message + ": " + object["error"].status);
+            
+            // After groups grid init, append functions to it's groupApi for access within the group cell template
+            $scope.$watch('groupUsersGridRef', function (newValue, oldValue) {
+                if (newValue && !newValue.makeUserGroupOwner) {
+                    newValue.makeUserGroupOwner = function (userId) {
+                        
+                        var _data = angular.copy($scope.selectedGroup);
+                        _data.ownerId = {$ref: cris.baseUrl + "users/" + userId};
+                        var progressModal = showProgressModal({uibModal: $uibModal});
+                        $http({
+                            url: "${urlGroups}/" + $scope.selectedGroup.id,
+                            method: "PUT",
+                            data: _data
+                        }).then(function (success) {
+                            progressModal.close();
+                            refreshGrid(true);
+                        }, function (error) {
+                            progressModal.close();
+                            showMessageModal({uibModal: $uibModal, message: "Failed to change owner. " + error.data});
+                        })
+                    };
+                }
+                
+                if (newValue && !newValue.removeUser) {
+                    newValue.removeUser = function (userId) {
+                        var progressModal = showProgressModal({uibModal: $uibModal});
+                        $http({
+                            url: "${urlGroupUsers}?userId=" + userId + "&groupId=" + $scope.selectedGroup.id,
+                            method: "GET"
+                        }).then(function (success) {
+                            var groupUserId = success.data.id;
+                            $http({
+                                url: "${urlGroupUsers}"+ groupUserId,
+                                method: "DELETE"
+                            }).then(function (success) {
+                                var response = success.data;
+                                if (response && response.message) {
+                                    progressModal.close();
+                                    showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + response.message});
+                                    return;
                                 } else {
-                                    gridGroups.setQuery(query);
-                                    updateGroupDetails(object);
-                                    pd.hide();
+                                    $scope.groupUsersGridRef.refreshGrid();
+                                    $scope.usersGridRef.refreshGrid();
+                                    progressModal.close();
                                 }
-                            },
-                            onError: function(error) {
+                            }, function (error) {
+                                progressModal.close();
                                 var message;
-                                if (error.responseText) {
-                                    var data = dojo.fromJson(error.responseText);
-                                    message = data.exception.message;
+                                if (error.data && error.data.responseText) {
+                                    message = JSON.parse(error.data.responseText).exception.message;
                                 } else {
-                                    message = error;
+                                    message = error.data.message;
                                 }
-                                pd.setContent("Failed to save changes: " + message);
-                            }
+                                showMessageModal({uibModal: $uibModal, message: "Failed: " + message});
+                            });
+                        }, function (error) {
+                            
                         });
-                    } else {
-                        showMessage("No change is made");
-                    }
-                } else {
-                    // new group
-                    var name = dijit.byId("name");
-                    if (name.getValue() == "") {
-                        showMessage("You must provide a name for the group");
+                    };
+                }
+            });
+            
+            // After group users grid init, append functions to it's groupApi for access within the group cell template
+            $scope.$watch('usersGridRef', function (newValue, oldValue) {
+                if (newValue && !newValue.addUser) {
+                    newValue.addUser = function (userId) {
+                        var groupId = $scope.selectedGroup.id;
+                        var progressModal = showProgressModal({uibModal: $uibModal});
+                        $http({
+                            url: "${urlGroupUsers}",
+                            method: "POST",
+                            data: {
+                                userId: {$ref: cris.baseUrl + "users/" + userId},
+                                groupId: {$ref: cris.baseUrl + "groups/" + groupId}
+                            }
+                        }).then(function (success) {
+                            var response = success.data;
+                            if (response.error) {
+                                progressModal.close();
+                                showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + response.error.message + " " + response.error.status});
+                                return;
+                            } else {
+                                $scope.groupUsersGridRef.refreshGrid();
+                                $scope.usersGridRef.refreshGrid();
+                                progressModal.close();
+                            }
+                        }, function (error) {
+                            progressModal.close();
+                            var message;
+                            if (error.data && error.data.responseText) {
+                                message = dojo.fromJson(error.data.responseText).exception.message;
+                            } else {
+                                message = error.data.message;
+                            }
+                            showMessageModal({uibModal: $uibModal, message: "Error: " + message});
+                        });
+                    };
+                }
+            });
+            
+            $scope.save = function () {
+                var data;
+                var method;
+                if ($scope.isNewGroup) {
+                    if (!$scope.record.name) {
+                        showMessageModal({uibModal: $uibModal, message: "You must provide a name for the group"});
                         return;
                     }
-
-                    var yes = showConfirm("Do you want to create a new group: " + name.getValue() + "?");
-                    if (yes) {
-                        var pd = createProgressDialog();
-                        var itemGroup = storeGroups.newItem();
-                        var description = dijit.byId("description");
-                        var enabled = dijit.byId("enabled");
-
-                        storeGroups.setValue(itemGroup, "name", name.getValue());
-                        storeGroups.setValue(itemGroup, "description", description.getValue());
-                        storeGroups.setValue(itemGroup, "enabled", enabled.getValue() === "on");
-                        storeGroups.save({
-                            onComplete: function(data) {
-                                var xhr = data[0].deferred.ioArgs.xhr.response;
-                                var object = JSON.parse(xhr);
-                                
-                                var query = {};
-                                if (isShowEnabled()) {
-                                    query.enabled = true;
-                                }
-                                
-                                if (object.error) {
-                                    gridGroups.setQuery(query);
-                                    pd.setContent("Failed to save changes. " + object["error"].message + ": " + object["error"].status);
-                                } else {
-                                    gridGroups.setQuery(query);
-                                    pd.hide();
-                                }
-                            },
-                            onError: function(error) {
-                                pd.setContent("Failed to save changes. " + error);
-                            }
-                        });
-                    }
-                }
-            });
-
-            var buttonReset = dijit.byId("buttonReset");
-            dojo.connect(buttonReset, "onClick", function(evt) {
-                var name = dijit.byId("name");
-                var description = dijit.byId("description");
-                var enabled = dijit.byId("enabled");
-                if (gridGroups.selection.getSelectedCount("row") >= 1) {
-                    var item = gridGroups.selection.getSelected("row")[0];
-                    name.setValue(item.name);
-                    description.setValue(item.description);
-                    enabled.set("checked", item.enabled);
+                    data = $scope.record;
+                    method = "POST";
                 } else {
-                    name.setValue("");
-                    description.setValue("");
-                    enabled.set("checked", true);
-                }
-            });
-
-            var buttonChangeOwner = dijit.byId("buttonChangeOwner");
-            dojo.connect(buttonChangeOwner, "onClick", function(evt) {
-                if (gridGroupUsers.selection.getSelectedCount("row") >= 1) {
-                    var itemUser = gridGroupUsers.selection.getSelected("row")[0];
-                    var itemGroup = gridGroups.selection.getSelected("row")[0];
-                    if (itemGroup.ownerId && itemUser.id === itemGroup.ownerId.id) {
-                        showMessage("You selected the current owner");
+                    if ($scope.selectedGroup) {
+                        if (!isModified()) {
+                            showMessageModal({uibModal: $uibModal, message: "No change is made"});
+                            return;
+                        }
+                        data = $scope.selectedGroup;
+                        data.name = $scope.record.name;
+                        data.description = $scope.record.description;
+                        data.enabled = $scope.record.enabled;
+                        data.isGroupOwner = $scope.record.isGroupOwner;
+                        method = "PUT";
                     } else {
-                        var pd = createProgressDialog();
-                        storeGroups.setValue(itemGroup, "ownerId", itemUser);
-                        storeGroups.save({
-                            onComplete: function() {
-                                var ownerName = dojo.byId("ownerName");
-                                ownerName.innerHTML = itemUser.firstName + ' ' + itemUser.lastName;
-                                pd.hide();
-                            },
-                            onError: function(error) {
-                                pd.setContent("Failed to change owner. " + error);
-                            }
-                        });
+                        showMessageModal({uibModal: $uibModal, message: "Please select a group"});
+                        return;
                     }
+                }
+                $scope.isNewGroup = false;
+                
+                var progressModal = showProgressModal({uibModal: $uibModal});
+                $http({
+                    url: "${urlGroups}" + (method === "PUT" ? "/" + data.id : ""),
+                    method: method,
+                    data: data
+                }).then(function (success) {
+                    var response = success.data;
+                    if (response.hasError) {
+                        showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + response.message + " " + response.status});
+                        progressModal.close();
+                        return;
+                    }
+                    refreshGrid(true);
+                    progressModal.close();
+                }, function (error) {
+                    var message;
+                    if (error.data && error.data.text) {
+                        message = JSON.parse(error.data.text).message;
+                    } else {
+                        message = error.data;
+                    }
+                    progressModal.close();
+                    showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + message});
+                });
+            };
+            
+            $scope.groupRowSelectCallback = function (rowData) { // on group selected
+                $scope.isNewGroup = false;
+                $scope.record = angular.copy(rowData);
+                $scope.selectedGroup = rowData;
+                $scope.toggleDetailsView(true);
+                
+                // update group users grid
+                $scope.groupUsersUrl = "${urlUsers}" + '/?' + 'enabled=true&groupId=' + rowData.id + '&sort(+lastName)';
+                $scope.groupUsersGridRef.refreshGrid();
+                $scope.groupUsersGridRef.selectedGroup = rowData; // We need access to selected group data within the group users grid
+                
+                // update url for other users (not in selected group)
+                $scope.usersUrl = "${urlUsers}" + '/?' + 'enabled=true&groupId=-' + rowData.id + '&sort(+lastName)';
+                $scope.usersGridRef.refreshGrid();
+                $scope.currentAction = "Edit selected group";
+            };
+                
+            $scope.createNewGroup = function () {
+                $scope.isNewGroup = true;
+                clearDetails();
+                $scope.record = {};
+                $scope.toggleDetailsView(true);
+                $scope.currentAction = "Create a new group";
+            };
+            
+            $scope.reset = function () {
+                if ($scope.selectedGroup) {
+                    $scope.record = angular.copy($scope.selectedGroup);
                 } else {
-                    showMessage("No user selected");
+                    $scope.record = {};
                 }
-            });
-
-            var buttonAdd = dijit.byId("buttonAddToGroup");
-            dojo.connect(buttonAdd, "onClick", function(evt) {
-                if (gridGroups.selection.getSelectedCount("row") !== 1) {
-                    showMessage("Please select a group");
-                    return;
-                }
-                if (gridOtherUsers.selection.getSelectedCount("row") !== 1) {
-                    showMessage("Please select a user");
-                    return;
-                }
-
-                var itemGroup = gridGroups.selection.getSelected("row")[0];
-                var itemUser = gridOtherUsers.selection.getSelected("row")[0];
-                var pd = createProgressDialog();
-                var itemGroupUser = storeGroupUsers.newItem();
-                itemGroupUser.groupId = itemGroup;
-                itemGroupUser.userId = itemUser;
-                storeGroupUsers.save({
-                    onComplete: function(data) {
-                        var xhr = data[0].deferred.ioArgs.xhr.response;
-                        var object = JSON.parse(xhr);
-                        if (object.error) {
-                            pd.setContent("Failed to save changes. " + object["error"].message + ": " + object["error"].status);
-                        } else {
-                            gridGroupUsers.setQuery({groupId: itemGroup.id, enabled: true});
-                            gridOtherUsers.setQuery({groupId: -itemGroup.id, enabled: true});
-                            pd.hide();
-                        }
-                    },
-                    onError: function(error) {
-                        var message;
-                        if (error.responseText) {
-                            var data = dojo.fromJson(error.responseText);
-                            message = data.exception.message;
-                        } else {
-                            message = error;
-                        }
-                        pd.setContent("Failed: " + message);
+            };
+            
+            // On smaller screens toggle between projects view and details view
+            $scope.toggleDetailsView = function (doShow, clearSelection) {
+                if (doShow) {
+                    $('#detailsView').removeClass('hidden-xs');
+                    $('#groupsView').addClass('hidden-xs');
+                } else {
+                    $('#detailsView').addClass('hidden-xs');
+                    $('#groupsView').removeClass('hidden-xs');
+                    if (clearSelection) {
+                        clearSelected();
                     }
-                });
-            });
-
-            var buttonRemove = dijit.byId("buttonRemoveFromGroup");
-            dojo.connect(buttonRemove, "onClick", function(evt) {
-                if (gridGroups.selection.getSelectedCount("row") !== 1) {
-                    showMessage("Please select a group");
-                    return;
                 }
-                if (gridGroupUsers.selection.getSelectedCount("row") !== 1) {
-                    showMessage("Please select a user");
-                    return;
+            };
+            
+            $scope.getTimeCreated = function (record) {
+                return record && record.timeCreated && record.timeCreated.$date ? dateIsoToLocale(record.timeCreated.$date) : "";
+            };
+            
+            $scope.getLastUpdated = function (record) {
+                return record && record.timeUpdated && record.timeUpdated.$date ? dateIsoToLocale(record.timeUpdated.$date) : "";
+            };
+            
+            $scope.isAdminUser = function () {
+                var result = false;
+                if ($scope.selectedGroup) { // only enable some buttons for administrators
+                    result = ($scope.selectedGroup.name === 'Admin Group');
                 }
-
-                var itemGroup = gridGroups.selection.getSelected("row")[0];
-                var itemUser = gridGroupUsers.selection.getSelected("row")[0];
-                var pd = createProgressDialog();
-                storeGroupUsers.fetch({
-                    query: {groupId: itemGroup.id, userId: itemUser.id},
-                    onComplete: function(item, request) {
-                        if (item) {
-                            storeGroupUsers.deleteItem(item);
-                            storeGroupUsers.save({
-                                onComplete: function(data) {
-                                    var xhr = data[0].deferred.ioArgs.xhr.response;
-                                    if (xhr == "") {
-                                        gridGroupUsers.setQuery({groupId: itemGroup.id, enabled: true});
-                                        gridOtherUsers.setQuery({groupId: -itemGroup.id, enabled: true});
-                                        pd.hide();
-
-                                    } else {
-                                        var object = JSON.parse(xhr);
-                                        if (object.message) {
-                                            pd.setContent("Failed to save changes. " + object.message);
-                                        }
-                                    }
-                                },
-                                onError: function(error) {
-                                    var message;
-                                    if (error.responseText) {
-                                        var data = dojo.fromJson(error.responseText);
-                                        message = data.exception.message;
-                                    } else {
-                                        message = error;
-                                    }
-                                    pd.setContent("Failed: " + message);
-                                }
-                            });
-                        } else {
-                            pd.setContent("Unable to remove user from group. Error: user is not in the group");
-                        }
-                    },
-                    onError: function(error, request) {
-                        pd.setContent("Unable to remove user from group. " + error);
+                return result;
+            };
+            
+            function refreshGrid (restoreSelection) {
+                if ($scope.groupsGridRef) {
+                    if (restoreSelection && $scope.selectedGroup) {
+                        $scope.groupsGridRef.refreshGrid(function () {
+                            $scope.groupsGridRef.selectRow($scope.selectedGroup.id, "id");
+                        });
+                    } else {
+                        $scope.groupsGridRef.refreshGrid();
                     }
-                });
-            });
-
-            var buttonNew = dijit.byId("buttonNew");
-            dojo.connect(buttonNew, "onClick", function(evt) {
-                dojo.style(dojo.byId('groupDetail'), 'display', 'block');
-                gridGroups.selection.clear();
-
-                var name = dijit.byId("name");
-                var description = dijit.byId("description");
-                var enabled = dijit.byId("enabled");
-
-                dojo.byId("groupId").innerHTML = "";
-                name.setValue("");
-                description.setValue("");
-                enabled.set("checked", true);
-                console.log(enabled.get("value"));
-                console.log(enabled.get("checked"));
-                dojo.byId("timeCreated").innerHTML = "";
-                dojo.byId("lastUpdated").innerHTML = "";
-
-                gridGroupUsers.setQuery({groupId: 0});
-                gridOtherUsers.setQuery({});
-            });
-
-            dojo.connect(dijit.byId("idShowEnabled"), "onClick", function(evt){
-                console.log("enabled");
-                gridGroups.setQuery({enabled: true});
-
-                var query = gridGroupUsers.query;
-                query.enabled = true;
-                gridGroupUsers.setQuery(query);
-
-                query = gridOtherUsers.query;
-                query.enabled = true;
-                gridOtherUsers.setQuery(query);
-            });
-
-            dojo.connect(dijit.byId("idShowAll"), "onClick", function(evt){
-                console.log("all");
-                gridGroups.setQuery({});
-
-                var query = gridGroupUsers.query;
-                delete query.enabled;
-                gridGroupUsers.setQuery(query);
-
-                query = gridOtherUsers.query;
-                delete query.enabled;
-                gridOtherUsers.setQuery(query);
-            });
-        });
+                }
+            }
+            
+            function isModified () {
+                var modified = false;
+                if ($scope.record.name !== $scope.selectedGroup.name) {
+                    modified = true;
+                }
+                if ($scope.record.description !== $scope.selectedGroup.description) {
+                    modified = true;
+                }
+                if ($scope.record.enabled !== $scope.selectedGroup.enabled) { // record boolean is string
+                    modified = true;
+                }
+                if ($scope.record.isGroupOwner !== $scope.selectedGroup.isGroupOwner) { // record boolean is string
+                    modified = true;
+                }
+                return modified;
+            } 
+            
+            function clearSelected () {
+                if ($scope.groupsGridRef) {
+                    $scope.groupsGridRef.clearSelection();
+                }
+                $scope.selectedGroup = null;
+                
+                // reset group users grid
+                if ($scope.groupUsersGridRef) {
+                    $scope.groupUsersUrl = "${urlUsers}" + '/?' + 'enabled=true&groupId=0&sort(+lastName)';
+                    $scope.groupUsersGridRef.refreshGrid();
+                    $scope.groupUsersGridRef.selectedGroup = {};
+                }
+                
+                // reset other group users grid
+                if ($scope.usersGridRef) {
+                    $scope.usersUrl = "${urlUsers}" + '/?' + 'enabled=true&sort(+lastName)';
+                    $scope.usersGridRef.refreshGrid();
+                }
+                $scope.currentAction = "No group selected";
+            }
+            
+            function clearDetails () {
+                clearSelected();
+                $scope.record = {};
+            }
+        }]);
+        cris.bootstrapAngular("idGroups", "crisGroups");
         // ]]>
     </script>
 

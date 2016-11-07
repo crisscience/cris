@@ -8,50 +8,139 @@
 
     <jsp:output omit-xml-declaration="yes"/>
 
-    <spring:url value="/viewpjtds/" var="url"/>
-    <spring:url value="/download/" var="urlDownload"/>
-    <spring:url value="/templates/" var="urlTemplates"/>
-    <spring:url value="/users/" var="urlUsers"/>
-    <spring:url value="/templates/terms" var="urlTemplateTerms"/>
-    <spring:url value="/search/search/" var="urlSearch"/>
+    <style>
+        /*TODO: reset: should be removed after cleaning up standard.css  */
+        label {
+            width: auto;
+            float: none;
+            font-weight: normal;
+        }
+    </style>
 
-    <div id="idSearch">
-        <div style="width: 100%; min-height: 900px" data-ng-controller="SearchController">
-            <fieldset style="width: 98%;">
-                <legend>CRIS Search</legend>
-                <div class="floatRight">
-                    Advanced Search: <input id='idCheckBoxAdvancedSearch' type="checkbox" data-dojo-type="dijit.form.CheckBox"/>
-                </div>
+    <div id="idSearch" data-ng-controller="SearchController">
+        <!-- query -->
+        <div class="well">
+            <div>
+                <span class="pull-left">CRIS Search</span>
 
-                <div id='idNormal'>
-                    &amp;nbsp;
-                    &amp;nbsp;
-                    <input id="idNormalInput" type="text" data-dojo-type="dijit.form.TextBox" style='width: 500px;'/>&amp;nbsp;
-                    <input id='idButtonSearch' type="button" data-dojo-type="dijit.form.Button" data-dojo-props="label : 'Search'"/>
-                </div>
-
-                <br class='clearBoth'/>
-
-                <div id="idAdvanced" style='display: none;'>
-                    <div id="idAdvancedInput">
-                        <!-- advanced search widgets are constructed dynamically -->
+                <span class="pull-right">
+                    <div class="checkbox-inline">
+                        <label>
+                            <input type="checkbox" data-ng-model="advanced"/>
+                            Advanced
+                        </label>
                     </div>
-                    <p>
-                        <input class="floatRight" id='idButtonAdvancedSearch' type="button" data-dojo-type="dijit.form.Button" data-dojo-props="label : 'Search'"/>
-                    </p>
-                </div>
-            </fieldset>
-            <hr/>
-            <div id='idSearchResult'>
-                <!-- Search result -->
+                </span>
+
+                <div class="clearfix"><!-- --></div>
             </div>
 
-            <!-- Detailed view -->
-            <div data-ng-show="showDetailedView">
-                <h4> <a href="" ng-click="reSearchProject()">Project : {{project != null ? project.name : ("N/A")}}</a></h4>
-                <h4> <a href="" ng-click="reSearchExperiment()">Experiment : {{experiment != null ? experiment.name : ("N/A")}}</a></h4>
-                <h4> <a href="" ng-click="reSearchJob()">Job : {{job != null ? job.name : ("N/A")}}</a></h4>
-                <cris-dataset term="term" dataset="data" message="message" read-only="readOnly" context="data"><!--  --></cris-dataset>
+            <div>
+                <form data-ng-submit="searchGeneral(keywords, userId, projectId, experimentId, jobId, dateFrom, dateTo, advanced)">
+                    <div class="input-group">
+                        <input type="search" class="form-control" data-ng-model="keywords" placeholder="Search for..." data-ng-keypress="$event.which === 13 ? searchGeneral(keywords, userId, projectId, experimentId, jobId, dateFrom, dateTo, advanced) : angular.noop()"/>
+                        <div class="input-group-addon">
+                            <span class="glyphicon glyphicon-search" data-ng-click="searchGeneral(keywords, userId, projectId, experimentId, jobId, dateFrom, dateTo, advanced)"><!-- --></span>
+                        </div>
+                    </div>
+
+                    <div class="input-group" data-ng-show="advanced">
+                        Filters:
+                        <div>
+                            <!-- date range -->
+                            <span class="input-group">
+                                <span class="input-group-addon">Date From</span>
+                                <input type="text" class="form-control" data-uib-datepicker-popup="" data-ng-model="dateFrom" data-is-open="status.dateFrom.opened" data-min-date="minDate" data-max-date="maxDate" data-datepicker-options="dateOptions" data-date-disabled="disabled(date, mode)" data-ng-required="true" data-close-text="Close" />
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default" data-ng-click="status.dateFrom.opened = true"><i class="glyphicon glyphicon-calendar"><!----></i></button>
+                                </span>
+                            </span>
+                            <span class="input-group">
+                                <span class="input-group-addon">Date To</span>
+                                <input type="text" class="form-control" data-uib-datepicker-popup="" data-ng-model="dateTo" data-is-open="status.dateTo.opened" data-min-date="minDate" data-max-date="maxDate" data-datepicker-options="dateOptions" data-date-disabled="disabled(date, mode)" data-ng-required="true" data-close-text="Close" />
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default" data-ng-click="status.dateTo.opened = true"><i class="glyphicon glyphicon-calendar"><!----></i></button>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="input-group">
+                            <!-- drop-down user list -->
+                            <span class="input-group-addon">User</span>
+                            <select class="form-control" data-ng-model="userId">
+                                <option value="">Please select</option>
+                                <option data-ng-repeat="user in users" value="{{user.id}}">{{user.firstName + " " + user.lastName}}</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <!-- drop-down project list -->
+                            <span class="input-group-addon">Project</span>
+                            <select class="form-control" data-ng-model="projectId">
+                                <option value="">Please select</option>
+                                <option data-ng-repeat="project in projects" value="{{project.id}}">{{project.name}}</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <!-- drop-down experiment list -->
+                            <span class="input-group-addon">Experiment</span>
+                            <select class="form-control" data-ng-model="experimentId">
+                                <option value="">Please select</option>
+                                <option data-ng-repeat="experiment in experiments" value="{{experiment.id}}">{{experiment.name}}</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <!-- drop-down job list -->
+                            <span class="input-group-addon">Job</span>
+                            <select class="form-control" data-ng-model="jobId">
+                                <option value="">Please select</option>
+                                <option data-ng-repeat="job in jobs" value="{{job.id}}">{{job.name}}</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- search result -->
+        <div class="well">
+            <!-- pagination -->
+            <div data-ng-show="data.data.hits.total">
+                <div>About <span class="badge">{{data.data.hits.total}}</span> results ({{data.data.took}}ms)</div>
+                <data-uib-pagination data-total-items="data.data.hits.total" data-items-per-page="itemsPerPage" data-max-size="5" data-ng-model="currentPage" data-ng-change="pageChanged()" data-boundary-links="true" previous-text="&lt;" next-text="&gt;" first-text="&lt;&lt;" last-text="&gt;&gt;"><!-- --></data-uib-pagination>
+            </div>
+
+            <!-- errors -->
+            <data-cris-error class="text-warning" data-ng-show="hasError()" data-error="error">
+                <!-- -->
+            </data-cris-error>
+
+            <!-- results -->
+            <data-cris-search-result data-ng-hide="hasError()" data-on-select="onSelect" data-data="data">
+                <!-- -->
+            </data-cris-search-result>
+        </div>
+
+        <!-- detailed view -->
+        <div class="well">
+            <div data-ng-show='inProgress'>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" style="width: 100%">
+                        <span class="sr-only">0% Complete</span>
+                    </div>
+                </div>
+            </div>
+
+            <div data-ng-hide='inProgress'>
+                <div data-ng-show="showDetailedView">
+                    Search again for:
+                    <span class="label label-info" data-ng-show="user"><a href="" data-ng-click="searchUser(user)">User : {{user != null ? user.firstName + " " + user.lastName : ("N/A")}}</a></span>&amp;nbsp;
+                    <span class="label label-info" data-ng-show="project"><a href="" data-ng-click="searchProject(project)">Project : {{project != null ? project.name : ("N/A")}}</a></span>&amp;nbsp;
+                    <span class="label label-info" data-ng-show="experiment"><a href="" data-ng-click="searchExperiment(experiment)">Experiment : {{experiment != null ? experiment.name : ("N/A")}}</a></span>&amp;nbsp;
+                    <span class="label label-info" data-ng-show="job"><a href="" data-ng-click="searchJob(job)">Job : {{job != null ? job.name : ("N/A")}}</a></span>
+
+                    <p><span class="label label-info">Details:</span></p>
+                    <div class="alert alert-warning" data-ng-show="error.message">{{error.message}}</div>
+                    <cris-dataset term="term" dataset="doc" message="message" read-only="readOnly" context="doc"><!--  --></cris-dataset>
+                </div>
             </div>
         </div>
     </div>
@@ -62,1187 +151,9 @@
     <c:set value="${jsRoot}/dm/SearchController.js" var="url" />
     <script type="text/javascript" src="${url}"><!-- --></script>
 
-    <style>
-        table table {
-            margin: 0px;
-            border: 0px;
-            padding: 0px;
-        }
-    </style>
-
     <script type="text/javascript">
         //<![CDATA[
-        cris.require('dijit/Editor');
-        cris.require('dijit/Tree');
-        cris.require('dijit/layout/BorderContainer');
-        cris.require('dojox/layout/ContentPane');
-        cris.require("dijit/layout/TabContainer");
-        cris.require('dojox/layout/ExpandoPane');
-        cris.require('dojox/grid/TreeGrid');
-        cris.require('dijit/form/Form');
-        cris.require("dijit/form/Button");
-        cris.require("dijit/form/FilteringSelect");
-        cris.require("dijit/form/RadioButton");
-        cris.require("dijit/form/TextBox");
-        cris.require("dijit/form/SimpleTextarea");
-        cris.require("dojo/store/JsonRest");
-        cris.require("dijit/Dialog");
-        cris.require("dojo/store/Memory");
-        cris.require("dojox/data/HtmlTableStore");
-        cris.require("dojox/data/JsonRestStore");
-        cris.require("dojo/json");
-
-        function isDisplayField(fieldName) {
-            if (fieldName !== "_id"
-            && fieldName !== "_context_id"
-            && fieldName !== "_project_id"
-            && fieldName !== "_experiment_id"
-            //&& fieldName !== "_job_id"
-            && fieldName !== "_task_id"
-            && fieldName !== "_site_uuid"
-            && fieldName !== "_tenant_uuid"
-            && fieldName !== "_tenant_id"
-            && fieldName !== "_creator_id"
-            && fieldName !== "_updater_id"
-//            && fieldName !== "_time_created"
-//            && fieldName !== "_time_updated"
-            && fieldName !== "_template_version"
-            && fieldName !== "_user_permission") {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        function isLessImportantField(fieldName) {
-            if (fieldName == '_time_updated' ||
-                fieldName == '_time_created') {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        function generateHead(json) {
-            var html = "<table class='form'><tbody>";
-
-            // Set the HTML Table Header for an array of object
-            html += "<tr>";
-//            var keysToProcessLater = new Array();
-            for (var key in json) {
-                if (json.hasOwnProperty(key) && isDisplayField(key)) {
-//                    if (!isLessImportantField(key)) {
-                      html += "<th style=\"font-weight: bold;\">" + prettyPrint(key, "_") + "<br></th>";
-//                    } else {
-//                        keysToProcessLater.push(key);
-//                    }
-                }
-            }
-
-//            for (var i = 0; i < keysToProcessLater.length; i++) {
-//                html += "<th style=\"font-weight: bold;\">" + prettyPrint(keysToProcessLater[i], "_") + "<br></th>";
-//            }
-
-            html += "</tr>";
-
-            return html;
-        }
-
-        function generateFoot() {
-            html = "</tbody></table>";
-
-            return html;
-        }
-
-        function jsonToHtml(json, noheading) {
-            var html = "";
-
-            if (json instanceof Array) {
-                // arrays
-                if (json.length >= 1 && json[0] instanceof Object) {
-                    // an array of objects
-                    html += generateHead(json[0]);
-
-                    // Set the HTML rows
-                    for (var i = 0; i < json.length; i++) {
-                        html += "<tr>" + jsonToHtml(json[i], true) + "</tr>";
-                    }
-
-                    html += generateFoot(json);
-                } else {
-                    // an array of primitive values
-                    for (var i = 0; i < json.length; i++) {
-                        html += jsonToHtml(json[i], true) + "<br/>";
-                    }
-                }
-
-            } else if (json instanceof Object) {
-                // objects
-                // special handling for $date and $oid
-                if (json["$date"]) {
-                    var date = new Date(Date.parse(json["$date"]));
-                    html += jsonToHtml(date.toLocaleDateString() + " " + date.toLocaleTimeString());
-                } else if (json["$oid"]) {
-                    html += jsonToHtml(json["$oid"]);
-                } else {
-                    if (!noheading) {
-//                        var returnArray = generateHead(json);
-//                        html += returnArray[0];
-                        html += generateHead(json);
-                    }
-
-                    //lookup for database state translation
-                    var databaseStateTranslation = {};
-                    databaseStateTranslation["0"] = "Sandboxed";
-                    databaseStateTranslation["1"] = "Operational";
-                    databaseStateTranslation["2"] = "Archived";
-                    databaseStateTranslation["3"] = "Deprecated";
-                    for (var key in json) {
-                        if (json.hasOwnProperty(key) && isDisplayField(key)) {
-//                            if (!noheading) {
-                                if (key == "_state") {
-                                    var value = databaseStateTranslation[json[key].toString()];
-                                } else {
-                                    var value = json[key];
-                                }
-                                html += "<td>";
-                                html += jsonToHtml(value);
-                                html += "</td>";
-//                            }
-                        }
-                    }
-
-//                    if (!noheading && returnArray[1]) {
-//                        var lessImportantFields = returnArray[1];
-//                        for (var i = 0; i < lessImportantFields.length; i++) {
-//                            if(json.hasOwnProperty(lessImportantFields[i])){
-//                                html += "<td>";
-//                                html += jsonToHtml(json[lessImportantFields[i]]);
-//                                html += "</td>";
-//                            }
-//                        }
-//                    }
-
-                    if (!noheading) {
-                        html += generateFoot(json);
-                    }
-                }
-            } else {
-                // primitive types
-                // special handling for StorageFile
-                var reStorageFile = new RegExp(/StorageFile:\d+/);
-                if (reStorageFile.test(json)) {
-                    var href = urlDownload + json;
-                    html += "<a href='" + href + "'>" + json + "</a>";
-                } else {
-                    if (json || json === 0 || json === false || json === ""){
-                        html += json;
-                    } else {
-                        html += "n/a";
-                    }
-                }
-            }
-
-            return html;
-        }
-
-        // search
-        var RESULT_PER_PAGE = 10;
-        var queryContext = {
-            queryData: null,
-            currentPage: 0,
-            resultPerPage: RESULT_PER_PAGE
-        };
-        function resetQueryContext() {
-            queryContext.queryData = null;
-            queryContext.currentPage = 0;
-            queryContext.resultPerPage = RESULT_PER_PAGE;
-        }
-
-        function addOpSelectAndInput(type, node, valueList) {
-            var storeBooleanOps = new dojo.store.Memory({
-                data: [
-                    {id: "equals", name: "equals"},
-                    {id: "not equal", name: "not equal"},
-                    {id: "is empty", name: "is empty"},
-                    {id: "is not empty", name: "is not empty"}
-                ]
-            });
-            var storeNumericOps = new dojo.store.Memory({
-                data: [
-                    {id: "equals", name: "equals"},
-                    {id: "not equal", name: "not equal"},
-                    {id: "range", name: "range"},
-                    {id: "less than", name: "less than"},
-                    {id: "greater than", name: "greater than"},
-                    {id: "less than or equal", name: "less than or equal"},
-                    {id: "greater than or equal", name: "greater than or equal"},
-                    {id: "is empty", name: "is empty"},
-                    {id: "is not empty", name: "is not empty"}
-                ]
-            });
-            var storeStringOps = new dojo.store.Memory({
-                data: [
-                    {id: "equals", name: "equals"},
-                    {id: "not equal", name: "not equal"},
-                    {id: "search", name: "search"},
-                    {id: "contains", name: "contains"},
-//                    {id: "not contain", name: "not contain"},
-                    {id: "starts with", name: "starts with"},
-//                    {id: "not start with", name: "not start with"},
-                    {id: "ends with", name: "ends with"},
-//                    {id: "not end with", name: "not end with"},
-                    {id: "is empty", name: "is empty"},
-                    {id: "is not empty", name: "is not empty"}
-                ]
-            });
-            var storeListOps = new dojo.store.Memory({
-                data: [
-                    {id: "equals", name: "equals"},
-                    {id: "not equal", name: "not equal"},
-                    {id: "is empty", name: "is empty"},
-                    {id: "is not empty", name: "is not empty"}
-                ]
-            });
-
-            // div for op selection
-            var divOpSelect = dojo.create("div", {
-                name: "searchOp",
-                style: {
-                    width: "100px",
-                    display: "inline-block"
-                }
-            }, node);
-
-            var dijitOpSelect;
-            var divSearchInput;
-            if (type !== null && type === "boolean") {
-                // select operation
-                dijitOpSelect = new dijit.form.FilteringSelect({
-                    store: storeBooleanOps,
-                    name: "op",
-                    value: "is",
-                    style: "width: 100px;"
-                }, divOpSelect);
-
-                // enter text
-                divSearchInput = dojo.create("div", {
-                    name: "searchInput",
-                    style: {
-                        width: "230px",
-                        display: "inline-block"
-                    }
-                }, node);
-
-                var spanTrue = dojo.create("span", {
-                }, divSearchInput);
-                new dijit.form.RadioButton({
-                    name: "input"
-                }, spanTrue);
-                dojo.create("span", {
-                   innerHTML: "true&nbsp;"
-                }, divSearchInput);
-
-                var spanFalse = dojo.create("span", {
-                }, divSearchInput);
-                new dijit.form.RadioButton({
-                    name: "input"
-                }, spanFalse);
-                dojo.create("span", {
-                   innerHTML: "false"
-                }, divSearchInput);
-            } else if (type !== null && (type === "numeric" || type === "date-time" || type === "date" || type === "time")) {
-                // select operation
-                dijitOpSelect = new dijit.form.FilteringSelect({
-                    store: storeNumericOps,
-                    name: "op",
-                    value: "range",
-                    style: "width: 100px;"
-                }, divOpSelect);
-
-                // enter text
-                divSearchInput = dojo.create("div", {
-                    name: "searchInput",
-                    style: {
-                        width: "230px",
-                        display: "inline-block"
-                    }
-                }, node);
-
-                var spanSearchInput = dojo.create("span", {
-                }, divSearchInput);
-                dijitSearchInput = new dijit.form.TextBox({
-                    name: "input",
-                    style: "width: 230px;"
-                }, spanSearchInput);
-            } else if (type !== null && type === "list") {
-                // construct a sotre for the list of possible values
-                if (valueList !== null && valueList instanceof Array) {
-                    var storeValueList = new dojo.store.Memory({data: valueList});
-                }
-
-                // select operation
-                dijitOpSelect = new dijit.form.FilteringSelect({
-                    store: storeListOps,
-                    name: "op",
-                    value: "equals",
-                    style: "width: 100px;"
-                }, divOpSelect);
-
-                // enter text
-                divSearchInput = dojo.create("div", {
-                    name: "searchInput",
-                    style: {
-                        width: "230px",
-                        display: "inline-block"
-                    }
-                }, node);
-
-                var spanSearchInput = dojo.create("span", {
-                }, divSearchInput);
-                dijitSearchInput = new dijit.form.FilteringSelect({
-                    store: storeValueList,
-                    name: "input",
-                    value: valueList[0] ? valueList[0].id : "",
-                    style: "width: 230px;"
-                }, spanSearchInput);
-            } else {
-                // everything else is treated as a string
-                // select operation
-                dijitOpSelect = new dijit.form.FilteringSelect({
-                    store: storeStringOps,
-                    name: "op",
-                    value: "search",
-                    style: "width: 100px;"
-                }, divOpSelect);
-
-                // enter text
-                var divSearchInput = dojo.create("div", {
-                    style: {
-                        width: "230px",
-                        display: "inline-block"
-                    }
-                }, node);
-
-                var spanSearchInput = dojo.create("span", {
-                }, divSearchInput);
-                dijitSearchInput = new dijit.form.TextBox({
-                    name: "input",
-                    style: "width: 230px;"
-                }, spanSearchInput);
-            }
-
-            dojo.connect(dijitOpSelect, "onChange", function(value) {
-                if (value !== null && (value === "is empty" || value === "is not empty")) {
-                    dojo.setStyle(divSearchInput, {
-                       visibility: "hidden"
-                    });
-                } else {
-                    dojo.setStyle(divSearchInput, {
-                       visibility: "visible"
-                    });
-                }
-            });
-        }
-
-        function addSearchRow(isFirstRow, enclosingElementId) {
-            if (window.advancedSearchRows == null) {
-                window.advancedSearchRows = 0;
-            } else {
-                window.advancedSearchRows += 1;
-            }
-            var searchRow = dojo.create("div", {
-                name: "selectRow",
-                id: "selectRow" + window.advancedSearchRows
-            }, enclosingElementId);
-            var divRow = dojo.create("div", {
-                name: "searchRow",
-                id: "searchRow" + window.advancedSearchRows
-            }, enclosingElementId);
-            var storeAndOrOps = new dojo.store.Memory({
-                data: [
-                    {id: "must", name: "must"},
-                    {id: "should", name: "should"},
-                    {id: "must_not", name: "must not"}
-                ]
-            });
-
-            var searchables = new dojo.store.Memory({
-                data: [
-                    {id: "template", name: "template", label: "Template"},
-                    {id: "_creator_id", name: "user", label: "User"},
-                    {id: "_time_updated", name: "date", label: "Date"}
-                ]
-            });
-            var storeTemplates = createJsonRestStore("${urlTemplates}");
-            var users = [];
-            dojo.xhr.get({
-                url: "${urlUsers}",
-                handleAs: "json",
-                headers: {
-                    Accept: 'application/json'
-                },
-                load: function(data) {
-                    data.forEach(function(user){
-                        user.displayName = user.lastName + "," + user.firstName;
-                        users.push(user);
-                    });
-                }
-            });
-
-            function getTemplateTerms(templateUUid, templateVersion) {
-                var rawData = dojo.xhr.get({
-                    url: "${urlTemplateTerms}",
-                    handleAs: "json",
-                    content: {
-                        uuid: templateUUid,
-                        version: templateVersion
-                    },
-                    sync: true
-                }).results[0];
-//                var rawData = getTerm(templateUUid, templateVersion, true);
-                var aliases = function process(rawData) {
-                    var aliases = [];
-                    rawData.forEach(function(term) {
-                        flattenAlias(term).forEach(function(alias) {
-                            aliases.push(alias);
-                        });
-                    });
-                    return aliases;
-                }(rawData);
-                return new dojo.store.Memory({
-                    data: aliases
-                });
-            }
-            window.dummy_validator = {};
-            dummy_validator_object = {};
-            dummy_validator_object_subobject = {};
-            dummy_validator_object_subobject.id = null;
-            dummy_validator_object_subobject.name = 'type';
-            dummy_validator_object_subobject.required = null;
-            dummy_validator_object_subobject.value = 'printable';
-            dummy_validator_object.property = [];
-            dummy_validator_object.property.push(dummy_validator_object_subobject);
-            window.dummy_validator.validator = [];
-            window.dummy_validator.validator.push(dummy_validator_object);
-
-            function flattenAlias(term) {
-                if (term.term.length <= 0) {
-                    if (term.alias == null) {
-                        term.alias = term.name;
-                    }
-                    term.id = term.alias;
-                    termsArray = [];
-                    termsArray.push(term);
-                    if (term.attachTo.length > 0) {
-                        term.attachTo.forEach(function (attached) {
-                            temp = {};
-                            temp.alias = term.alias + "." + attached.useAlias;
-                            temp.id = temp.alias;
-                            temp.validation = window.dummy_validator;
-                            termsArray.push(temp);
-                        });
-                    }
-                    return termsArray;
-                } else {
-                    var subTerms = [];
-                    term.term.forEach(function (subTerm) {
-                        var containedAliases = flattenAlias(subTerm);
-                        containedAliases.forEach( function(containedAlias) {
-                            subTerms.push(containedAlias);
-                        });
-                    });
-                    var aliases = [];
-                    if (term.alias == null) {
-                        term.alias = term.name;
-                    }
-                    subTerms.forEach(function (subAlias) {
-                        if (subAlias.alias == null) {
-                            subAlias.alias = subAlias.name;
-                        }
-                        subAlias.alias = term.alias + "." + subAlias.alias;
-                        subAlias.id = subAlias.alias;
-                        aliases.push(subAlias);
-                        if (subAlias.attachTo.length > 0) {
-                            term.attachTo.forEach(function (attached) {
-                                temp = {};
-                                temp.alias = subAlias.alias + "." + attached.useAlias;
-                                temp.id = temp.alias;
-                                temp.validation = window.dummy_validator;
-                                aliases.push(temp);
-                            });
-                        }
-                    });
-                    if (term.attachTo.length > 0) {
-                        term.attachTo.forEach(function (attached) {
-                            temp = {};
-                            temp.alias = term.alias + "." + attached.useAlias;
-                            temp.id = temp.alias;
-                            temp.validation = window.dummy_validator;
-                            aliases.push(temp);
-                        });
-                    }
-                    return aliases;
-                }
-            }
-
-            var storeUsers = new dojo.store.Memory({
-                data: users
-            });
-
-            var storeTemplateTerms = createJsonRestStore("${urlTemplateTerms}", "alias");
-
-            window.templates = storeTemplates;
-            window.templateTerms = storeTemplateTerms;
-
-            if (isFirstRow) {
-                // add button
-                var buttonAdd = dojo.create("input", {
-                    style: "width: 25px;"
-                }, searchRow);
-                var dijitButtonAdd = new dijit.form.Button({
-                    label: "+",
-                    style: "width: 25px;"
-                }, buttonAdd);
-                //dijitButtonAdd.startup();
-                dojo.connect(dijitButtonAdd, "onClick", function() {
-                    addSearchRow(false, enclosingElementId);
-                });
-
-                // a nbsp
-                dojo.create("span", {
-                    innerHTML: "&nbsp;"
-                }, searchRow);
-
-                // an empty space
-                var divEmpty = dojo.create("div", {
-                    style: {
-                        width: "75px",
-                        display: "inline-block"
-                    }
-                }, searchRow);
-                new dijit.form.FilteringSelect({
-                    store: storeAndOrOps,
-                    name: "andOr",
-                    value: "must",
-                    style: "width: 75px;"
-                }, divEmpty);
-            } else {
-                // remove button
-                var buttonRemove = dojo.create("input", {
-                    style: "width: 25px;"
-                }, searchRow);
-                var dijitButtonRemove = new dijit.form.Button({
-                    label: "-",
-                    style: "width: 25px;"
-                }, buttonRemove);
-                dijitButtonRemove.startup();
-                dojo.connect(dijitButtonRemove, "onClick", function() {
-                    //TODO: unregister widget
-                    dojo.destroy(searchRow);
-                    dojo.destroy(divRow);
-                    window.advancedSearchRows -= 1;
-                });
-
-                // a nbsp
-                dojo.create("span", {
-                    innerHTML: "&nbsp;"
-                }, searchRow);
-
-                // AND/OR select
-                var divAndOrSelect = dojo.create("div", {
-                    name: "andOrOp",
-                    style: {
-                        width: "75px",
-                        display: "inline-block"
-                    }
-                }, searchRow);
-                new dijit.form.FilteringSelect({
-                    store: storeAndOrOps,
-                    name: "andOr",
-                    value: "must",
-                    style: "width: 75px;"
-                }, divAndOrSelect);
-                //dijitAndOrSelector.startup();
-            }
-
-            var divSearchableSelect = dojo.create("div", {
-                name: "searchableDiv",
-                style: {
-                    width: "230px",
-                    display: "inline-block"
-                }
-            }, searchRow);
-
-            var dijitSearchableSelect = new dijit.form.FilteringSelect({
-                store: searchables,
-                name: "searchable",
-                placeholder: "Please select a field to search on",
-                required: true,
-                searchAttr: "label",
-                style: "width: 230px;"
-            }, divSearchableSelect);
-
-            dojo.connect(dijitSearchableSelect, "onChange", function(value) {
-                // populate field list
-                dojo.empty(divRow);
-                if (value == 'template') {
-                    {
-                        var anotherDivEmpty = dojo.create("div", {
-                            style: {
-                                width: "103px",
-                                display: "inline-block"
-                            }
-                        }, divRow);
-
-                        // an nbsp
-                        dojo.create("span", {
-                            innerHTML: "&nbsp;&nbsp;"
-                        }, divRow);
-
-                        // dropdown list for templates
-                        var divTemplateSelect = dojo.create("div", {
-                            name: "template",
-                            style: {
-                                width: "230px",
-                                display: "inline-block"
-                            }
-                        }, divRow);
-                        var dijitTemplateSelect = new dijit.form.FilteringSelect({
-                            store: storeTemplates,
-                            name: "templateId",
-                            placeholder: "all templates",
-                            required: false,
-                            style: "width: 230px;"
-                        }, divTemplateSelect);
-                        dojo.connect(dijitTemplateSelect, "onChange", function(value) {
-                            // populate field list
-                            storeTemplates.fetchItemByIdentity({
-                                identity: value,
-                                onItem: function(template) {
-//                                    dijitTermSelect.query.uuid = template.uuid.$uuid;
-//                                    dijitTermSelect.query.version = template.versionNumber.$uuid;
-                                    dijitTermSelect.store = getTemplateTerms(template.uuid.$uuid, template.versionNumber.$uuid);
-                                    dijitTermSelect.reset();
-                                }
-                            });
-                        });
-
-                        // an nbsp
-                        dojo.create("span", {
-                            innerHTML: "&nbsp;"
-                        }, divRow);
-
-                        // drop down list for terms
-                        var divTermSelect = dojo.create("div", {
-                            name: "term",
-                            style: {
-                                width: "200px",
-                                display: "inline-block"
-                            }
-                        }, divRow);
-
-                        var dijitTermSelect = new dijit.form.FilteringSelect({
-                            store: new dojo.store.Memory({ data: [] }),
-                            name: "termAlias",
-                            //id: "termAlias",
-                            placeholder: "all terms",
-                            searchAttr: "alias",
-                            required: false,
-                            style: "width: 200px;"
-                        }, divTermSelect);
-                        dojo.connect(dijitTermSelect, "onChange", function(value) {
-                            // populate op and input
-                            var term = dijitTermSelect.store.query({alias : value})[0];
-                            if (term.validation && term.validation.validator && term.validation.validator.length >= 1) {
-                                var type = term.validation.validator[0].type;
-                                var property = term.validation.validator[0].property;
-                                var valueList = [];
-                                for (var i = 0; i < property.length; i++) {
-                                    if (property[i].name === "item") {
-                                        valueList.push({id: property[i].value, name: property[i].value});
-                                    }
-                                }
-                                dojo.empty(divOpSelectInput);
-                                addOpSelectAndInput(type, divOpSelectInput, valueList);
-                            }
-                        });
-
-                        // drop down list for oprations and input for: string, number, boolean or date according to the type of the field selected
-                        var divOpSelectInput = dojo.create("div", {
-                            name: "opAndInput",
-                            style: {
-                                display: "inline-block"
-                            }
-                        }, divRow);
-                        addOpSelectAndInput("string", divOpSelectInput);
-
-                    }
-                } else if (value == '_creator_id') {
-                    var anotherDivEmpty = dojo.create("div", {
-                        style: {
-                            width: "103px",
-                            display: "inline-block"
-                        }
-                    }, divRow);
-
-                    // an nbsp
-                    dojo.create("span", {
-                        innerHTML: "&nbsp;&nbsp;"
-                    }, divRow);
-
-                    var onlyEqualsOp = new dojo.store.Memory({
-                        data: [
-                            {id: "equals", name: "equals"}
-                        ]
-                    });
-
-                    var divUserEqualsInput = dojo.create("div", {
-                        name: "rangeInput",
-                        style: {
-                            display: "inline-block"
-                        },
-                        required: true
-                    }, divRow);
-
-                    var spanUserEqualsInput = dojo.create("span", {
-                    }, divUserEqualsInput);
-
-                    dijitOpSelect = new dijit.form.FilteringSelect({
-                        store: onlyEqualsOp,
-                        name: "op",
-                        value: "equals",
-                        style: "width: 100px;"
-                    }, spanUserEqualsInput);
-
-                    var divUserInput = dojo.create("div", {
-                        name: "searchInput",
-                        style: {
-                            width: "230px",
-                            display: "inline-block"
-                        }
-                    }, divRow);
-
-                    var spanUserInput = dojo.create("span", {
-                    }, divUserInput);
-                    var dijitSearchInput = new dijit.form.FilteringSelect({
-                        store: storeUsers,
-                        name: "input",
-                        placeholder: "Select user",
-                        required: true,
-                        style: "width: 230px;",
-                        searchAttr: "displayName",
-                        labelAttr: "displayName",
-                        labelType: "text"
-                    }, spanUserInput);
-                } else if (value == '_time_updated') {
-                    var anotherDivEmpty = dojo.create("div", {
-                        style: {
-                            width: "103px",
-                            display: "inline-block"
-                        }
-                    }, divRow);
-
-                    // an nbsp
-                    dojo.create("span", {
-                        innerHTML: "&nbsp;&nbsp;"
-                    }, divRow);
-
-                    var onlyRangeOp = new dojo.store.Memory({
-                        data: [
-                            {id: "range", name: "range"}
-                        ]
-                    });
-
-                    var divDateRangeInput = dojo.create("div", {
-                        name: "rangeInput",
-                        style: {
-                            display: "inline-block"
-                        },
-                        required: true
-                    }, divRow);
-
-                    var spanDateRangeInput = dojo.create("span", {
-                    }, divDateRangeInput);
-
-                    dijitOpSelect = new dijit.form.FilteringSelect({
-                        store: onlyRangeOp,
-                        name: "op",
-                        value: "range",
-                        style: "width: 100px;"
-                    }, spanDateRangeInput);
-
-                    var divFromDateInput = dojo.create("div", {
-                        name: "searchInput1",
-                        style: {
-                            width: "230px",
-                            display: "inline-block"
-                        },
-                        required: true
-                    }, divRow);
-
-                    var spanFromDateInput = dojo.create("span", {
-                    }, divFromDateInput);
-                    var dijitSearchInput1 = new dijit.form.DateTextBox({
-                        //id: "input1",
-                        name: "input1",
-                        placeholder: "From",
-                        style: "width: 230px;",
-                        required: true,
-                        value: new Date(1970, 1, 1)
-                    }, spanFromDateInput);
-
-                    var divToDateInput = dojo.create("div", {
-                        name: "searchInput2",
-                        style: {
-                            width: "230px",
-                            display: "inline-block"
-                        },
-                        required: true
-                    }, divRow);
-
-                    var spanToDateInput = dojo.create("span", {
-                    }, divToDateInput);
-                    var dijitSearchInput2 = new dijit.form.DateTextBox({
-                        //id: "input2",
-                        name: "input2",
-                        placeholder: "To",
-                        style: "width: 230px;",
-                        required: true,
-                        value: new Date()
-                    }, spanToDateInput);
-
-                    var divToDateInput = dojo.create("div", {
-                        name: "searchInput2",
-                        style: {
-                            width: "230px",
-                            display: "inline-block"
-                        },
-                        required: true
-                    }, divRow);
-
-                    var spanToDateInput = dojo.create("span", {
-                    }, divToDateInput);
-
-                    var divHiddenDateInput = dojo.create("div", {
-                        name: "hiddenInput",
-                        style: {
-                            display: "inline-block"
-                        },
-                        required: true
-                    }, divRow);
-
-                    var spanHiddenDateInput = dojo.create("span", {
-                    }, divHiddenDateInput);
-
-                    var dijitHiddenSearchInput = new dijit.form.TextBox({
-                        type: "hidden",
-                        name: "hiddenInput",
-                        //id: "hiddenInput",
-                        value: (new Date(dijitSearchInput1.getValue())).getTime() + "," + (new Date(dijitSearchInput2.getValue())).getTime(),
-                        style: "width: 230px;"
-                    }, spanHiddenDateInput);
-
-                    dojo.connect(dijitSearchInput1, "onChange", function(value) {
-                        var fromDate = new Date(value);
-                        var hiddenSearchInputValue = dijit.byId("hiddenInput").getValue();
-                        var fromValue = fromDate.getTime();
-                        var toValue = hiddenSearchInputValue.split(",")[1];
-                        dijit.byId("hiddenInput").setValue(fromValue + "," + toValue);
-                    });
-
-                    dojo.connect(dijitSearchInput2, "onChange", function(value) {
-                        var toDate = new Date(value);
-                        toDate.setDate(toDate.getDate() + 1);
-                        var hiddenSearchInputValue = dijit.byId("hiddenInput").getValue();
-                        var toValue = toDate.getTime();
-                        var fromValue = hiddenSearchInputValue.split(",")[0];
-                        dijit.byId("hiddenInput").setValue(fromValue + "," + toValue);
-                    });
-                }
-            });
-        }
-
-        function submitSearchQuery(queryContext) {
-            var xhrArgs = {
-                url: "${urlSearch}",
-                content: {queryContext : dojo.toJson(queryContext)},
-
-                load: function(data){
-                    displaySearchResults(data);
-                },
-
-                error: function(error){
-                    displaySearchResults(error);
-                }
-            };
-
-            // Call the asynchronous xhrGet
-            dojo.xhrGet(xhrArgs);
-        }
-
-        function displaySearchResults(results) {
-            var divSearchResult = dojo.byId("idSearchResult");
-            dojo.empty(divSearchResult);
-
-            if (results) {
-                data = dojo.fromJson(results);
-            } else {
-                data = "no results";
-            }
-
-            if (data instanceof Object) {
-                if (data && data.hits) {
-                    // update total results
-                    var totalResults = data.hits.total;
-
-                    // search result
-                    var divTopLine = dojo.create("div", {
-                    }, divSearchResult);
-
-                    // search summary
-                    dojo.create("div", {
-                        innerHTML: "Page " + (queryContext.currentPage + 1) + " of " + Math.ceil(totalResults/RESULT_PER_PAGE) + ". Total results:" + totalResults + " (" + data.took / 1000 + " seconds)",
-                        style: {
-                            width: "300px",
-                            display: "inline-block"
-                        }
-                    }, divTopLine);
-
-                    // navigation
-                    // "first" button
-                    var divButtonFirst = dojo.create("span", {}, divTopLine);
-                    var dijitButtonFirst = new dijit.form.Button({
-                        label: "|<- First"
-                    }, divButtonFirst);
-                    dojo.connect(dijitButtonFirst, "onClick", function(){
-                        queryContext.currentPage = 0;
-                        submitSearchQuery(queryContext);
-                    });
-                    // "prev" button
-                    var divButtonPrev = dojo.create("span", {}, divTopLine);
-                    var dijitButtonPrev = new dijit.form.Button({
-                        label: "<- Prev"
-                    }, divButtonPrev);
-                    dojo.connect(dijitButtonPrev, "onClick", function(){
-                        if (queryContext.currentPage > 0) {
-                            queryContext.currentPage -= 1;
-                            submitSearchQuery(queryContext);
-                        }
-                    });
-
-                    // "next" button
-                    var divButtonNext = dojo.create("span", {}, divTopLine);
-                    var dijitButtonNext = new dijit.form.Button({
-                        label: "Next ->"
-                    }, divButtonNext);
-                    dojo.connect(dijitButtonNext, "onClick", function(){
-                        var lastPage = Math.floor((totalResults - 1) / queryContext.resultPerPage) + 1;
-                        if ((queryContext.currentPage + 1) < lastPage) {
-                            queryContext.currentPage += 1;
-                            submitSearchQuery(queryContext);
-                        }
-                    });
-                    // "last" button
-                    var divButtonLast = dojo.create("span", {}, divTopLine);
-                    var dijitButtonLast = new dijit.form.Button({
-                        label: "Last ->|"
-                    }, divButtonLast);
-                    dojo.connect(dijitButtonLast, "onClick", function(){
-                        var currentPage = Math.floor((totalResults - 1) / queryContext.resultPerPage);
-                        queryContext.currentPage = currentPage;
-                        submitSearchQuery(queryContext);
-                    });
-
-                    // parse search results
-                    var hits = data.hits.hits;
-                    for (var i = 0; i < hits.length; i++) {
-                        var hit = hits[i];
-                        var p = dojo.create("p", {
-                        }, divSearchResult);
-                        var searchResultRow = dojo.create("div", {
-                            innerHTML: jsonToHtml(hit._source),
-                            id: "searchHit_" + i
-                        }, p);
-                        dojo.connect(dojo.byId("searchHit_" + i), "onclick", function(){
-                            var scope = getAngularElementScope(dojo.attr(this, "id"));
-                            var currentlyHighlightedSearchHits = dojo.query(".selectedSearchHit");
-                            if (currentlyHighlightedSearchHits != null) {
-                                for (var i = 0; i < currentlyHighlightedSearchHits.length; i++) {
-                                    if (currentlyHighlightedSearchHits[i] != null) {
-                                        dojo.removeClass(currentlyHighlightedSearchHits[i], "selectedSearchHit");
-                                    }
-                                }
-                            }
-                            dojo.addClass(this, "selectedSearchHit");
-                            var element = dojo.attr(this, "id").split("_");
-                            scope.openDocument(hits[element[1]]);
-                        });
-                        var scope = getAngularElementScope("searchHit_" + i);
-                        scope.hideDetailedView();
-                    }
-                } else if (data.message) {
-                    // error
-                    dojo.create("div", {
-                        innerHTML: "Search failed. Details:<br/>" + data.message
-                    }, divSearchResult);
-                } else {
-                    // just display the data
-                    dojo.create("div", {
-                        innerHTML: dojo.toJson(data)
-                    }, divSearchResult);
-                }
-            } else {
-                dojo.create("div", {
-                    innerHTML: "Search failed. Details:<br/>" + data
-                }, divSearchResult);
-            }
-
-            /*
-            // Replace newlines with nice HTML tags.
-            data = data.replace(/\n/g, "<br>");
-            // Replace tabs with spaces.
-            data = data.replace(/\t/g, "&nbsp;&nbsp;&nbsp;");
-            alert("data : " + data);
-            */
-        }
-
-        cris.ready(function() {
-            urlDownload = "${urlDownload}";
-
-            //************SEARCH ENGINE CODE***********************************/
-            // add the first row to advanced search
-            addSearchRow(true, "idAdvancedInput");
-
-            // switch between "normal" and "advanced" search
-            var checkBoxAdvancedSearch = dijit.byId("idCheckBoxAdvancedSearch");
-            dojo.connect(checkBoxAdvancedSearch, "onClick", function() {
-                var isChecked= checkBoxAdvancedSearch.getValue();
-                var normalNode = dojo.byId("idNormal");
-                var advancedNode = dojo.byId("idAdvanced");
-                if (isChecked) {
-                    dojo.setStyle(normalNode, "display", "none");
-                    dojo.setStyle(advancedNode, "display", "block");
-                } else {
-                    dojo.setStyle(normalNode, "display", "block");
-                    dojo.setStyle(advancedNode, "display", "none");
-                }
-            });
-
-            // do a normal search
-            dojo.connect(dijit.byId("idButtonSearch"), "onClick", function() {
-                // build search query
-                var queryData = [];
-                var item = {};
-                item.andOr = null;
-                item.templateId = null;
-                item.termAlias = null;
-                item.op = null;
-                item.input = dijit.byId("idNormalInput").getValue();
-                queryData.push(item);
-
-                // submit query
-                resetQueryContext();
-                queryContext.queryData = queryData;
-                submitSearchQuery(queryContext);
-            });
-
-            // do an advanced search
-            dojo.connect(dijit.byId("idButtonAdvancedSearch"), "onClick", function() {
-                // build search query
-                var queryData = [];
-//                queryData.push({});
-
-                dojo.query("div#idAdvanced [name $= searchRow]").forEach(function(node, index, nodelist){
-                    var relatedSelectRowId = dojo.attr(node, "id");
-                    relatedSelectRowId = relatedSelectRowId.replace (/\D/g, "");
-                    var relatedSelectRow = dojo.byId("selectRow" + relatedSelectRowId);
-                    var andOr = null;
-                    var templateId = null;
-                    var termAlias = null;
-                    var op = null;
-                    var input = null;
-                    var hiddenInput = null;
-                    var input1 = null;
-                    var input2 = null;
-                    var field = null;
-
-                    var widgets = dijit.findWidgets(node);
-                    for (var i = 0; i < widgets.length; i++) {
-                        var widget = widgets[i];
-                        if (widget.name === "templateId") {
-                            templateId = widget.getValue();
-                        }
-                        if (widget.name === "termAlias") {
-                            termAlias = widget.getValue();
-                        }
-                        if (widget.name === "op") {
-                            op = widget.getValue();
-                        }
-                        if (widget.name === "input") {
-                            input = widget.getValue();
-                        }
-                        if (widget.name === "input1") {
-                            input1 = widget.getValue();
-                        }
-                        if (widget.name === "input2") {
-                            input2 = widget.getValue();
-                        }
-                        if (widget.name === "hiddenInput") {
-                            hiddenInput = widget.getValue();
-                        }
-                    }
-
-                    widgets = dijit.findWidgets(relatedSelectRow);
-                    for (var i = 0; i < widgets.length; i++) {
-                        var widget = widgets[i];
-                        if (widget.name === "andOr") {
-                            andOr = widget.getValue();
-                        }
-                        if (widget.name === "searchable") {
-                            field = widget.getValue();
-                        }
-                    }
-
-                    var item = {};
-                    item.andOr = andOr;
-                    item.templateId = templateId;
-                    item.termAlias = termAlias;
-                    item.op = op;
-                    item.input = input;
-                    item.input1 = input1;
-                    item.input2 = input2;
-                    item.hiddenInput = "[" + hiddenInput + "]";
-                    item.field = field;
-                    queryData.push(item);
-                });
-
-                // submit query
-                resetQueryContext();
-                queryContext.queryData = queryData;
-                submitSearchQuery(queryContext);
-            });
-        });
-
-        window.linkedSearch = function(fieldName, value) {
-            var item = {};
-            item.andOr = "must";
-            item.termAlias = fieldName;
-            item.op = "equals";
-            item.input = value;
-            var queryData = [];
-            queryData.push(item);
-            resetQueryContext();
-            queryContext.queryData = queryData;
-            submitSearchQuery(queryContext);
-        }
-
-        //reset position to top of window. CRIS-300
-        window.onload = function(){
-            window.scrollTo(0,0);
-        }
-
-        angular.module('crisSearch', ['dataset', 'angular-dojo']);
+        cris.require("dojox/xml/parser");
 
         cris.bootstrapAngular("idSearch", "crisSearch");
         //]]>

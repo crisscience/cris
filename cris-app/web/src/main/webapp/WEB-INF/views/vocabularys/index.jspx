@@ -99,11 +99,11 @@
 
             <!-- dialog -->
             <div id="idDialogVocabulary" data-dojo-type="dijit/Dialog" title="Import Vocabulary" style="width: 500px">
-                <cris-uploader-dialog id="idUploaderVocabulary" dialog-id="idDialogVocabulary" title="Select a Vocabulary Xml File" label-text="Browse..." placeholder="Vocabulary Xml file (*.xml)" allow-multiple="true" submit-url="vocabularys/import" errors="errors"><!-- --></cris-uploader-dialog>
+                <cris-uploader-dialog id="idUploaderVocabulary" dialog-id="idDialogVocabulary" title="Select a Vocabulary Xml File" label-text="Browse..." placeholder="Vocabulary Xml file (*.xml)" allow-multiple="true" submit-url="vocabularys/import" errors="errors" show-check-box="true" check-box-name="force" check-box-message="force new version if there's a conflict"><!-- --></cris-uploader-dialog>
             </div>
 
             <div id="idDialogTemplate" data-dojo-type="dijit/Dialog" title="Import Template" style="width: 500px">
-                <cris-uploader-dialog id="idUploaderTemplate" dialog-id="idDialogTemplate" title="Select a Template Xml File" label-text="Browse..." placeholder="Template Xml file (*.xml)" allow-multiple="true" submit-url="templates/import" errors="errors"><!-- --></cris-uploader-dialog>
+                <cris-uploader-dialog id="idUploaderTemplate" dialog-id="idDialogTemplate" title="Select a Template Xml File" label-text="Browse..." placeholder="Template Xml file (*.xml)" allow-multiple="true" submit-url="templates/import" errors="errors" show-check-box="true" check-box-name="force" check-box-message="force new version if there's a conflict"><!-- --></cris-uploader-dialog>
             </div>
         </div>
     </div>
@@ -141,13 +141,13 @@
                 var args = {
                     query: {"showAllStatus" : true},
                     sortFields: [{attribute: "name", descending: false}],
-                    rowsPerPage: 20
+                    rowsPerPage: 50
                 };
-                
+
                 var _args = {
                     query: {"showAllStatus" : true},
                     sortFields: [{attribute: "name", descending: false}],
-                    rowsPerPage: 20,
+                    rowsPerPage: 50,
                     filter: {column: 2, type: "number", condition: "equalTo", value: 1}
                 }
 
@@ -197,14 +197,14 @@
                         });
                     }
                 });
-                
+
                 var _timeoutVocabularyFilter;
                 dijit.registry.byId('idVocabularyFilter').onChange = function (value) {
                     if (_timeoutVocabularyFilter) {
                         clearTimeout(_timeoutVocabularyFilter);
                         _timeoutVocabularyFilter = null;
                     }
-                    
+
                     _timeoutVocabularyFilter = setTimeout(function() {
                         var statusId = null;
                         if (scope.showVocabulary === 'active') {
@@ -212,7 +212,7 @@
                         } else if (scope.showVocabulary === 'deprecated') {
                             statusId = 0;
                         }
-                        
+
                         var statusFilter = {column: 2, type: "number", condition: "equalTo", value: statusId};
                         if (value) {
                             var nameFilter = {column: 1, type: "string", condition: "startsWith", value: value};
@@ -230,11 +230,11 @@
                         }
                     }, 500);
                 };
-                
+
                 scope.$watch('showVocabulary', function(newValue, oldValue) {
                     if (newValue !== oldValue) {
                         dijit.byId('idVocabularyFilter').set('value', '');
-                    }    
+                    }
                 })
 
                 /******************************************
@@ -281,14 +281,14 @@
                         });
                     }
                 });
-                
+
                  var _timeoutTemplateFilter;
                 dijit.registry.byId('idTemplateFilter').onChange = function (value) {
                     if (_timeoutTemplateFilter) {
                         clearTimeout(_timeoutTemplateFilter);
                         _timeoutTemplateFilter = null;
                     }
-                    
+
                     _timeoutTemplateFilter = setTimeout(function() {
                         var statusId = null;
                         if (scope.showTemplate === 'active') {
@@ -296,7 +296,7 @@
                         } else if (scope.showTemplate === 'deprecated') {
                             statusId = 0;
                         }
-                        
+
                         var statusFilter = {column: 2, type: "number", condition: "equalTo", value: statusId};
                         if (value) {
                             var nameFilter = {column: 1, type: "string", condition: "startsWith", value: value};
@@ -314,11 +314,11 @@
                         }
                     }, 500);
                 };
-                
+
                 scope.$watch('showTemplate', function(newValue, oldValue) {
                     if (newValue !== oldValue) {
                         dijit.byId('idTemplateFilter').set('value', '');
-                    }    
+                    }
                 })
 
                 /******************************************
@@ -334,14 +334,14 @@
                 var filter = {column: 1, type: "number", condition: "equalTo", value: 1};
             	gridTerm.setFilter(filter);
                 scope.referenceGrid = gridTerm;
-                
+
                 var _timeoutTermFilter;
                 dijit.registry.byId('idTermFilter').onChange = function (value) {
                     if (_timeoutTermFilter) {
                         clearTimeout(_timeoutTermFilter);
                         _timeoutTermFilter = null;
                     }
-                    
+
                     _timeoutTermFilter = setTimeout(function() {
                         if (value) {
                             var nameFilter = {column: 0, type: "string", condition: "startsWith", value: value};
@@ -365,14 +365,14 @@
                 var filter = {column: 1, type: "number", condition: "equalTo", value: 1};
             	gridAttachTo.setFilter(filter);
                 scope.attachToGrid = gridAttachTo;
-                
+
                 var _timeoutAttachToFilter;
                 dijit.registry.byId('idAttachToFilter').onChange = function (value) {
                     if (_timeoutAttachToFilter) {
                         clearTimeout(_timeoutAttachToFilter);
                         _timeoutAttachToFilter = null;
                     }
-                    
+
                     _timeoutAttachToFilter = setTimeout(function() {
                         if (value) {
                             var nameFilter = {column: 0, type: "string", condition: "startsWith", value: value};

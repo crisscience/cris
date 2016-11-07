@@ -7,19 +7,22 @@
           >
 
     <jsp:output omit-xml-declaration="yes"/>
+    
+    <style type="text/css">
+        label {
+            text-align: left !important;
+        }
+    </style>
 
     <script type="text/javascript">
-        cris.require([
-            "dijit/form/ValidationTextBox",
-            "dijit/form/Button"
-        ]);
-
         cris.ready(function() {
         });
     </script>
 
-    <div class="half">
-        <div class="instruction">
+    <div class="col-xs-12 col-md-6">
+        <h2>Sign Up</h2>
+
+        <div>
             ${wsSignupInstruction}
         </div>
 
@@ -27,24 +30,42 @@
 
         <spring:url value="/auth/signup" var="url"/>
         <form:form action="${url}" method="POST" modelAttribute="user">
-            <label for="firstName">First Name:</label>
-            <input name="firstName" value="${user.firstName}" id="firstName" data-dojo-type="dijit.form.ValidationTextBox"/>
+            
+            <div class="form-group row form-horizontal">
+                <label for="firstName" class="col-sm-12 col-md-3 col-lg-2 control-label">First Name:</label>
+                <div class="col-sm-8 col-md-6 col-lg-5">
+                    <input type="text" name="firstName" id="firstName" value="${user.firstName}" class="form-control" />
+                </div>
+            </div>
 
             <p></p>
 
-            <label for="middleName">Middle Name:</label>
-            <input name="middleName" value="${user.middleName}" id="middleName" data-dojo-type="dijit.form.ValidationTextBox" />
-
+            <div class="form-group row form-horizontal">
+                <label for="middleName" class="col-sm-12 col-md-3 col-lg-2 control-label">Middle Name:</label>
+                <div class="col-sm-8 col-md-6 col-lg-5">
+                    <input name="middleName" value="${user.middleName}" id="middleName" class="form-control" />
+                </div>
+            </div>
+            
             <p></p>
 
-            <label for="lastName">Last Name:</label>
-            <input name="lastName" value="${user.lastName}" id="lastName" data-dojo-type="dijit.form.ValidationTextBox" />
-
+            <div class="form-group row form-horizontal">
+                <label for="lastName" class="col-sm-12 col-md-3 col-lg-2 control-label">Last Name:</label>
+                <div class="col-sm-8 col-md-6 col-lg-5">
+                    <input name="lastName" value="${user.lastName}" id="lastName" class="form-control" />
+                </div>
+            </div>
+            
             <p></p>
 
-            <label>&amp;nbsp;</label>Note: It will be used as your login ID.<br/>
-            <label for="email">Email:</label>
-            <input name="email" value="${user.email}" id="email" data-dojo-type="dijit.form.ValidationTextBox" placeholder="minimum 8 characters"/>
+            <div class="form-group row form-horizontal">
+                <label for="email" class="col-sm-12 col-md-3 col-lg-2 control-label">Email:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-8 col-md-6 col-lg-5">
+                    <input name="email" value="${user.email}" id="email" class="form-control" placeholder="minimum 8 characters"/>
+                    (It will be used as your login ID)
+                </div>
+            </div>
+            
             <c:set var="errors"><form:errors path="email" /></c:set>
             <c:if test="${not empty errors}">
                 <label>&amp;nbsp;</label>
@@ -53,13 +74,22 @@
 
             <p></p>
 
-            <label for="username">Re-type Email:</label>
-            <input name="username" value="${user.username}" id="username" data-dojo-type="dijit.form.ValidationTextBox"/>
-
+            <div class="form-group row form-horizontal">
+                <label for="username" class="col-sm-12 col-md-3 col-lg-2 control-label">Re-type Email:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-8 col-md-6 col-lg-5">
+                    <input name="username" value="${user.username}" id="username" class="form-control" />
+                </div>
+            </div>
+            
             <p></p>
 
-            <label for="password">Password:</label>
-            <input type="password" name="password" id="password" value="" data-dojo-type="dijit.form.ValidationTextBox" placeholder="minimum 8 characters"/>
+            <div class="form-group row form-horizontal">
+                <label for="password" class="col-sm-12 col-md-3 col-lg-2 control-label">Password:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-8 col-md-6 col-lg-5">
+                    <input type="password" name="password" id="password" value="" class="form-control" placeholder="minimum 8 characters"/>
+                </div>
+            </div>
+            
             <c:set var="errors"><form:errors path="password" /></c:set>
             <c:if test="${not empty errors}">
                 <label>&amp;nbsp;</label>
@@ -68,13 +98,21 @@
 
             <p></p>
 
-            <label for="password2">Re-type Password:</label>
-            <input type="password" name="password2" id="password2" value=""  data-dojo-type="dijit.form.ValidationTextBox"/>
-
+            <div class="form-group row form-horizontal">
+                <label for="password2" class="col-sm-12 col-md-3 col-lg-2 control-label">Re-type Password:<span style="color:red;font-weight:bold;">&#160;*</span></label>
+                <div class="col-sm-8 col-md-6 col-lg-5">
+                    <input type="password" name="password2" id="password2" value="" class="form-control" />
+                </div>
+            </div>
+            
             <p></p>
 
-            <input type="submit" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Sign In'"/>&amp;nbsp;
-            <input type="reset" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Reset'"/>
+            <div>
+                <input type="submit" class="btn btn-primary" value="Sign In" />
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+                <input type="reset" class="btn btn-primary" value="Reset" />
+            </div>
+            &amp;nbsp;
         </form:form>
     </div>
 

@@ -6,13 +6,13 @@
 package edu.purdue.cybercenter.dm.repository;
 
 import edu.purdue.cybercenter.dm.domain.JobContext;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.querydsl.QueryDslPredicateExecutor;
+import org.springframework.stereotype.Repository;
 
 /**
  *
  * @author xu222
  */
-public interface JobContextRepository extends JpaRepository<JobContext, Integer>, QueryDslPredicateExecutor<JobContext> {
+@Repository
+public interface JobContextRepository extends CrisRepository<JobContext> {
 
 }

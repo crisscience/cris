@@ -148,7 +148,7 @@ public class ReportService {
     public String getReportTemplateFromId(UUID uuid) throws IOException {
         TypedQuery<Report> query = DomainObjectHelper.createNamedQuery("Report.findByUuid", Report.class);
         query.setParameter("uuid", uuid);
-        Report report = domainObjectService.executeTypedQueryWithSingleResult(query);
+        Report report = domainObjectService.executeTypedQueryWithSingleResultUnsecured(query);
 
         Random r = new Random();
         String filename = System.getProperty("java.io.tmpdir")

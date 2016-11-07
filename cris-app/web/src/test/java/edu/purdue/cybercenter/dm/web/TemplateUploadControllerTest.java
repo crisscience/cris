@@ -254,7 +254,7 @@ public class TemplateUploadControllerTest extends BaseControllerTest {
 
     private ResultActions uploadTemplate(String fileName) throws Exception{
         MockMultipartFile file = new MockMultipartFile(fileName, new FileInputStream(TEMPLATE_FILES_DIR + fileName));
-        MockMultipartHttpServletRequestBuilder mockMultipartHttpServletRequestBuilder = (MockMultipartHttpServletRequestBuilder) fileUpload("/templates/import").accept(MediaType.ALL).session(httpSession);
+        MockMultipartHttpServletRequestBuilder mockMultipartHttpServletRequestBuilder = (MockMultipartHttpServletRequestBuilder) fileUpload("/templates/import?force=true").accept(MediaType.ALL).session(httpSession);
         mockMultipartHttpServletRequestBuilder.file(file);
         ResultActions resultActions = mockMvc.perform(mockMultipartHttpServletRequestBuilder);
         return resultActions;

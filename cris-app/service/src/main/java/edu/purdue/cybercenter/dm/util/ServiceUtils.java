@@ -5,6 +5,12 @@
  */
 package edu.purdue.cybercenter.dm.util;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.springframework.util.StringUtils;
+
 /**
  *
  * @author xu222
@@ -24,4 +30,31 @@ public class ServiceUtils {
         return dest;
     }
 
+    private static final Pattern PATTERN = Pattern.compile("(.+)\\[(\\d+)\\]$");
+    public static Map<String, Object> processArrayNotation(String text) {
+        String base;
+        Integer index;
+
+        if (StringUtils.isEmpty(text)) {
+            base = text;
+            index = null;
+        } else {
+            Matcher matcher = PATTERN.matcher(text);
+            boolean matched = matcher.matches();
+
+            if (matched) {
+                base = matcher.group(1);
+                index = Integer.parseInt(matcher.group(2));
+            } else {
+                base = text;
+                index = null;
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("base", base);
+        result.put("index", index);
+
+        return result;
+    }
 }

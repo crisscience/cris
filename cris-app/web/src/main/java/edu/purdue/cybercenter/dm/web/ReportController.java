@@ -86,7 +86,7 @@ public class ReportController {
     }
 
     @RequestMapping(value = "/export/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public void export(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) throws IOException {
+    public void exportReport(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) throws IOException {
         Report report = Report.findReport(id);
         byte[] content = DatatypeConverter.parseBase64Binary(report.getContent());
         response.setContentLength(content.length);
@@ -136,7 +136,7 @@ public class ReportController {
         fis.close();
     }
 
-    @RequestMapping(value = "/parameters/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/parameters/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public void parameters(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) throws MalformedURLException, ResourceKeyCreationException, ResourceException, ServletException, IOException {
         ServletContext servletContext = request.getSession().getServletContext();
         Report report = Report.findReport(id);
@@ -163,13 +163,13 @@ public class ReportController {
         out.flush();
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.show(id, request, response, Report.class);
     }
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.list(request, response, Report.class);

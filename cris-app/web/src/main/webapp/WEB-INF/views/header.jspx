@@ -17,12 +17,13 @@
     </script>
 
     <c:set value="${imagesRoot}/${wsBannerImage}" var="bannerUrl" />
+    <c:set value="${imagesRoot}/background_repeater.jpg" var="bannerBackgroundUrl" />
     <spring:url var="home" value="/" />
     <spring:message code="button_home" var="home_label" />
     <!--
     <a href="${home}" name="${fn:escapeXml(home_label)}" title="${fn:escapeXml(home_label)}"><img src="${bannerUrl}" width="100%" height="100px"/></a>
     -->
-    <div style="height: 100px; background-color: #D8B600; background-image: url('${bannerUrl}'); overflow: hidden; text-wrap: normal;">
+    <div style="height: 100px; background-color: #333333; background-image: url('${bannerUrl}'); overflow: hidden; text-wrap: normal; background-position: center; background-repeat: no-repeat;">
         <!-- -->
     </div>
 

@@ -124,13 +124,27 @@ public class FileStorageFileManager extends AbstractStorageFileManager {
         return children;
     }
 
+    private String makeTargetFileName(StorageFile storageFile) {
+        String fileName = storageFile.getFileName();
+        int index = fileName.lastIndexOf(".");
+        String targetFileName;
+        if (index != -1) {
+            targetFileName = fileName.substring(0, index) + "_" + storageFile.getId() + fileName.substring(index);
+        } else {
+            targetFileName = fileName + "_" + storageFile.getId();
+        }
+
+        return targetFileName;
+    }
+
     private String getFileFromStorage(StorageFile storageFile, String target) throws IOException {
         String source = storageFile.getStorageId().getLocation() + storageFile.getLocation();
 
         String destination;
         if (target == null || target.isEmpty() || target.endsWith("/")) {
             // if the target is a directory or empty, use the source file name as the destination file name
-            destination = (target == null || target.isEmpty()) ? storageFile.getFileName() : target + storageFile.getFileName();
+            String targetFilename = makeTargetFileName(storageFile);
+            destination = (target == null || target.isEmpty()) ? targetFilename : target + targetFilename;
         } else {
             destination = target;
         }

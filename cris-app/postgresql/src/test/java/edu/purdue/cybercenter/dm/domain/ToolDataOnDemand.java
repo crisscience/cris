@@ -92,7 +92,7 @@ public class ToolDataOnDemand {
     }
 
 	public void setImageId(Tool obj, int index) {
-        SmallObject imageId = smallObjectDataOnDemand.getRandomSmallObject();
+        Integer imageId = smallObjectDataOnDemand.getRandomSmallObject().getId();
         obj.setImageId(imageId);
     }
 
@@ -105,7 +105,7 @@ public class ToolDataOnDemand {
     }
 
 	public void setOwnerId(Tool obj, int index) {
-        Group ownerId = groupDataOnDemand.getRandomGroup();
+        Integer ownerId = groupDataOnDemand.getRandomGroup().getId();
         obj.setOwnerId(ownerId);
     }
 

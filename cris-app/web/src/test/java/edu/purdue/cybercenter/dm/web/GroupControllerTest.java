@@ -35,7 +35,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         if(groupMap == null || groupMap.isEmpty())
             throw new RuntimeException("Improper Inputs");
 
-        assertEquals(14, groupMap.size());
+        assertEquals(15, groupMap.size());
         assertEquals("Id", expectedMap.get("id"), groupMap.get("id"));
         assertEquals("Name", expectedMap.get("name"), groupMap.get("name"));
         assertEquals("OwnerId", ((Map<String, Object>) expectedMap.get("ownerId")).get("$ref"), ((Map<String, Object>) groupMap.get("ownerId")).get("$ref"));
@@ -52,11 +52,11 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
      */
     @Test
     public void testCreateGroup() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups").content(newGroup).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups").content(newGroup).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isCreated());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
     }
 
     /*
@@ -67,11 +67,11 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void testRetrieveGroup() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/groups/"+operationalGroupId).accept(MediaType.APPLICATION_JSON).session(httpSession);//operationalGroupId
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/groups/"+operationalGroupId).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);//operationalGroupId
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         validateGroupInfo(Helper.deserialize(operationalGroup, Map.class), Helper.deserialize(resultActions.andReturn().getResponse().getContentAsString(), Map.class));
 
@@ -92,11 +92,11 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         expectedMap.put("description", "This is a demo. Another Update.");
         expectedMap.put("name", "demoGroup with Update");
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/"+operationalGroupId).content(Helper.deepSerialize(groupMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/"+operationalGroupId).content(Helper.deepSerialize(groupMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         validateGroupInfo(expectedMap, Helper.deserialize(resultActions.andReturn().getResponse().getContentAsString(), Map.class));
 
@@ -112,11 +112,11 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         Map<String, Object> expectedMap = Helper.deserialize(operationalGroup, Map.class);
         expectedMap.put("enabled", false);
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/"+operationalGroupId).content(Helper.deepSerialize(expectedMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/"+operationalGroupId).content(Helper.deepSerialize(expectedMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         validateGroupInfo(expectedMap, Helper.deserialize(resultActions.andReturn().getResponse().getContentAsString(), Map.class));
 
@@ -132,11 +132,11 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         Map<String, Object> expectedMap = Helper.deserialize(deprecatedGroup, Map.class);
         expectedMap.put("enabled", true);
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/"+operationalGroupId).content(Helper.deepSerialize(expectedMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/"+operationalGroupId).content(Helper.deepSerialize(expectedMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         validateGroupInfo(expectedMap, Helper.deserialize(resultActions.andReturn().getResponse().getContentAsString(), Map.class));
 
@@ -149,7 +149,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
     */
     @Test
     public void testRetrieveNonExistGroup() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/groups/1006").accept(MediaType.APPLICATION_JSON).session(httpSession);//operationalGroupId
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/groups/1006").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);//operationalGroupId
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -166,7 +166,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
     public void testUpdateNonExistGroup() throws Exception{
         String groupUpdate = "{id: 1006, description: \"This is a demo. Another Update.\", name: \"demoGroup with Update\"}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/1006").content(groupUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/1006").content(groupUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -183,7 +183,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
     public void testDeprecateNonExistGroup() throws Exception{
         String groupUpdate = "{id: 1006,\"enabled\":false}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/1006").content(groupUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/1006").content(groupUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -200,7 +200,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
     public void testRestoreNonExistGroup() throws Exception{
         String groupUpdate = "{id: 1006, \"enabled\":true}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/1006").content(groupUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/groups/1006").content(groupUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -220,12 +220,12 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String groupId = "1000";
         String addUser = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeAdded + "\"}}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         System.out.println(resultActions.andReturn().getResponse().getContentAsString());
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
     }
     /*
@@ -239,11 +239,11 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeRemoved = "2";
         String groupId = "1000";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
     }
 
     /*
@@ -257,7 +257,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeAdded = "1000";// non exist user
         String groupId = "1000";
         String addUser = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeAdded + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -273,7 +273,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeRemoved = "1000"; // non exist user
         String groupId = "1000";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -289,7 +289,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeAdded = "6";
         String groupId = "5000";// Non exist Group
         String addUser = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeAdded + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -305,7 +305,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeRemoved = "6";
         String groupId = "5000";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -321,7 +321,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeAdded = "1000";// Non exist Group
         String groupId = "5000";// Non exist Group
         String addUser = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeAdded + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/add?groupId=" + groupId + "&userId="+userIdToBeAdded).content(addUser).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -337,7 +337,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeRemoved = "1000";// Non exist user
         String groupId = "5000";// Non exist group
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = delete("/groups/remove?groupId=" + groupId + "&userId="+userIdToBeRemoved).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -353,11 +353,11 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeMadeAdmin = "2";
         String groupId = "1000";
         String addUserAsAdmin = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeMadeAdmin + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
     }
     /*
      * 19. set an existing user as the owner of an existing group of which the user is a NOT member
@@ -370,7 +370,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeMadeAdmin = "6"; // Non member
         String groupId = "1000";
         String addUserAsAdmin = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeMadeAdmin + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -386,7 +386,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeMadeAdmin = "1000";// Non exist user
         String groupId = "1000";
         String addUserAsAdmin = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeMadeAdmin + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -402,7 +402,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeMadeAdmin = "1";
         String groupId = "5000"; // Non exist group
         String addUserAsAdmin = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeMadeAdmin + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -418,7 +418,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         String userIdToBeMadeAdmin = "1000"; //Non exist user
         String groupId = "5000"; // Non exist group
         String addUserAsAdmin = "{\"groupId\": {$ref: \"/groups/"+ groupId+"\"}, \"userId\": {$ref: \"/users/" + userIdToBeMadeAdmin + "\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/groups/admin?groupId=" + groupId + "&userId="+userIdToBeMadeAdmin).content(addUserAsAdmin).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         resultActions.andExpect(status().isNotFound());
@@ -450,7 +450,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
 
         assertEquals(map.size(), 0);
 
-        mockHttpServletRequestBuilder = post("/groupusers").accept(MediaType.APPLICATION_JSON)
+        mockHttpServletRequestBuilder = post("/groupusers").accept(MediaType.APPLICATION_JSON_UTF8)
             .content("{\"groupId\":{\"$ref\":\"/groups/" + groupId + "\"},\"userId\":{\"$ref\":\"/users/" + userId + "\"}}")
             .session(httpSession);
 
@@ -490,7 +490,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
     }
 
     private Integer createTestGroup() throws Exception {
-        MockHttpServletRequestBuilder  mockHttpServletRequestBuilder = get("/testws").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder  mockHttpServletRequestBuilder = get("/testws").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
 
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
@@ -498,7 +498,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         assertNotNull(httpSession.getAttribute("tenantId"));
 
         login(Constant.AdminUsername, "password");
-        mockHttpServletRequestBuilder = post("/groups").accept(MediaType.APPLICATION_JSON)
+        mockHttpServletRequestBuilder = post("/groups").accept(MediaType.APPLICATION_JSON_UTF8)
                 .content("{name : \"Test Group\", description : \"This is a test group.\"}")
                 .session(httpSession);
 
@@ -526,7 +526,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
 
     private Integer enableTestUser() throws Exception {
         login(Constant.AdminUsername, "password");
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/users?sort=+lastName").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/users?sort=+lastName").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         String content = resultActions.andReturn().getResponse().getContentAsString();
         List<Map<String, Object>> map = Helper.deserialize(content, List.class);
@@ -541,7 +541,7 @@ public class GroupControllerTest extends BaseWithAdminUserControllerTest {
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         content = resultActions.andReturn().getResponse().getContentAsString();
         content = content.replace("\"enabled\":false", "\"enabled\":true");
-        mockHttpServletRequestBuilder = put("/users/" + userId).content(content).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = put("/users/" + userId).content(content).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         content = resultActions.andReturn().getResponse().getContentAsString();
         System.out.println("GCT: ******************************************" + content + "******************************************");

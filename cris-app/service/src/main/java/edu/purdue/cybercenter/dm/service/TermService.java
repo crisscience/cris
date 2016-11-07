@@ -10,18 +10,22 @@ import edu.purdue.cybercenter.dm.util.CDataEscapeHandler;
 import edu.purdue.cybercenter.dm.util.DomainObjectHelper;
 import edu.purdue.cybercenter.dm.util.EnumAssetStatus;
 import edu.purdue.cybercenter.dm.util.Helper;
+import edu.purdue.cybercenter.dm.util.ServiceUtils;
 import edu.purdue.cybercenter.dm.vocabulary.util.VocabularyUtils;
 import edu.purdue.cybercenter.dm.xml.vocabulary.AttachTo;
+import edu.purdue.cybercenter.dm.xml.vocabulary.Property;
 import edu.purdue.cybercenter.dm.xml.vocabulary.Term;
 import edu.purdue.cybercenter.dm.xml.vocabulary.ValidationType;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import javax.persistence.TypedQuery;
 import javax.xml.bind.JAXBContext;
@@ -43,6 +47,16 @@ import org.springframework.stereotype.Service;
 public class TermService {
 
     static final private String VOCABULARY_SCHEMA_LOCATION = "http://cyber.purdue.edu/cris/schemas/vocabulary/1.0.0 vocabulary-1.0.0.xsd";
+
+    private JAXBContext context;
+
+    public TermService() {
+        try {
+            context = JAXBContext.newInstance(Term.class);
+        } catch (JAXBException ex) {
+            throw new RuntimeException("failed to instantiate unmarshaller for Term: " + ex.getMessage());
+        }
+    }
 
     @Autowired
     private DomainObjectService domainObjectService;
@@ -347,13 +361,15 @@ public class TermService {
             List<Term> terms = termFound.getTerm();
             termFound = null;
 
+            Map<String, Object> result = ServiceUtils.processArrayNotation(alias);
+            String base = (String) result.get("base");
             for (Term t : terms) {
                 String termAlias = t.getAlias();
                 if (termAlias == null || termAlias.isEmpty()) {
                     termAlias = t.getName();
                 }
 
-                if (termAlias != null && termAlias.equals(alias)) {
+                if (termAlias != null && termAlias.equals(base)) {
                     termFound = t;
                     break;
                 }
@@ -607,16 +623,16 @@ public class TermService {
         if (StringUtils.isEmpty(term.getAlias())) {
             isTermValid = true;
         } else {
-            List<Term> terms = getTerms(UUID.fromString(term.getUuid()), false);
-            isTermValid = !terms.isEmpty();
+            edu.purdue.cybercenter.dm.domain.Term found  = findByUuidAndVersionNumber(UUID.fromString(term.getUuid()), null);
+            isTermValid = found != null;
         }
         return isTermValid;
     }
 
     public boolean isTermValid(AttachTo attachTo) {
-        List<Term> terms = getTerms(UUID.fromString(attachTo.getUuid()), false);
+        edu.purdue.cybercenter.dm.domain.Term found  = findByUuidAndVersionNumber(UUID.fromString(attachTo.getUuid()), null);
 
-        boolean isTermValid = !terms.isEmpty();
+        boolean isTermValid = found != null;
 
         return isTermValid;
     }
@@ -627,15 +643,13 @@ public class TermService {
         if (StringUtils.isEmpty(term.getAlias())) {
             isVersionValid = true;
         } else {
-            List<Term> terms = getTerms(UUID.fromString(term.getUuid()), false);
-            isVersionValid = false;
-
+            String uuid = term.getUuid();
             String version = term.getVersion();
-            for (Term t : terms) {
-                if (t.getVersion().equals(version)) {
-                    isVersionValid = true;
-                    break;
-                }
+            if (!StringUtils.isEmpty(uuid) && !StringUtils.isEmpty(version)) {
+                edu.purdue.cybercenter.dm.domain.Term found  = findByUuidAndVersionNumber(UUID.fromString(uuid), UUID.fromString(version));
+                isVersionValid = found != null;
+            } else {
+                isVersionValid = false;
             }
         }
 
@@ -643,16 +657,17 @@ public class TermService {
     }
 
     public boolean isVersionValid(AttachTo attachTo) {
-        List<Term> terms = getTerms(UUID.fromString(attachTo.getUuid()), false);
         boolean isVersionValid = false;
 
+        String uuid = attachTo.getUuid();
         String version = attachTo.getVersion();
-        for (Term t : terms) {
-            if (t.getVersion().equals(version)) {
-                isVersionValid = true;
-                break;
-            }
+        if (StringUtils.isEmpty(uuid) || StringUtils.isEmpty(version)) {
+            return isVersionValid;
         }
+
+        edu.purdue.cybercenter.dm.domain.Term found  = findByUuidAndVersionNumber(UUID.fromString(uuid), UUID.fromString(version));
+
+        isVersionValid = found != null;
 
         return isVersionValid;
     }
@@ -661,10 +676,10 @@ public class TermService {
         // "term" needs to be an existing in the system
         boolean isLatest = true;
 
-        List<Term> terms = getTerms(UUID.fromString(term.getUuid()), false);
-        if (!terms.isEmpty()) {
-            Term latestTerm = terms.get(0);
-            if (!latestTerm.getVersion().equals(term.getVersion())) {
+        edu.purdue.cybercenter.dm.domain.Term latestTerm = findByUuidAndVersionNumber(UUID.fromString(term.getUuid()), null);
+        if (latestTerm != null) {
+            String version = latestTerm.getVersionNumber() != null ? latestTerm.getVersionNumber().toString() : null;
+            if (version != null && !version.equals(term.getVersion())) {
                 isLatest = false;
             }
         }
@@ -676,10 +691,10 @@ public class TermService {
         // "term" needs to be an existing in the system
         boolean isLatest = true;
 
-        List<Term> terms = getTerms(UUID.fromString(attachTo.getUuid()), false);
-        if (!terms.isEmpty()) {
-            Term latestTerm = terms.get(0);
-            if (!latestTerm.getVersion().equals(attachTo.getVersion())) {
+        edu.purdue.cybercenter.dm.domain.Term latestTerm = findByUuidAndVersionNumber(UUID.fromString(attachTo.getUuid()), null);
+        if (latestTerm != null) {
+            String version = latestTerm.getVersionNumber() != null ? latestTerm.getVersionNumber().toString() : null;
+            if (version != null && !version.equals(attachTo.getVersion())) {
                 isLatest = false;
             }
         }
@@ -751,32 +766,27 @@ public class TermService {
 
     public Term convertXmlToTerm(String xmlTerm) {
         Term term = null;
-        try {
-            JAXBContext context = JAXBContext.newInstance(Term.class);
+        try (InputStream is = new ByteArrayInputStream(xmlTerm.getBytes())) {
             Unmarshaller unMarshaller = context.createUnmarshaller();
-            InputStream is = new ByteArrayInputStream(xmlTerm.getBytes());
-            Object unmarshalled = unMarshaller.unmarshal(is);
-            if (unmarshalled instanceof Term) {
-                term = (Term) unmarshalled;
-            }
+            term = (Term) unMarshaller.unmarshal(is);
+            fixExpression(term);
         } catch (JAXBException ex) {
-            throw new RuntimeException("Invalid xml term definition", ex);
+            throw new RuntimeException("Unable to convert xml to term definition", ex);
+        } catch (IOException ex) {
+            throw new RuntimeException("Unable to read xml term definition", ex);
         }
         return term;
     }
 
     public String convertTermToXml(Term term) {
         String xmlTerm = null;
-        try {
-            JAXBContext writerContext = JAXBContext.newInstance(Term.class);
-            Marshaller marshaller = writerContext.createMarshaller();
+        try (OutputStream os = new ByteArrayOutputStream()) {
+            Marshaller marshaller = context.createMarshaller();
             marshaller.setProperty(CharacterEscapeHandler.class.getName(), CDataEscapeHandler.theInstance);
             marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
             marshaller.setProperty(Marshaller.JAXB_SCHEMA_LOCATION, VOCABULARY_SCHEMA_LOCATION);
-            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-                marshaller.marshal(term, bos);
-                xmlTerm = new String(bos.toByteArray());
-            }
+            marshaller.marshal(term, os);
+            xmlTerm = os.toString();
         } catch (JAXBException ex) {
             throw new RuntimeException("Unable to generate xml term definition", ex);
         } catch (IOException ex) {
@@ -785,7 +795,56 @@ public class TermService {
         return xmlTerm;
     }
 
+    public boolean fileIsList(Term term) {
+        boolean isList = false;
+
+        ValidationType validation = term.getValidation();
+        if (validation != null) {
+            List<ValidationType.Validator> validators = validation.getValidator();
+            if (!validators.isEmpty()) {
+                ValidationType.Validator validator = validators.get(0);
+                List<Property> properties = validator.getProperty();
+                for (Property property : properties) {
+                    if ("multiple".equals(property.getName())) {
+                        if ("true".equals(property.getValue())) {
+                            isList = true;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return isList;
+    }
+
     private void setDefaultProperties(Term term) {
         VocabularyUtils.fixTerm(term);
+    }
+
+    private void fixExpression(Term term) {
+        String readOnlyExpression = term.getReadOnlyExpressionAttr();
+        String requiredExpression = term.getRequiredExpressionAttr();
+        if (StringUtils.isNotEmpty(readOnlyExpression)) {
+            term.setReadOnlyExpression(readOnlyExpression);
+        }
+        if (StringUtils.isNotEmpty(requiredExpression)) {
+            term.setRequiredExpression(requiredExpression);
+        }
+
+        term.getAttachTo().stream().forEach((a) -> {
+            String readOnly = a.getReadOnlyExpressionAttr();
+            String required = a.getRequiredExpressionAttr();
+            if (StringUtils.isNotEmpty(readOnly)) {
+                a.setReadOnlyExpression(readOnly);
+            }
+            if (StringUtils.isNotEmpty(required)) {
+                a.setRequiredExpression(required);
+            }
+        });
+
+        term.getTerm().stream().forEach((t) -> {
+            fixExpression(t);
+        });
+
     }
 }

@@ -23,7 +23,7 @@ public class GroupUserController {
     @Autowired
     private GroupUserService groupUserService;
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public ResponseEntity<String> getGroupUser(@RequestParam(value = "groupId", required = true) Integer groupId, @RequestParam(value = "userId", required = true) Integer userId, HttpServletRequest request, HttpServletResponse response) {
         GroupUser groupUser = groupUserService.getGroupUser(groupId, userId);
 
@@ -33,7 +33,7 @@ public class GroupUserController {
         return responseEntity;
     }
 
-    @RequestMapping(method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public ResponseEntity<String> createGroupUser(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         GroupUser groupUser = DomainObjectUtils.fromJson(json, request.getContextPath(), GroupUser.class);
         groupUser = groupUserService.createGroupUser(groupUser);
@@ -44,7 +44,7 @@ public class GroupUserController {
         return responseEntity;
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     public ResponseEntity<String> deleteGroupUser(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         groupUserService.deleteGroupUser(id);
 

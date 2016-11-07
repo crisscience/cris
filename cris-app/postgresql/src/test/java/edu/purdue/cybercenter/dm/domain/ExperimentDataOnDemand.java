@@ -80,7 +80,7 @@ public class ExperimentDataOnDemand {
     }
 
 	public void setImageId(Experiment obj, int index) {
-        SmallObject imageId = smallObjectDataOnDemand.getRandomSmallObject();
+        Integer imageId = smallObjectDataOnDemand.getRandomSmallObject().getId();
         obj.setImageId(imageId);
     }
 
@@ -93,7 +93,7 @@ public class ExperimentDataOnDemand {
     }
 
 	public void setOwnerId(Experiment obj, int index) {
-        Group ownerId = groupDataOnDemand.getRandomGroup();
+        Integer ownerId = groupDataOnDemand.getRandomGroup().getId();
         obj.setOwnerId(ownerId);
     }
 

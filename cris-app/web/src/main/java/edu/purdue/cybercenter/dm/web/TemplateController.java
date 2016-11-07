@@ -40,7 +40,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
@@ -64,13 +63,13 @@ public class TemplateController {
         return "templates/index";
     }
 
-   @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+   @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.show(id, request, response, edu.purdue.cybercenter.dm.domain.Term.class);
     }
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
         Session session = DomainObjectHelper.getHbmSession();
@@ -82,7 +81,7 @@ public class TemplateController {
         return result;
     }
 
-    @RequestMapping(value = "/metadata/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/metadata/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object getMetadataByUuidAndVersion(@PathVariable("uuid") String uuid, @PathVariable("version") String version, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Term dbTerm = termService.findByUuidAndVersionNumber(UUID.fromString(uuid), UUID.fromString(version));
@@ -90,7 +89,7 @@ public class TemplateController {
         return result;
     }
 
-    @RequestMapping(value = "/metadata/{uuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/metadata/{uuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object getMetadataByUuid(@PathVariable("uuid") String uuid, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Term dbTerm = termService.findByUuidAndVersionNumber(UUID.fromString(uuid), null);
@@ -109,15 +108,23 @@ public class TemplateController {
             if (!mpFile.isEmpty()) {
                 try {
                     String xmlTemplate = new String(mpFile.getBytes());
-                    dbTemplate = templateService.saveXml(xmlTemplate, mpFile.getOriginalFilename());
+                    Term template = termService.convertXmlToTerm(xmlTemplate);
+                    String sUuid = template.getUuid();
+                    String sVersion = template.getVersion();
+                    String sForceImport = request.getParameter("force");
+                    boolean force = (sForceImport != null && sForceImport.equals("true"));
 
-                    // update search engine
-                    //TODO: This should just generate an event instead of doing the update itself
-                    try {
-                        String sEngineUrl = (String) request.getSession().getServletContext().getAttribute("searchEngineUrl");
-                        notifySearchEngine(dbTemplate.getUuid().toString(), sEngineUrl);
-                    } catch (Exception ex) {
-                        // ignore failure
+                    if (force) {
+                        dbTemplate = templateService.save(template, mpFile.getOriginalFilename());
+                    } else if (sUuid != null && sVersion != null) {
+                        edu.purdue.cybercenter.dm.domain.Term existing = termService.findByUuidAndVersionNumber(UUID.fromString(sUuid), UUID.fromString(sVersion));
+                        if (existing == null) {
+                            dbTemplate = templateService.save(template, mpFile.getOriginalFilename());
+                        } else {
+                            error = "template version already exists. Please use the force flag to allow system to generate a new version number";
+                        }
+                    } else {
+                        error = "missing uuid/version. populate these fields or use force flag";
                     }
                 } catch (IOException ex) {
                     // Return error message saying upload will fail because same version cannot be uploaded twice.
@@ -185,7 +192,7 @@ public class TemplateController {
         }
     }
 
-    @RequestMapping(value = "/save", method = {RequestMethod.PUT, RequestMethod.POST}, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/save", method = {RequestMethod.PUT, RequestMethod.POST}, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object save(HttpServletRequest request, HttpServletResponse response) {
         boolean hasError = false;
@@ -199,15 +206,6 @@ public class TemplateController {
             message = "Fail to save template: " + ex.getMessage();
         }
 
-        // update search engine
-        //TODO: This should just generate an event instead of doing the update itself
-        try {
-            String sEngineUrl = (String) request.getSession().getServletContext().getAttribute("searchEngineUrl");
-            notifySearchEngine(dbTemplate.getUuid().toString(), sEngineUrl);
-        } catch (Exception ex) {
-            // ignore failure
-        }
-
         Map<String, Object> result = new HashMap<>();
         result.put("hasError", hasError);
         result.put("message", message);
@@ -216,7 +214,7 @@ public class TemplateController {
         return Helper.serialize(result);
     }
 
-    @RequestMapping(value = "/load/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/load/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object loadById(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Term dbTerm;
@@ -231,7 +229,7 @@ public class TemplateController {
 
     }
 
-    @RequestMapping(value = "/load/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/load/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object loadByUuidAndVersion(@PathVariable("uuid") String uuid, @PathVariable("version") String version, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Term dbTerm = termService.findByUuidAndVersionNumber(UUID.fromString(uuid), UUID.fromString(version));
@@ -239,7 +237,7 @@ public class TemplateController {
         return result;
     }
 
-    @RequestMapping(value = "/load", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/load", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object load(HttpServletRequest request, HttpServletResponse response) {
         String id = request.getParameter("id");
@@ -266,7 +264,7 @@ public class TemplateController {
         return result;
     }
 
-    @RequestMapping(value = "/head/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/head/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object makeCurrent(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Term dbTerm = termService.findById(id);
@@ -274,7 +272,7 @@ public class TemplateController {
         return Helper.serialize(dbTerm);
     }
 
-    @RequestMapping(value = "/status/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/status/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     @CacheEvict(value = "vocabulary", allEntries = true)
     public Object changeStatus(@PathVariable("id") Integer id, @RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
@@ -288,7 +286,7 @@ public class TemplateController {
         return result;
     }
 
-    @RequestMapping(value = "/versions/{uuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/versions/{uuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object getVersionsByUuid(@PathVariable("uuid") UUID uuid, HttpServletRequest request, HttpServletResponse response) {
         List<Map<String, Object>> results = getVersions(uuid);
@@ -341,7 +339,7 @@ public class TemplateController {
         return termService.convertTermToXml(template);
     }
 
-    @RequestMapping(value = "/json/names", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/json/names", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listNames(HttpServletRequest request, HttpServletResponse response) {
         Session session = DomainObjectHelper.getHbmSession();
@@ -393,9 +391,11 @@ public class TemplateController {
         //Where where = WebHelper.FromJsonToFilterClass(String.format("{\"op\":\"equal\",\"data\":[{\"op\":\"boolean\",\"data\":\"isTemplate\",\"isCol\":true},{\"op\":\"boolean\",\"data\":\"%s\",\"isCol\":false}]}", "true"));
         //List<edu.purdue.cybercenter.dm.domain.Term> items = domainObjectService.findEntries(0, Integer.MAX_VALUE, null, where, edu.purdue.cybercenter.dm.domain.Term.class);
         List<edu.purdue.cybercenter.dm.domain.Term> items = templateService.findLatest();
+        Map<String, Object> aggregators = new HashMap<>();
+        aggregators.put(DocumentService.AGGREGATOR_MATCH, queryMap);
         for (edu.purdue.cybercenter.dm.domain.Term item : items) {
             String showAll = request.getParameter("showAll");
-            if ((showAll != null && showAll.equals("true")) || datasetService.count(item.getUuid(), queryMap) > 0) {
+            if ((showAll != null && showAll.equals("true")) || datasetService.count(item.getUuid(), aggregators) > 0) {
                 Map<String, String> nvp = new HashMap<>();
                 nvp.put("id", item.getUuid().toString());
                 nvp.put("name", item.getName());
@@ -407,7 +407,7 @@ public class TemplateController {
         Collections.sort(ssItems, new Comparator<Map<String, String>>() {
             @Override
             public int compare(Map<String, String> a, Map<String, String> b) {
-                return a.get("name").compareTo(b.get("name"));
+                return a.get("name").compareToIgnoreCase(b.get("name"));
             }
         });
 
@@ -416,7 +416,7 @@ public class TemplateController {
 
     //TODO: use listDatasetJson() from RestController
     @Deprecated()
-    @RequestMapping(value = "/json/dataset", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/json/dataset", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listDataset(HttpServletRequest request, HttpServletResponse response) {
         String sTemplateUuid = request.getParameter("templateUuid");
@@ -469,10 +469,13 @@ public class TemplateController {
         UUID templateUuid = UUID.fromString(sTemplateUuid);
         UUID templateVersion = (sTemplateVersion == null || sTemplateVersion.isEmpty()) ? null : UUID.fromString(sTemplateVersion);
 
+        Map<String, Object> aggregators = new HashMap<>();
+        aggregators.put(DocumentService.AGGREGATOR_MATCH, query);
+
         Integer[] a = WebHelper.getDojoGridPaginationInfo(request);
         int firstResult = a[0];
         int maxResults = a[1] - firstResult + 1;
-        int count = (int) datasetService.count(templateUuid, query);
+        int count = (int) datasetService.count(templateUuid, aggregators);
         if (maxResults > 0) {
             Map<String, Integer> sort = new HashMap<>();
             Map.Entry<String, String> ele = WebHelper.getDojoJsonRestStoreOrderBy(request.getParameterNames());
@@ -489,8 +492,6 @@ public class TemplateController {
             } else {
                 sort.put(ele.getKey(), "asc".equals(ele.getValue()) ? 1 : -1);
             }
-            Map<String, Object> aggregators = new HashMap<>();
-            aggregators.put(DocumentService.AGGREGATOR_MATCH, query);
             aggregators.put(DocumentService.AGGREGATOR_SORT, sort);
             aggregators.put(DocumentService.AGGREGATOR_SKIP, firstResult);
             aggregators.put(DocumentService.AGGREGATOR_LIMIT, maxResults);
@@ -503,7 +504,7 @@ public class TemplateController {
         }
     }
 
-    @RequestMapping(value = "/json/layout", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/json/layout", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String layout(HttpServletRequest request, HttpServletResponse response) {
         String sTemplateUuid = request.getParameter("templateUuid");
@@ -565,28 +566,6 @@ public class TemplateController {
         }
         finalContent.add(content);
         return finalContent;
-    }
-
-    private void notifySearchEngine(String templateUuid, String sEngineUrl) {
-        // create index for elasticsearch
-        String collectionName = DatasetUtils.makeCollectionName(templateUuid, false);
-
-        Map<String, Object> mongodb = new HashMap<>();
-        mongodb.put("db", "cris");
-        mongodb.put("collection", collectionName);
-
-        Map<String, Object> index = new HashMap<>();
-        index.put("name", "cris");
-        index.put("type", collectionName);
-
-        Map<String, Object> mapRequest = new HashMap<>();
-        mapRequest.put("type", "mongodb");
-        mapRequest.put("mongodb", mongodb);
-        mapRequest.put("index", index);
-
-        RestTemplate restTemplate = new RestTemplate();
-        String searchEngineUrl = sEngineUrl;
-        restTemplate.put(searchEngineUrl + "_river/" + collectionName + "/_meta", Helper.serialize(mapRequest));
     }
 
 }

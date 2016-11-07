@@ -16,78 +16,53 @@
     <spring:url value="/auth/signout" var="urlSignout"/>
     <spring:url value="/profile" var="urlProfile"/>
 
-    <script>
-        function changeView() {
-            var view = dijit.byId("idView");
-            window.location.href='${urlHome}' + '?view=' + view.get("value");
-        }
+    <div>
+        <div class="pull-left">
+            <a href="${urlHome}" title="Computational Research Infrastructure for Science">
+                <span class="glyphicon glyphicon-home" title="Go home"><!-- --></span><span class="hidden-xs hidden-sm">&amp;nbsp;CRIS</span>
+            </a>
+            <c:if test="${empty tenant.name}">
+                Computational Research Infrastructure for Science
+            </c:if>
+        </div>
 
-        cris.require([
-            "dijit/form/ComboBox"
-        ]);
-
-        cris.ready(function() {
-            var view = dijit.byId("idView");
-            dojo.connect(view, "onChange", changeView);
-        });
-    </script>
-
-    <table style="border: 0px; padding: 0px; margin: 0px; width: 100%;">
-        <tr style="border: 0px; padding: 0px; margin: 0px;">
-            <td style="border: 0px; padding: 0px; margin: 0px; background-color: #ffffff">
-                <a href="${urlHome}" title="Computational Research Infrastructure for Science">
-                    <c:set value="${imagesRoot}/famfamfam_silk_icons_v013/icons/house.png" var="urlLogo"/>
-                    <img src="${urlLogo}"/>
-                    CRIS
+        <c:if test="${not empty tenant.name}">
+        <div class="pull-right">
+            <sec:authorize access="isAuthenticated()">
+                <a href="${urlProfile}">
+                    <span class="glyphicon glyphicon-user" title='${user.firstName} ${user.lastName}'><!-- --></span>&amp;nbsp;${user.firstName}
                 </a>
-            </td>
-
-            <c:if test="${not empty tenant.name}">
-            <td style="border: 0px; padding: 0px; margin: 0px; background-color: #ffffff">
-                ${tenant.name}
-            </td>
-
-            <td style="text-align: right; border: 0px; padding: 0px; margin: 0px; background-color: #ffffff">
-                <sec:authorize access="isAuthenticated()">
-                    Welcome <a href="${urlProfile}">${user.firstName}</a>
-
-                    &amp;nbsp;&amp;nbsp; | &amp;nbsp;&amp;nbsp;
-
-                    <c:if test="${fn:length(views) > 1}">
-                    View:
-                    <select data-dojo-type="dijit.form.ComboBox" id="idView" name="view" data-dojo-props="value: '${currentView}'" style="width: 80px; border: 0px; background-color: #D8B600">
-                        <option>admin</option>
-                        <option>user</option>
-                    </select>
-
-                    &amp;nbsp;&amp;nbsp; | &amp;nbsp;&amp;nbsp;
-                    </c:if>
-
-                    <a href="${urlSignout}">
-                        <spring:message code="security_logout"/>
-                    </a>
-                </sec:authorize>
-                <sec:authorize access="!isAuthenticated()">
-                    To access the system, please
-                    <a href="${urlSignin}">
-                        <spring:message code="dm_sign_in"/>
-                    </a>
-
-                    &amp;nbsp;&amp;nbsp; | &amp;nbsp;&amp;nbsp;
-
-                    New here?
-
-                    <a href="${urlSignup}">
-                        <spring:message code="dm_sign_up"/>
-                    </a>
-                </sec:authorize>
 
                 &amp;nbsp;&amp;nbsp; | &amp;nbsp;&amp;nbsp;
-                <c:set value="${imagesRoot}/famfamfam_silk_icons_v013/icons/help.png" var="urlHelpIcon"/>
-                <a href="${urlHelp}"><img src="${urlHelpIcon}" title="Help"/></a>
-            </td>
-            </c:if>
-        </tr>
-    </table>
+
+                <a href="${urlSignout}">
+                    <span class="glyphicon glyphicon-off" title='logout'><!-- --></span>&amp;nbsp;<spring:message code="security_logout"/>
+                </a>
+            </sec:authorize>
+            <sec:authorize access="!isAuthenticated()">
+                <a href="${urlSignin}">
+                    <spring:message code="dm_sign_in"/>
+                </a>
+
+                &amp;nbsp;&amp;nbsp; | &amp;nbsp;&amp;nbsp;
+
+                New here?
+
+                <a href="${urlSignup}">
+                    <spring:message code="dm_sign_up"/>
+                </a>
+            </sec:authorize>
+
+            &amp;nbsp;&amp;nbsp; | &amp;nbsp;&amp;nbsp;
+            <a href="${urlHelp}"><span class="glyphicon glyphicon-question-sign" title='Help'><!-- --></span></a>
+        </div>
+
+        <div class="hidden-xs hidden-sm text-center">
+            <span class="label label-default">${tenant.name}</span>
+        </div>
+        </c:if>
+
+        <div class="clearfix"><!-- --></div>
+    </div>
 
 </jsp:root>

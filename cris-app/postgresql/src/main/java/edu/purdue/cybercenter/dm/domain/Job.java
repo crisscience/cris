@@ -17,7 +17,6 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
-import javax.validation.constraints.NotNull;
 import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.Filters;
 import org.hibernate.envers.Audited;
@@ -42,14 +41,11 @@ import org.springframework.beans.factory.annotation.Configurable;
 @Audited
 @EntityListeners(CrisEntityListener.class)
 @Configurable
-public class Job extends AbstractCrisEntity {
+public class Job extends AbstractCrisAsset {
     private static final long serialVersionUID = 1L;
 
     @OneToMany(mappedBy = "jobId", cascade = CascadeType.REMOVE)
     private Set<JobContext> jobContexts;
-
-    @Column(name = "status_id")
-    private Integer statusId;
 
     @ManyToOne
     @JoinColumn(name = "experiment_id", referencedColumnName = "id")
@@ -68,23 +64,12 @@ public class Job extends AbstractCrisEntity {
     private Project projectId;
 
     @ManyToOne
-    @JoinColumn(name = "resource_id", referencedColumnName = "id")
-    private Resource resourceId;
-
-    @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User userId;
 
     @ManyToOne
     @JoinColumn(name = "workflow_id", referencedColumnName = "id")
     private Workflow workflowId;
-
-    @Column(name = "name", length = 100)
-    @NotNull
-    private String name;
-
-    @Column(name = "description")
-    private String description;
 
     @Column(name = "parameters")
     private String parameters;
@@ -109,14 +94,6 @@ public class Job extends AbstractCrisEntity {
 
     public void setJobContexts(Set<JobContext> jobContexts) {
         this.jobContexts = jobContexts;
-    }
-
-    public Integer getStatusId() {
-        return statusId;
-    }
-
-    public void setStatusId(Integer statusId) {
-        this.statusId = statusId;
     }
 
     public Experiment getExperimentId() {
@@ -151,14 +128,6 @@ public class Job extends AbstractCrisEntity {
         this.projectId = projectId;
     }
 
-    public Resource getResourceId() {
-        return resourceId;
-    }
-
-    public void setResourceId(Resource resourceId) {
-        this.resourceId = resourceId;
-    }
-
     public User getUserId() {
         return userId;
     }
@@ -173,22 +142,6 @@ public class Job extends AbstractCrisEntity {
 
     public void setWorkflowId(Workflow workflowId) {
         this.workflowId = workflowId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
     }
 
     public String getParameters() {

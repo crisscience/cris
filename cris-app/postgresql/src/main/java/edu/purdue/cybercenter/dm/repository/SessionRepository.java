@@ -6,8 +6,6 @@
 package edu.purdue.cybercenter.dm.repository;
 
 import edu.purdue.cybercenter.dm.domain.Session;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.querydsl.QueryDslPredicateExecutor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -15,6 +13,6 @@ import org.springframework.stereotype.Repository;
  * @author xu222
  */
 @Repository
-public interface SessionRepository extends JpaRepository<Session, Integer>, QueryDslPredicateExecutor<Session> {
+public interface SessionRepository extends CrisRepository<Session> {
     public Session findByJsessionid(String jsessionId);
 }

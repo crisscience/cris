@@ -4,23 +4,19 @@ body, div, td {
     font-size: 12px;
     color: #555555;
 }
+html {
+    position: relative;
+    min-height: 100%;
+}
 
 body {
-    background-color: #777777;
-    text-align: center;
-    margin: 0px;
+    margin-bottom: 80px;
 }
 
 #wrapper {
-    width: 980px;
-    min-width: 980px;
-    max-width: 980px;
     margin-right: auto;
     margin-left: auto;
     background-color: #ffffff;
-
-    overflow: hidden;
-    display: block;
 }
 
 #debug {
@@ -39,20 +35,25 @@ body {
 }
 
 #main {
-    overflow: hidden;
-    display: block;
-    margin: 1em;
 }
 
 #footer {
-    background-color: #D8B600;
-    height: 5em;
 }
 
 #copyright {
     margin: 4px;
     margin-left: 1em;
     margin-right: 1em;
+    color: #888888;
+}
+
+.footer-bar {
+    padding: 5px;
+    background-color: #333333;
+    height: 60px;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
 }
 
 .floatLeft {
@@ -156,13 +157,48 @@ table.borderless {
     width: 100%
 }
 
+.table tbody > tr > td {
+    vertical-align: middle;
+}
+
+table.table-striped tbody > tr > td {
+    border: none;
+}
+
 table.borderless tr, table.borderless td {
     border: 0px;
 }
 
+table.plain {
+    border: 0 !important;
+    /*width: auto !important;*/
+    margin: 0 !important;
+}
+
+table.plain tr td  {
+    border: 0 !important;
+    background-color: #fff !important;
+}
+
+.table-striped td, .table-striped th {
+    padding: 2px;
+}
+
+.table-striped th {
+    font-size: 0.9em;
+    text-align: left;
+    font-weight: bold;
+    color: #FFF;
+    background: #999;
+}
+
 label {
+    /*
     width:120px;
     float:left;
+    */
+    //word-wrap: break-word;
+    //white-space: normal;
 }
 
 input, textarea, select {
@@ -193,7 +229,7 @@ div .box {
 .claro h1,h2,h3,h4,h5,h6 {
     margin-top: 10px;
     font-weight: bold;
-    color: #D8B600;
+    color: #a57600;
 }
 
 .claro h1 {
@@ -240,24 +276,25 @@ div .box {
     color: #333333;
 }
 
-a {
-    text-decoration: underline;
-}
-
 a img {
     border: 0 none;
     vertical-align: middle;
 }
 
 a:link {
-    color: #D8B600;
+    /*color: #D8B600;*/
+    text-decoration: underline;
+}
+
+.nav a:link {
+    text-decoration: none;
 }
 
 a:hover {
 }
 
 a:active {
-    color: #D8B600;
+    /*color: #D8B600;*/
 }
 
 a:visited {
@@ -485,7 +522,7 @@ fieldset th {
 }
 */
 
-.claro select {
+select.claro  {
     width: 240px;
 }
 
@@ -520,6 +557,18 @@ fieldset th {
 .termIndexLabel {
     display: inline-block;
     width: 50px;
+}
+
+.storageFileContainer {
+    /*margin-left: 150px;*/
+}
+
+.gridxCellWidget .storageFileContainer {
+    margin-left: 0;
+}
+
+.gridxCellWidget li .storageFileContainer {
+    margin-left: 150px;
 }
 
 .selectedSearchHit table tbody tr th {
@@ -563,15 +612,106 @@ fieldset th {
     height: 16px;
 }
 
-.overlayDiv {
-    width: 99%;
-    height: 99%;
+.radioButtonLabel {
+    width: auto;
+    margin-bottom: 0px;
+    float: none;
+    font-weight: normal;
+}
+
+/* For angular client-side validation, color border of invalid element */
+ng-form.submitted .ng-invalid {
+    border: 1px solid red !important;
+}
+
+/* Styling for bootstrap upload buttons */
+.btn-file {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-file input[type=file] {
     position: absolute;
     top: 0;
-    left: 0;
-    z-index: 1000;
-    background-color: white;
-    display: none;
-    margin: 4px;
-    border: 1px solid lightgray;
+    right: 0;
+    min-width: 100%;
+    min-height: 100%;
+    font-size: 100px;
+    text-align: right;
+    filter: alpha(opacity=0);
+    opacity: 0;
+    outline: none;
+    background: white;
+    cursor: inherit;
+    display: block;
+}
+/*--------------------------------*/
+
+/* For input of type "number", webkit based browsers, e.g. chrome and firefox, add a spinner for increamenting/decreamenting value. These styles hide the spinner." */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance:textfield;
+}
+/*-------------------------------- */
+
+/* Overide default bootstrap size for buttons and inputs */
+input {
+    font-size: inherit !important;
+    height: auto !important;
+}
+
+textarea {
+    font-size: inherit !important;
+}
+
+.btn, .input-group-btn {
+    font-size: inherit !important;
+}
+
+/* Large angular ui modal */
+.largeModal .modal-dialog{
+    width: 80%;
+}
+
+/* This is a dirty fix for a bug with angular-ui. Popup widgets, e.g. dropdown or date-picker, don't open when used in a modal window */
+body > ul.dropdown-menu, div > ul.dropdown-menu {
+    z-index:99999999999;
+}
+
+/* For widgets in grid disable bootstrap column styling for labels. Otherwise labels won't have enough room */
+div.ui-grid-cell-contents div.row label {
+    display: block !important;
+    float: none !important;
+}
+
+/* Reduce left and right padding on the filter searchbox container in a ui-grid */
+.ui-grid-filter-container {
+    padding-right: 5px;
+    padding-left: 5px;
+}
+
+/* Remove dots in the ui-grid pagination section. abbr elements (which are used in the pagination section) have dots at the bottom. */
+abbr[title] {
+    border-bottom: none;
+}
+
+/* Styling angular-ui tabs */
+.tab-content {
+    height: 100%;
+}
+
+.tab-content > .tab-pane {
+    height: 100%;
+    padding: 5px;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+}
+
+.noPadding {
+    padding: 0;
 }

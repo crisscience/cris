@@ -277,7 +277,7 @@
                         });
                         populateTiles($scope.tiles);
                     }
-                ).error();
+                );
             };
 
             // get tiles from backend

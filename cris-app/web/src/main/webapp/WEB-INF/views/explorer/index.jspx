@@ -13,28 +13,29 @@
     <spring:url value="/users/" var="urlUsers"/>
     <spring:url value="/templates/terms" var="urlTemplateTerms"/>
     <spring:url value="/projects/search/" var="urlSearch"/>
-
-    <style>
-        table table {
-            margin: 0px;
-            border: 0px;
-            padding: 0px;
-        }
-    </style>
-
-    <div id="idExplorer">
-        <div style="width: 100%; min-height: 900px">
-            <div id="idBorderContainer" data-dojo-type="dijit/layout/BorderContainer" data-dojo-props='design : "sidebar", gutters : "true", liveSplitters : "true"' style="height: 600px; padding: 0px;">
-                <div data-dojo-type="dojox/layout/ExpandoPane" data-dojo-props='title : "Explorer", splitter : "true", region : "leading"' style="width: 25%; padding: 0px;">
-                    <div id="treeDataset"><!-- --></div>
-                </div>
-                <div data-dojo-type="dojox/layout/ContentPane" data-dojo-props='splitter : "true", region : "center"' style="padding: 0px;">
-                    <div id="gridDataset"><!-- --></div>
-                </div>
+    
+    <div id="idExplorer" data-ng-controller="crisExplorerController" style="white-space: nowrap;">
+        <div style="display:inline-block;width:22%;max-height:672px;overflow:auto;" ng-show="expanded">
+            <div id="treeDataset"><!-- --></div>
+        </div>
+        <div style="display:inline-block;vertical-align:top;margin-right:2px;margin-left:2px;">
+            <button type="button" class="btn btn-default" ng-click="togglePaneDisplay()" ng-class="expanded ? 'glyphicon glyphicon-chevron-left' : 'glyphicon glyphicon-chevron-right'"></button>
+        </div>
+        <div style="width:{{expanded ? '74%' : '96%'}};display:inline-block;vertical-align:top;">
+            <div>
+                <cris-ui-grid column-defs="gridColumnDefs" grid-ref="gridRef" url="url" url-filter="urlFilter" sort-field="sortField" enable-filtering="false" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(name,rowData)"><!----></cris-ui-grid>
             </div>
+            
+            <br />
+            <div ng-if="details.projectName">
+                Project: {{details.projectName}} &amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp; Experiment: {{details.experimentName}} &amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp; Job: {{details.jobName}}
+            </div>
+            <hr />
+            
+            <cris-dataset term="term" dataset="context" context="context" read-only="true" override-hidden="true"><!----></cris-dataset>
         </div>
     </div>
-
+    
     <c:set value="${jsRoot}/dm/dataset.js" var="url" />
     <script src="${url}" type="text/javascript"><!-- required for FF3 and Opera --></script>
 
@@ -45,135 +46,122 @@
     <script type="text/javascript">
         //<![CDATA[
         cris.require('dijit/Tree');
-        cris.require('dijit/layout/BorderContainer');
-        cris.require('dojox/layout/ContentPane');
-        cris.require('dojox/layout/ExpandoPane');
         cris.require("dojo/store/JsonRest");
-        cris.require("dijit/Dialog");
-        cris.require("dojox/data/JsonRestStore");
         cris.require("dojo/json");
-
-        function isDisplayField(fieldName) {
-            if (fieldName !== "_id"
-            && fieldName !== "_context_id"
-            && fieldName !== "_project_id"
-            && fieldName !== "_experiment_id"
-//            && fieldName !== "_job_id"
-            && fieldName !== "_task_id"
-            && fieldName !== "_site_uuid"
-            && fieldName !== "_tenant_uuid"
-            && fieldName !== "_tenant_id"
-            && fieldName !== "_creator_id"
-            && fieldName !== "_updater_id"
-//            && fieldName !== "_time_created"
-//            && fieldName !== "_time_updated"
-            && fieldName !== "_template_version"
-            && fieldName !== "_user_permission") {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        function generateHead(json) {
-            var html = "<table class='form'><tbody>";
-
-            // Set the HTML Table Header for an array of object
-            html += "<tr>";
-            for (var key in json) {
-                if (json.hasOwnProperty(key) && isDisplayField(key)) {
-                    html += "<th style=\"font-weight: bold;\">" + prettyPrint(key, "_") + "<br></th>";
+        cris.require("dojox/xml/parser");
+        
+        angular.module("crisExplorer").controller("crisExplorerController", function($scope, $http) {
+            resetScopeData(); // clear data displayed by cris-dataset
+            
+            // toggling display of tree pane
+            $scope.expanded = true;
+            $scope.togglePaneDisplay = function () {
+                if ($scope.expanded)  {
+                    $scope.expanded = false;
+                } else {
+                    $scope.expanded = true;
                 }
             }
-
-            html += "</tr>";
-
-            return html;
-        }
-
-        function generateFoot() {
-            html = "</tbody></table>";
-
-            return html;
-        }
-
-        function jsonToHtml(json, noheading) {
-            var html = "";
-
-            if (json instanceof Array) {
-                // arrays
-                if (json.length >= 1 && json[0] instanceof Object) {
-                    // an array of objects
-                    html += generateHead(json[0]);
-
-                    // Set the HTML rows
-                    for (var i = 0; i < json.length; i++) {
-                        html += "<tr>" + jsonToHtml(json[i], true) + "</tr>";
-                    }
-
-                    html += generateFoot(json);
+            
+            //ui-grid column definitions
+            $scope.gridColumnDefs = [
+                {field: 'projectId', name: 'Project ID', displayName: 'Project ID', enableSorting: true, minWidth: 200, visible: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'experimentId', name: 'Experiment ID', displayName: 'Experiment ID', enableSorting: true, minWidth: 200, visible: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'jobId', name: 'Job ID', displayName: 'Job ID', enableSorting: true, minWidth: 200, visible: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'taskId', name: 'Task ID', displayName: 'Task ID', enableSorting: true, minWidth: 200, visible: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'dataId', name: 'Data ID', displayName: 'Data ID', enableSorting: true, minWidth: 200, visible: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'projectName', name: 'Project', enableSorting: true, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'experimentName', name: 'Experiment', enableSorting: true, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'jobName', name: 'Job', enableSorting: true, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'taskName', name: 'Task', enableSorting: true, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'dataTermUuid', name: 'Term UUID', enableSorting: true, minWidth: 200, visible: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'dataTermVersion', name: 'Term Version', enableSorting: true, minWidth: 200, visible: false, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'dataName', name: 'Name', enableSorting: true, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'},
+                {field: 'dataValue', name: 'Value', enableSorting: true, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({name:COL_FIELD,rowData:row.entity}) CUSTOM_FILTERS}}</div>'}
+            ];
+            
+            $scope.rowSelectCallback = function (rowData) {
+                if (rowData.dataValue !== "[ ]" && rowData.dataValue !== null && rowData.dataValue.indexOf(":") !== -1) {
+                    var valueJson = dojo.fromJson(rowData.dataValue);
+                    
+                    var scope = getAngularElementScope("idExplorer");
+                    scope.context = valueJson[0];
+                    scope.term = getTerm(rowData.dataTermUuid.$uuid, rowData.dataTermVersion.$uuid, true);
+                    scope.details = {};
+                    scope.details.projectName = rowData.projectName;
+                    scope.details.experimentName = rowData.experimentName;
+                    scope.details.jobName = rowData.jobName;
+                    scope.$apply();
                 } else {
-                    // an array of primitive values
-                    for (var i = 0; i < json.length; i++) {
-                        html += jsonToHtml(json[i], true) + "<br/>";
-                    }
-                }
-
-            } else if (json instanceof Object) {
-                // objects
-                // special handling for $date and $oid
-                if (json["$date"]) {
-                    var date = new Date(Date.parse(json["$date"]));
-                    html += jsonToHtml(date.toLocaleDateString() + " " + date.toLocaleTimeString());
-                } else if (json["$oid"]) {
-                    html += jsonToHtml(json["$oid"]);
-                } else {
-                    if (!noheading) {
-                        html += generateHead(json);
-                    }
-
-                    //lookup for database state translation
-                    var databaseStateTranslation = {};
-                    databaseStateTranslation["0"] = "Sandboxed";
-                    databaseStateTranslation["1"] = "Operational";
-                    databaseStateTranslation["2"] = "Archived";
-                    databaseStateTranslation["3"] = "Deprecated";
-                    for (var key in json) {
-                        if (json.hasOwnProperty(key) && isDisplayField(key)) {
-                                var value;
-                                if (key == "_state") {
-                                    value = databaseStateTranslation[json[key].toString()];
-                                } else {
-                                    value = json[key];
-                                }
-                                html += "<td>";
-                                html += jsonToHtml(value);
-                                html += "</td>";
-                        }
-                    }
-
-                    if (!noheading) {
-                        html += generateFoot(json);
-                    }
-                }
-            } else {
-                // primitive types
-                // special handling for StorageFile
-                var reStorageFile = new RegExp(/StorageFile:\d+/);
-                if (reStorageFile.test(json)) {
-                    var urlDownload = "${urlDownload}";
-                    var href = urlDownload + json;
-                    html += "<a href='" + href + "'>" + json + "</a>";
-                } else {
-                    if (json || json === 0 || json === false || json === ""){
-                        html += json;
-                    } else {
-                        html += "n/a";
-                    }
+                    resetScopeData(true);
                 }
             }
-
-            return html;
+            $scope.url = cris.baseUrl + 'viewpjtds';
+            
+            $scope.$watch('filterItem', function (newValue, oldValue) {
+                var field;
+                var value;
+                if (newValue) {
+                    value = newValue.value;
+                    field = newValue.field;
+                    if (newValue.field === "projectId") {
+                        $scope.gridColumnDefs[5].visible = false;
+                        $scope.gridColumnDefs[6].visible = true;
+                        $scope.gridColumnDefs[7].visible = true;
+                        $scope.gridColumnDefs[8].visible = true;
+                    } else if (newValue.field === "experimentId") {
+                        $scope.gridColumnDefs[5].visible = false;
+                        $scope.gridColumnDefs[6].visible = false;
+                        $scope.gridColumnDefs[7].visible = true;
+                        $scope.gridColumnDefs[8].visible = true;
+                    } else if (newValue.field === "jobId") {
+                        $scope.gridColumnDefs[5].visible = false;
+                        $scope.gridColumnDefs[6].visible = false;
+                        $scope.gridColumnDefs[7].visible = false;
+                        $scope.gridColumnDefs[8].visible = true;
+                    } else if (newValue.field === "taskId") {
+                        $scope.gridColumnDefs[5].visible = false;
+                        $scope.gridColumnDefs[6].visible = false;
+                        $scope.gridColumnDefs[7].visible = false;
+                        $scope.gridColumnDefs[8].visible = false;
+                    }
+                } else {
+                    $scope.gridColumnDefs[5].visible = true;
+                    $scope.gridColumnDefs[6].visible = true;
+                    $scope.gridColumnDefs[7].visible = true;
+                    $scope.gridColumnDefs[8].visible = true;
+                }
+                
+                $scope.urlFilter = (field ? '{"op":"equal","data":[{"op":"number","data":"' + field + '","isCol":true},{"op":"number","data":' + value + ',"isCol":false}]}' : '');
+                $scope.sortField = field;
+                
+                if ($scope.gridRef) {
+                    $scope.gridRef.refreshGrid();
+                }
+            });
+            
+            $scope.formatDisplayValue = function (name, rowData) {
+                var result = name;
+                if (name === null || name === undefined){
+                    result = "";
+                } else if (name.trim().replace(' ', '') === "[]" || name.trim().replace(' ', '') === '{}') {
+                    result = "";
+                } else if ((name.trim().startsWith('[') && name.trim().endsWith(']')) || (name.trim().startsWith('{') && name.trim().endsWith('}'))) {
+                    result = "Click for Values";
+                }
+                return result;
+            };
+        });
+        
+        function resetScopeData(apply) {
+            var scope = getAngularElementScope("idExplorer");
+            scope.term = {};
+            scope.context = {};
+            scope.details = {};
+            
+            if (apply) {
+                scope.$apply();
+            }
         }
 
         cris.ready(function() {
@@ -216,6 +204,9 @@
             var tree = new dijit.Tree({
                 model: storeProjects,
                 showRoot: false,
+                onClick: function(item) {
+                    resetScopeData(true);
+                },
                 getIconClass: function(item, opened) {
                     var iconClass;
                     switch (item.type) {
@@ -240,169 +231,26 @@
             }, "treeDataset");
             tree.startup();
 
-            var store = createJsonRestStore("${urlViewpjtds}");
-
-            var layout= [{cells: [
-                { field: 'projectId', name: 'Project ID', hidden: true, width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.projectId === null ? "" : item.projectId;
-                } },
-                { field: 'experimentId', name: 'Experiment ID', hidden: true, width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.experimentId === null ? "" : item.experimentId;
-                } },
-                { field: 'jobId', name: 'Job ID', hidden: true, width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.jobId === null ? "" : item.jobId;
-                } },
-                { field: 'taskId', name: 'Task ID', hidden: true, width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.taskId === null ? "" : item.taskId;
-                } },
-                { field: 'dataId', name: 'Data ID', hidden: true, width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.dataId === null ? "" : item.dataId;
-                } },
-                { field: 'projectName', name: 'Project', width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.projectName === null ? "" : item.projectName;
-                } },
-                { field: 'experimentName', name: 'Experiment', width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.experimentName === null ? "" : item.experimentName;
-                } },
-                { field: 'jobName', name: 'Job', width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.jobName === null ? "" : item.jobName;
-                } },
-                { field: 'taskName', name: 'Task', width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.taskName === null ? "" : item.taskName;
-                } },
-                { field: 'dataTermUuid', name: 'Term UUID', hidden: true, width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.dataTermUuid === null ? "" : item.dataTermUuid;
-                } },
-                { field: 'dataTermVersion', name: 'Term Version', hidden: true, width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.dataTermVersion === null ? "" : item.dataTermVersion;
-                } },
-                { field: 'dataName', name: 'Name', width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-                    return item.dataName === null ? "" : item.dataName;
-                } },
-                { field: 'dataValue', name: 'Value', width: 'auto', get: function(row, item){
-                    if (!item) {
-                        return "Loading...";
-                    }
-
-                    if (item.dataValue === null || item.dataValue === undefined){
-                        this.value = "";
-                    } else if (item.dataValue === "[ ]" || item.dataValue.indexOf(":") === -1){
-                        this.value = "";
-                    } else {
-                        this.value = "Click for Values";
-                    }
-
-                    return this.value;
-                } }
-            ]}];
-
-            var asc = true;
-            var args = {
-                sortFields: [{attribute: "projectName", descending: !asc}]
-            };
-
-            var grid = createGrid(store, layout, "gridDataset", args);
-            grid.setSortIndex(0, asc);
-            if ("${filter}" !== "") {
-                grid.setQuery({filter: "${filter}"});
-            }
-
-            grid.onRowClick = function(e) {
-
-                var item = e.grid.getItem(e.rowIndex);
-                if (item.dataValue !== "[ ]" && item.dataValue !== null && item.dataValue.indexOf(":") !== -1) {
-                    var valueJson = dojo.fromJson(item.dataValue);
-                    var html = jsonToHtml(valueJson);
-
-                    valuesDialog = new dijit.Dialog({
-                        title: "Value(s)",
-                        content: html
-                    });
-                    valuesDialog.show();
-                }
-            };
-
             dojo.connect(tree, "onClick", function(item) {
                 var filter;
-                if (item.id === "root") {
-                    filter = null;
-                    grid.layout.setColumnVisibility(5, true);
-                    grid.layout.setColumnVisibility(6, true);
-                    grid.layout.setColumnVisibility(7, true);
-                    grid.layout.setColumnVisibility(8, true);
-                } else if (item.type === "project") {
-                    filter = {type: "number", column: 0, condition: "equalTo", value: item.id};
-                    grid.layout.setColumnVisibility(5, false);
-                    grid.layout.setColumnVisibility(6, true);
-                    grid.layout.setColumnVisibility(7, true);
-                    grid.layout.setColumnVisibility(8, true);
+                if (item.type === "project") {
+                    filter = {field: "projectId", value: item.id};
                 } else if (item.type === "experiment") {
-                    filter = {type: "number", column: 1, condition: "equalTo", value: item.id};
-                    grid.layout.setColumnVisibility(5, false);
-                    grid.layout.setColumnVisibility(6, false);
-                    grid.layout.setColumnVisibility(7, true);
-                    grid.layout.setColumnVisibility(8, true);
+                    filter = {field: "experimentId", value: item.id};
                 } else if (item.type === "job") {
-                    filter = {type: "number", column: 2, condition: "equalTo", value: item.id};
-                    grid.layout.setColumnVisibility(5, false);
-                    grid.layout.setColumnVisibility(6, false);
-                    grid.layout.setColumnVisibility(7, false);
-                    grid.layout.setColumnVisibility(8, true);
+                    filter = {field: "jobId", value: item.id};
                 } else if (item.type === "task") {
-                    filter = {type: "number", column: 3, condition: "equalTo", value: item.id};
-                    grid.layout.setColumnVisibility(5, false);
-                    grid.layout.setColumnVisibility(6, false);
-                    grid.layout.setColumnVisibility(7, false);
-                    grid.layout.setColumnVisibility(8, false);
+                    filter = {field: "taskId", value: item.id};
                 } else {
                     filter = null;
-                    grid.layout.setColumnVisibility(5, true);
-                    grid.layout.setColumnVisibility(6, true);
-                    grid.layout.setColumnVisibility(7, true);
-                    grid.layout.setColumnVisibility(8, true);
                 }
-                grid.setFilter(filter);
+                
+                var scope = getAngularElementScope("idExplorer");
+                scope.filterItem = filter;
+                scope.$apply();
             });
 
             // keep this last
-            dijit.byId("idBorderContainer").resize();
-
         });
 
         cris.bootstrapAngular("idExplorer", "crisExplorer");

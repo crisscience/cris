@@ -4,32 +4,27 @@
  */
 package edu.purdue.cybercenter.dm.security;
 
-import edu.purdue.cybercenter.dm.domain.Experiment;
 import edu.purdue.cybercenter.dm.domain.Group;
-import edu.purdue.cybercenter.dm.domain.GroupUser;
-import edu.purdue.cybercenter.dm.domain.Job;
-import edu.purdue.cybercenter.dm.domain.Project;
-import edu.purdue.cybercenter.dm.domain.Shortcut;
-import edu.purdue.cybercenter.dm.domain.Term;
-import edu.purdue.cybercenter.dm.domain.Tile;
 import edu.purdue.cybercenter.dm.domain.User;
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.acls.AclPermissionEvaluator;
-import org.springframework.security.acls.domain.DefaultPermissionFactory;
-import org.springframework.security.acls.domain.ObjectIdentityImpl;
+import org.springframework.security.acls.domain.GrantedAuthoritySid;
 import org.springframework.security.acls.domain.ObjectIdentityRetrievalStrategyImpl;
 import org.springframework.security.acls.domain.PermissionFactory;
-import org.springframework.security.acls.jdbc.JdbcMutableAclService;
+import org.springframework.security.acls.domain.PrincipalSid;
+import org.springframework.security.acls.domain.SidRetrievalStrategyImpl;
+import org.springframework.security.acls.model.AccessControlEntry;
 import org.springframework.security.acls.model.Acl;
 import org.springframework.security.acls.model.AclService;
 import org.springframework.security.acls.model.NotFoundException;
 import org.springframework.security.acls.model.ObjectIdentity;
+import org.springframework.security.acls.model.ObjectIdentityGenerator;
 import org.springframework.security.acls.model.ObjectIdentityRetrievalStrategy;
 import org.springframework.security.acls.model.Permission;
 import org.springframework.security.acls.model.Sid;
-import org.springframework.security.acls.model.SidRetrievalStrategy;
 import org.springframework.security.core.Authentication;
 
 /**
@@ -38,14 +33,14 @@ import org.springframework.security.core.Authentication;
  */
 public class CustomAclPermissionEvaluator extends AclPermissionEvaluator {
 
-    @Autowired
-    private JdbcMutableAclService aclService;
+    private final AclService aclService;
+    private final PermissionFactory permissionFactory = new CustomPermissionFactory();
+    private final ObjectIdentityGenerator objectIdentityGenerator = new ObjectIdentityRetrievalStrategyImpl();
     private final ObjectIdentityRetrievalStrategy objectIdentityRetrievalStrategy = new ObjectIdentityRetrievalStrategyImpl();
-    private final SidRetrievalStrategy sidRetrievalStrategy = new CustomSidRetrievalStrategyImpl();
-    private final PermissionFactory permissionFactory = new DefaultPermissionFactory();
 
     public CustomAclPermissionEvaluator(AclService aclService) {
         super(aclService);
+        this.aclService = aclService;
     }
 
     @Override
@@ -54,145 +49,78 @@ public class CustomAclPermissionEvaluator extends AclPermissionEvaluator {
             return false;
         }
 
-        Object object;
-        if (domainObject.getClass() == Job.class) {
-            // a job uses the same permission as its associated experiment/project
-            object = ((Job) domainObject).getExperimentId();
-            if (object == null) {
-                object = ((Job) domainObject).getProjectId();
-            }
-            if (object == null) {
-                return false;
-            }
-        } else {
-            object = domainObject;
-        }
+        ObjectIdentity objectIdentity = objectIdentityRetrievalStrategy.getObjectIdentity(domainObject);
 
-        String objectClass = object.getClass().getName();
-        if (isExceptionClass(objectClass)) {
-            return true;
-        } else if (permission.toString().equals("create")) { // special check for create permission
-            return checkPermissionCreate(authentication, object, permission);
-        } else {
-            if (isClassUserGroupManagement(objectClass) || objectClass.equals(Term.class.getName())) { // For groups and users, permissions are applied at class level
-                return checkPermission(authentication, new ObjectIdentityImpl(objectClass.equals(GroupUser.class.getName()) ? Group.class.getName() : objectClass, new Long(0)), permission);
-            } else { // For remaining classes, permissions are applied at object level
-                return checkPermission(authentication, objectIdentityRetrievalStrategy.getObjectIdentity(object), permission);
-            }
-        }
+        return checkPermission(authentication, objectIdentity, permission);
     }
 
-    private boolean checkPermissionCreate(Authentication authentication, Object domainObject, Object permission) {
+    @Override
+    public boolean hasPermission(Authentication authentication, Serializable targetId, String targetType, Object permission) {
+        ObjectIdentity objectIdentity = objectIdentityGenerator.createObjectIdentity(targetId, targetType);
 
-        String objectClass = domainObject.getClass().getName();
-        ObjectIdentity oid;
-        boolean isProject = false, isExperiment = false, isJob = false;
-
-        if (isClassProjectExperimentJob(objectClass)) {
-            if (objectClass.equals(Project.class.getName())) {
-                oid = new ObjectIdentityImpl(objectClass, new Long(0));
-                isProject = true;
-            } else {
-                if (objectClass.equals(Job.class.getName())) {
-                    Experiment exp = ((Job) domainObject).getExperimentId();
-                    oid = new ObjectIdentityImpl(Experiment.class, new Long(exp.getId()));
-                    isJob = true;
-                } else {
-                    Project pro = ((Experiment) domainObject).getProjectId();
-                    oid = new ObjectIdentityImpl(Project.class, new Long(pro.getId()));
-                    isExperiment = true;
-                }
-            }
-            List<Sid> sids = sidRetrievalStrategy.getSids(authentication);
-            List<Permission> requiredPermission = resolvePermission(permission);
-            boolean check = false;
-            boolean checkJob = false;
-            try {
-                // Lookup only ACLs for SIDs we're interested in
-                Acl acl = aclService.readAclById(oid, sids);
-                check = true; // this implies object exists
-                boolean match = acl.isGranted(requiredPermission, sids, false);
-                return match;
-            } catch (NotFoundException nfe) {
-                try {
-                    if (isProject) {
-                        return false;
-                    } else if (isExperiment && !check) { //i.e check the parent if object does not exist
-                        ObjectIdentity oi = new ObjectIdentityImpl(Project.class, new Long(0));
-                        Acl aclAll = aclService.readAclById(oi, sids);
-                        if (aclAll.isGranted(requiredPermission, sids, false)) {
-                            return true;
-                        }
-                    } else if (isJob && !check) {
-                        Project pro = ((Job) domainObject).getProjectId();
-                        ObjectIdentity oi = new ObjectIdentityImpl(Project.class, new Long(pro.getId()));
-                        Acl aclAll = aclService.readAclById(oi, sids);
-                        checkJob = true;
-                        boolean match = aclAll.isGranted(requiredPermission, sids, false);
-                        if (match) {
-                            return true;
-                        }
-                    }
-                    return false;
-                } catch (NotFoundException nfe1) {
-                    if (isExperiment) {
-                        return false;
-                    } else if (isJob && !checkJob) {
-                        try {
-                            ObjectIdentity oiP = new ObjectIdentityImpl(Project.class, new Long(0));
-                            Acl aclP = aclService.readAclById(oiP, sids);
-                            if (aclP.isGranted(requiredPermission, sids, false)) {
-                                return true;
-                            }
-                        } catch (NotFoundException nfe2) {
-                            return false;
-                        }
-                    }
-                    return false;
-                }
-            }
-        } else {
-            return checkPermission(authentication, new ObjectIdentityImpl(objectClass.equals(GroupUser.class.getName()) ? Group.class.getName() : objectClass, new Long(0)), permission);
-        }
+        return checkPermission(authentication, objectIdentity, permission);
     }
 
     private boolean checkPermission(Authentication authentication, ObjectIdentity oid, Object permission) {
-        // Obtain the SIDs applicable to the principal
-        List<Sid> sids = sidRetrievalStrategy.getSids(authentication);
-        List<Permission> requiredPermission = resolvePermission(permission);
-        String objectClass = oid.getType();
+        Permission requiredPermission = toPermission(permission);
+        if (requiredPermission.getMask() == 0) {
+            return false;
+        }
 
-        ObjectIdentity oidAll = new ObjectIdentityImpl(objectClass, new Long(0));
-        boolean check = false;
+        // Obtain the SIDs applicable to the principal
+        Object principal = authentication.getPrincipal();
+        User user = ((UserDetailsAdapter) principal).getUser();
+        Sid userSid = new PrincipalSid(user.getId().toString());
+
+        boolean isGranted = false;
+        boolean checkGroups = false;
         try {
-            // Lookup only ACLs for SIDs we're interested in
-            Acl acl = aclService.readAclById(oid, sids);
-            boolean match = acl.isGranted(requiredPermission, sids, false);
-            check = true;
-            if (match) {
-                return true;
-            } else {
-                Acl aclAll = aclService.readAclById(oidAll, sids);
-                if (aclAll.isGranted(requiredPermission, sids, false)) {
-                    return true;
+            // Lookup only ACLs for userSid
+            Acl acl = aclService.readAclById(oid, Arrays.asList(userSid));
+            try {
+                isGranted = acl.isGranted(Arrays.asList(requiredPermission), Arrays.asList(userSid), false);
+            } catch (NotFoundException nfe1) {
+                checkGroups = true;
+                List<AccessControlEntry> aces = acl.getEntries();
+                for (AccessControlEntry ace : aces) {
+                    if (userSid.equals(ace.getSid())) {
+                        checkGroups = false;
+                    }
                 }
             }
         } catch (NotFoundException nfe) {
-            if (!check) {
+            // there's no permission on userSid, check groupSids
+            checkGroups = true;
+        }
+
+        if (checkGroups) {
+            List<Sid> groupSids = getGroupSids(user.getId());
+            if (!groupSids.isEmpty()) {
                 try {
-                    Acl aclAll = aclService.readAclById(oidAll, sids);
-                    if (aclAll.isGranted(requiredPermission, sids, false)) {
-                        return true;
-                    }
-                } catch (NotFoundException nfe1) {
-                    return false;
+                    Acl acl = aclService.readAclById(oid, groupSids);
+                    isGranted = acl.isGranted(Arrays.asList(requiredPermission), groupSids, false);
+                } catch (NotFoundException nfe) {
+                    isGranted = false;
                 }
             }
         }
-        return false;
+
+        return isGranted;
     }
 
-    private List<Permission> resolvePermission(Object permission) {
+    private List<Sid> getGroupSids(int userId) {
+        User user = User.findUser(userId);
+        List<Group> groups = user.getMemberGroups();
+
+        List<Sid> sids = new ArrayList<>(groups.size());
+        groups.stream().forEach((group) -> {
+            sids.add(new GrantedAuthoritySid(group.getId().toString()));
+        });
+
+        return sids;
+    }
+
+    private Permission toPermission(Object permission) {
         Permission p;
 
         if (permission instanceof Permission) {
@@ -207,23 +135,9 @@ public class CustomAclPermissionEvaluator extends AclPermissionEvaluator {
         }
 
         if (p != null) {
-            return Arrays.asList(p);
+            return p;
         }
 
         throw new IllegalArgumentException("Unsupported permission: " + permission);
-    }
-
-    private boolean isClassUserGroupManagement(String objectClass) {
-        return (objectClass.equals(Group.class.getName())) || (objectClass.equals(GroupUser.class.getName()))
-                || (objectClass.equals(User.class.getName()));
-    }
-
-    private boolean isClassProjectExperimentJob(String objectClass) {
-        return (objectClass.equals(Project.class.getName())) || (objectClass.equals(Experiment.class.getName()))
-                || (objectClass.equals(Job.class.getName()));
-    }
-
-    private boolean isExceptionClass(String objectClass) {
-        return (objectClass.equals(Tile.class.getName())) || (objectClass.equals(Shortcut.class.getName()));
     }
 }

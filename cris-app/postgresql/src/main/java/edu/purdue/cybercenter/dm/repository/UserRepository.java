@@ -6,8 +6,6 @@
 package edu.purdue.cybercenter.dm.repository;
 
 import edu.purdue.cybercenter.dm.domain.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.querydsl.QueryDslPredicateExecutor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -15,6 +13,6 @@ import org.springframework.stereotype.Repository;
  * @author xu222
  */
 @Repository
-public interface UserRepository extends JpaRepository<User, Integer>, QueryDslPredicateExecutor<User> {
-
+public interface UserRepository extends CrisRepository<User> {
+    User findByUsernameAndTenantId(String username, Integer tenantId);
 }

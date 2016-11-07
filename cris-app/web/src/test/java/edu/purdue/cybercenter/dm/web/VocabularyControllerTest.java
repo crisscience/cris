@@ -76,7 +76,7 @@ public class VocabularyControllerTest extends BaseControllerTest {
 
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        assertTrue(resultActions.andReturn().getResponse().getContentAsString().contains("All terms in the Vocabulary are already in the system. Vocabulary is not imported"));
+        assertTrue(resultActions.andReturn().getResponse().getContentAsString().contains("vocabulary version already exists. Please use the force flag to allow system to generate a new version number"));
     }
 
     @Test
@@ -175,7 +175,7 @@ public class VocabularyControllerTest extends BaseControllerTest {
         resultActions.andExpect(status().isOk());
 
         mockMultipartFile = new MockMultipartFile("updated_vocab.xml", new FileInputStream(VOCAB_FILES_DIR + "updated_vocab_no_version.xml"));
-        mockMultipartHttpServletRequestBuilder = (MockMultipartHttpServletRequestBuilder) fileUpload("/vocabularys/import").accept(MediaType.ALL).session(httpSession);
+        mockMultipartHttpServletRequestBuilder = (MockMultipartHttpServletRequestBuilder) fileUpload("/vocabularys/import?force=true").accept(MediaType.ALL).session(httpSession);
         mockMultipartHttpServletRequestBuilder.file(mockMultipartFile);
 
         resultActions = mockMvc.perform(mockMultipartHttpServletRequestBuilder);
@@ -220,7 +220,7 @@ public class VocabularyControllerTest extends BaseControllerTest {
         resultActions.andExpect(status().isOk());
 
         mockMultipartFile = new MockMultipartFile("updated_vocab.xml", new FileInputStream(VOCAB_FILES_DIR + "modified_vocab.xml"));
-        mockMultipartHttpServletRequestBuilder = (MockMultipartHttpServletRequestBuilder) fileUpload("/vocabularys/import").accept(MediaType.ALL).session(httpSession);
+        mockMultipartHttpServletRequestBuilder = (MockMultipartHttpServletRequestBuilder) fileUpload("/vocabularys/import?force=true").accept(MediaType.ALL).session(httpSession);
         mockMultipartHttpServletRequestBuilder.file(mockMultipartFile);
 
         resultActions = mockMvc.perform(mockMultipartHttpServletRequestBuilder);

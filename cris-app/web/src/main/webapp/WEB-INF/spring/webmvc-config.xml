@@ -33,7 +33,6 @@
     <mvc:interceptors>
         <bean class="org.springframework.web.servlet.theme.ThemeChangeInterceptor"/>
         <bean class="org.springframework.web.servlet.i18n.LocaleChangeInterceptor" p:paramName="lang"/>
-        <bean class="edu.purdue.cybercenter.dm.web.handler.PermissionHandler"/>
     </mvc:interceptors>
 
     <!-- selects a static view for rendering without the need for an explicit controller -->

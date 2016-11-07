@@ -21,7 +21,6 @@ import javax.persistence.criteria.Root;
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
 import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PostFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,24 +33,33 @@ import org.springframework.stereotype.Component;
 @Component
 public class DomainObjectService {
 
-    static final private String PostFilterRead = "hasGroup('Admin Group') or hasPermission(filterObject, 'read') or filterObject.getClass().getSimpleName().equals('Term')";
-    static final private String PostAuthorizeRead = "hasGroup('Admin Group') or hasPermission(returnObject, 'read') or returnObject.getClass().getSimpleName().equals('Term')";
-    static final private String PreAuthorizeCreate = "hasGroup('Admin Group') or hasPermission(#item, 'create')";
-    static final private String PreAuthorizeRead = "hasGroup('Admin Group') or hasPermission(#item, 'read')";
-    static final private String PreAuthorizeUpdate = "hasGroup('Admin Group') or hasPermission(#item, 'write')";
-    static final private String PreAuthorizeDelete = "hasGroup('Admin Group') or hasPermission(#item, 'delete')";
+    static final private String POST_FILTER_RAED =    "isAdmin() or hasDomainObjectPermission(filterObject, 'read') or hasDomainObjectPermission(filterObject, 'execute')";
+    static final private String POST_AUTHORIZE_READ = "isAdmin() or hasDomainObjectPermission(returnObject, 'read') or hasDomainObjectPermission(returnObject, 'execute')";
+    static final private String PRE_AUTORIZE_CREATE = "isAdmin() or hasDomainObjectPermission(#item, 'create')";
+    static final private String PRE_AUTORIZE_UPDATE = "isAdmin() or hasDomainObjectPermission(#item, 'write')";
+    static final private String PRE_AUTORIZE_DELETE = "isAdmin() or hasDomainObjectPermission(#item, 'delete')";
 
-    @PostAuthorize(PostAuthorizeRead)
+    private final Validator validator;
+
+    public DomainObjectService() {
+        this.validator = Validation.buildDefaultValidatorFactory().getValidator();
+    }
+
+    @PostAuthorize(POST_AUTHORIZE_READ)
     public <T> T executeTypedQueryWithSingleResult(TypedQuery<T> query) {
         return query.getSingleResult();
     }
 
-    @PostFilter(PostFilterRead)
+    public <T> T executeTypedQueryWithSingleResultUnsecured(TypedQuery<T> query) {
+        return query.getSingleResult();
+    }
+
+    @PostFilter(POST_FILTER_RAED)
     public <T> List<T> executeTypedQueryWithResultList(TypedQuery<T> query) {
         return query.getResultList();
     }
 
-    @PostAuthorize(PostAuthorizeRead)
+    @PostAuthorize(POST_AUTHORIZE_READ)
     public <T> T findById(Integer id, Class<T> clazz) {
         if (id == null || clazz == null) {
             return null;
@@ -69,27 +77,27 @@ public class DomainObjectService {
         return typedQuery.getSingleResult();
     }
 
-    @PostFilter(PostFilterRead)
+    @PostFilter(POST_FILTER_RAED)
     public <T> List<T> findAll(Class<T> clazz) {
         return findEntries(null, null, null, null, clazz);
     }
 
-    @PostFilter(PostFilterRead)
+    @PostFilter(POST_FILTER_RAED)
     public <T> List<T> findAll(Entry<String, String> orderBy, Class<T> clazz) {
         return findEntries(null, null, orderBy, null, clazz);
     }
 
-    @PostFilter(PostFilterRead)
+    @PostFilter(POST_FILTER_RAED)
     public <T> List<T> findBy(Entry<String, String> orderBy, Map<String, Object> where, Class<T> clazz) {
         return findEntries(null, null, orderBy, where, clazz);
     }
 
-    @PostFilter(PostFilterRead)
+    @PostFilter(POST_FILTER_RAED)
     public <T> List<T> findBy(Map<String, Object> where, Class<T> clazz) {
         return findEntries(null, null, null, where, clazz);
     }
 
-    @PostFilter(PostFilterRead)
+    @PostFilter(POST_FILTER_RAED)
     public <T> List<T> findEntries(Integer firstResult, Integer maxResults, Entry<String, String> orderBy, Map<String, Object> where, Class<T> clazz) {
         EntityManager em = DomainObjectHelper.getEntityManager();
         CriteriaBuilder cb = em.getCriteriaBuilder();
@@ -147,35 +155,33 @@ public class DomainObjectService {
         return em.createQuery(cq).getSingleResult();
     }
 
-    @PreAuthorize(PreAuthorizeCreate)
+    @PreAuthorize(PRE_AUTORIZE_CREATE)
     public <T extends CrisEntity> void persist(T item, Class<T> clazz) {
         item.persist();
     }
 
-    @PreAuthorize(PreAuthorizeUpdate)
+    @PreAuthorize(PRE_AUTORIZE_UPDATE)
     public <T extends CrisEntity> T merge(T item, Class<T> clazz) {
         T merged = (T) item.merge();
         return merged;
     }
 
-    @PreAuthorize(PreAuthorizeDelete)
+    @PreAuthorize(PRE_AUTORIZE_DELETE)
     public <T extends CrisEntity> void remove(T item, Class<T> clazz) {
         item.remove();
     }
 
-    @PreAuthorize(PreAuthorizeDelete)
+    @PreAuthorize(PRE_AUTORIZE_DELETE)
     public <T extends CrisEntity> void flush(T item, Class<T> clazz) {
         item.flush();
     }
 
-    @PreAuthorize(PreAuthorizeDelete)
+    @PreAuthorize(PRE_AUTORIZE_DELETE)
     public <T extends CrisEntity> void clear(T item, Class<T> clazz) {
         item.clear();
     }
 
     public <T extends CrisEntity> Set<ConstraintViolation<T>> validate(T item) {
-        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-        Validator validator = factory.getValidator();
         Set<ConstraintViolation<T>> constraintViolations = validator.validate(item);
         return constraintViolations;
     }

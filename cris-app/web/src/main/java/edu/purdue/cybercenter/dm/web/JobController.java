@@ -30,8 +30,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -128,7 +126,7 @@ public class JobController {
     public String createForm(Model model, HttpServletRequest request) {
         model.addAttribute("name", request.getParameter("name"));
         model.addAttribute("description", request.getParameter("description"));
-        model.addAttribute("projects", domainObjectService.findAll(Project.class));
+        //model.addAttribute("projects", domainObjectService.findAll(Project.class));
         return "jobs/create";
     }
 
@@ -230,7 +228,7 @@ public class JobController {
     public String start(@PathVariable("id") Integer jobId, Model model, HttpServletRequest request) {
         User user = (User) request.getAttribute("user");
 
-        Job job = Job.findJob(jobId);
+        Job job = domainObjectService.findById(jobId, Job.class);
         if (!job.getStatusId().equals(EnumJobStatus.CREATED.getIndex())) {
             return "redirect:/jobs/" + job.getId().toString();
         }
@@ -290,11 +288,11 @@ public class JobController {
         return "redirect:/jobs/" + jobId;
     }
 
-    @RequestMapping(value = "/cancel/{id}", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/cancel/{id}", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public ResponseEntity<String> cancel(@PathVariable("id") Integer jobId, Model model, HttpServletRequest request) {
         String message = null;
-        Job job = Job.findJob(jobId);
+        Job job = domainObjectService.findById(jobId, Job.class);
         if (job == null) {
             message = "Job \"" + jobId + "\" does not exist";
         } else {
@@ -320,7 +318,7 @@ public class JobController {
 
                 Map<String, Object> queryAllJobData = new HashMap<>();
                 queryAllJobData.put(MetaField.JobId, jobId);
-                datasetService.updateState(deprecatedState, queryAllJobData, templateUuids);
+                datasetService.updateStateUnsecured(deprecatedState, queryAllJobData, templateUuids);
             }
 
         }
@@ -332,7 +330,7 @@ public class JobController {
 
     @RequestMapping(value = "/close/{id}", method = RequestMethod.POST, produces = MediaType.TEXT_HTML_VALUE)
     public String close(@PathVariable("id") Integer jobId, @RequestParam(value = "status", required = false) String status) {
-        Job job = Job.findJob(jobId);
+        Job job = domainObjectService.findById(jobId, Job.class);
         if (job == null) {
             //result.addError(new ObjectError("aaa", "connot find the job"));
             return "redirect:jobs/list";
@@ -346,7 +344,7 @@ public class JobController {
 
     @RequestMapping(value = "/task/{id}", method = RequestMethod.GET, produces = MediaType.TEXT_HTML_VALUE)
     public String taskForm(@PathVariable("id") Integer jobId, Model model, HttpServletRequest request) {
-        Job job = Job.findJob(jobId);
+        Job job = domainObjectService.findById(jobId, Job.class);
         if (job == null) {
             throw new RuntimeException(String.format("No job exists with Job ID: %d", jobId));
         }
@@ -498,8 +496,8 @@ public class JobController {
 
     @Transactional
     @RequestMapping(value = "/task", method = RequestMethod.POST, produces = MediaType.TEXT_HTML_VALUE)
-    public String task(@RequestParam("jobId") Integer jobId, @RequestParam("taskId") String taskId, Model model, MultipartHttpServletRequest request) {
-        Job job = Job.findJob(jobId);
+    public String task(@RequestParam("jobId") Integer jobId, @RequestParam("taskId") String taskId, Model model, MultipartHttpServletRequest request) throws IOException {
+        Job job = domainObjectService.findById(jobId, Job.class);
         if (job == null) {
             //result.addError(new ObjectError("aaa", "connot find the job"));
             return "redirect:jobs/list";
@@ -562,10 +560,14 @@ public class JobController {
         //runtimeService.signal(processInstance.getId());
         taskService.complete(task.getId());
 
+        // update the time_updated timestamp
+        job.setTimeUpdated(new Date());
+        job.merge();
+
         return "redirect:/jobs/task/" + job.getId().toString();
     }
 
-    @RequestMapping(value = "/status/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/status/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object status(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         Job job = domainObjectService.findById(id, Job.class);
@@ -584,13 +586,13 @@ public class JobController {
         return status;
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.show(id, request, response, Job.class);
     }
 
-    @RequestMapping(value = "/json/list", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/json/list", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public List<Map<String, Object>> getJsonList(@RequestParam(value = "start", required = false) Integer firstResult, @RequestParam(value = "count", required = false) Integer maxResults, @RequestParam(value = "status", defaultValue = "", required = false) String status, @RequestParam(value = "dateFilter", required = false) String dateFilter, HttpServletRequest request, HttpServletResponse response) {
         User user = (User) request.getAttribute("user");
@@ -682,61 +684,7 @@ public class JobController {
         return ssItems;
     }
 
-    @RequestMapping(value = "/json/names", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseBody
-    public List<Map<String, Object>> getJobList(@RequestParam(value = "start", required = false) Integer firstResult, @RequestParam(value = "count", required = false) Integer maxResults, @RequestParam(value = "onlyNew", defaultValue = "false", required = false) Boolean onlyNew, @RequestParam(value = "dateFilter", required = false) String dateFilter, HttpServletRequest request, HttpServletResponse response) {
-        List<Job> items = new ArrayList<>();
-        Map<String, Object> where;
-        int experimentId = 0;
-        try {
-            experimentId = Integer.parseInt(request.getParameter("experimentId"));
-        } catch (NumberFormatException e) {
-        }
-        Experiment experiment = Experiment.findExperiment(experimentId);
-        if (experiment == null) {
-            int projectId = 0;
-            try {
-                projectId = Integer.parseInt(request.getParameter("projectId"));
-            } catch (NumberFormatException e) {
-            }
-            Project project = Project.findProject(projectId);
-            if (project == null) {
-                for (Project aProject : domainObjectService.findAll(Project.class)) {
-                    where = WebHelper.getWhere(aProject, null);
-                    items.addAll(domainObjectService.findBy(where, Job.class));
-                }
-            } else {
-                where = WebHelper.getWhere(project, null);
-                items = domainObjectService.findBy(where, Job.class);
-            }
-        } else {
-            where = WebHelper.getWhere(null, experiment);
-            items = domainObjectService.findBy(where, Job.class);
-        }
-        List<Map<String, Object>> ssItems = new ArrayList<>();
-        for (Job item : items) {
-            Map<String, Object> nvp = new HashMap<>();
-            nvp.put("id", item.getId().toString());
-            nvp.put("name", item.getName());
-            ssItems.add(nvp);
-        }
-        if (ssItems.size() > 1) {
-            Collections.sort(ssItems, new Comparator<Map<String, Object>>() {
-                @Override
-                public int compare(Map<String, Object> a, Map<String, Object> b) {
-                    return a.get("name").toString().compareTo(b.get("name").toString());
-                }
-            });
-        }
-        Map<String, Object> nvp = new HashMap<>();
-        nvp.put("id", "0");
-        nvp.put("name", "--ALL--");
-        ssItems.add(0, nvp);
-
-        return ssItems;
-    }
-
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.list(request, response, Job.class);

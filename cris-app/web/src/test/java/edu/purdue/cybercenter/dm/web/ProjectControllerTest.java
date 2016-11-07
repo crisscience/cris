@@ -43,7 +43,7 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
         if (projectMap == null || projectMap.isEmpty())
             throw new RuntimeException("Improper inputs");
 
-        assertEquals(13, projectMap.size());
+        assertEquals(15, projectMap.size());
         if (expectedMap.get("id") != null) {
             assertEquals("Id", (int) expectedMap.get("id"), projectMap.get("id"));
             assertEquals("StatusId", (int) expectedMap.get("statusId"), projectMap.get("statusId"));
@@ -87,9 +87,9 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
      */
     @Test
     public void testProjectCreation() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/projects").content(jsonNewProject).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/projects").content(jsonNewProject).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
-        resultActions.andExpect(status().isCreated()).andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(status().isCreated()).andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
 
         Map<String, Object> jsonProjectMap = Helper.deserialize(resultActions.andReturn().getResponse().getContentAsString(), Map.class);
         Map<String, Object> expectedMap = Helper.deserialize(jsonNewProject, Map.class);
@@ -104,7 +104,7 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
     */
     @Test
     public void testProjectRetrieval() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5001").accept(MediaType.APPLICATION_JSON).session(httpSession); //.accept(MediaType.APPLICATION_JSON)
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5001").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession); //.accept(MediaType.APPLICATION_JSON_UTF8)
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
 
@@ -122,10 +122,10 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
     @Test
     public void testProjectUpdate() throws Exception{
         String json = "{id : 5001, name : \"NSF Modified Fund 12345678\", description : \"This is a test project\", \"assetTypeId\":7, \"statusId\":1, \"tenantId\":1}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5001").content(json).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5001").content(json).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
 
         Map<String, Object> projectMap = Helper.deserialize(contents, Map.class);
@@ -144,7 +144,7 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
     */
     @Test
     public void testProjectDeprecation() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5001").accept(MediaType.APPLICATION_JSON).session(httpSession); //.accept(MediaType.APPLICATION_JSON)
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5001").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession); //.accept(MediaType.APPLICATION_JSON_UTF8)
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
 
@@ -154,10 +154,10 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
         projectMap.put("statusId", 0); // to deprecate the project
         expectedMap.put("statusId", 0); // to validate deprecation
 
-        mockHttpServletRequestBuilder = put("/projects/5001").content(Helper.deepSerialize(projectMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = put("/projects/5001").content(Helper.deepSerialize(projectMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         projectMap = Helper.deserialize(contents, Map.class);
 
@@ -177,10 +177,10 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
         projectMap.put("statusId", 1);// to restore deprecated project
         expectedMap.put("statusId", 1);// to validate restoration
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5005").content(Helper.deepSerialize(projectMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5005").content(Helper.deepSerialize(projectMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         projectMap = Helper.deserialize(contents, Map.class);
 
@@ -194,7 +194,7 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
     */
     @Test
     public void testNonProjectRetrieval() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5006").accept(MediaType.APPLICATION_JSON).session(httpSession); //.accept(MediaType.APPLICATION_JSON)
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5006").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession); //.accept(MediaType.APPLICATION_JSON_UTF8)
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
 
@@ -209,7 +209,7 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
     @Test
     public void testNonProjectUpdation() throws Exception{
         String json = "{id : 5006, name : \"NIH Modified Modified Fund ABCD1234\", description : \"This is a test project\", \"assetTypeId\":7, \"statusId\":1, \"tenantId\":{\"$ref\":\"/tenants/1\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5006").content(json).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5006").content(json).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
     }
@@ -223,7 +223,7 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
     @Test
     public void testNonProjectDeprecation() throws Exception{
         String json = "{id : 5006, name : \"NIH Modified Modified Fund ABCD1234\", description : \"This is a test project\", \"assetTypeId\":7, \"statusId\":0, \"tenantId\":{\"$ref\":\"/tenants/1\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5006").content(json).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5006").content(json).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
     }
@@ -237,7 +237,7 @@ public class ProjectControllerTest extends BaseWithAdminUserControllerTest {
     @Test
     public void testNonProjectRestoration() throws Exception {
         String json = "{id : 5006, name : \"NIH Modified Modified Fund ABCD1234\", description : \"This is a test project\", \"assetTypeId\":7, \"statusId\":1, \"tenantId\":{\"$ref\":\"/tenants/1\"}}";
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5006").content(json).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/projects/5006").content(json).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
     }

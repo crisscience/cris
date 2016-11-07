@@ -159,7 +159,7 @@ function removeUniqueId(term) {
     return term;
 }
 
-var crisVocabulary = angular.module("crisVocabulary", ['angular-dojo', 'dataset']);
+var crisVocabulary = angular.module("crisVocabulary", ['angular-dojo', 'dataset', 'ui.bootstrap']);
 
 crisVocabulary.directive("crisView", function($compile) {
     return {
@@ -287,7 +287,7 @@ crisVocabulary.directive("crisTermValidator", function($compile) {
         templateUrl: cris.baseUrl + "vocabularys/partials/view_term_validator",
         link: function(scope, element, attrs) {
             console.log("==== validator link: begin ====");
-
+            
             /****************
              * model -> view
              ****************/
@@ -528,9 +528,6 @@ crisVocabulary.directive("crisTermDefaultValue", function($compile) {
                                    scope.setDefaultValue(this.value ? dojo.toJson(value) : "");
                                 };
                             }
-                        } else if (validator.type === "file") {
-                            widget = new TextBox({disabled: true});
-                            scope.ngModel.value = null;
                         } else if (validator.type === "numeric") {
                             widget = new ValidationTextBox({});
                             widget.onChange = function (value) {
@@ -586,7 +583,7 @@ crisVocabulary.directive("crisTermDefaultValue", function($compile) {
                         }
 
                         // Disable expression box where it is not necessary
-                        if (validator && (validator.type === "file" || validator.type === 'composite')) {
+                        if (validator && validator.type === 'composite') {
                             expressionTextbox.set('disabled', true);
                         }
 
@@ -608,9 +605,9 @@ crisVocabulary.directive("crisTermDefaultValue", function($compile) {
                             }
                         }
 
-                        angular.element(expressionTextbox.domNode).wrap('<div style="display:table"></div>');
+                        angular.element(expressionTextbox.domNode).wrap('<div style="display:table;margin-top:2px;"></div>');
                         dojo.setStyle(expressionTextbox.domNode, 'display', 'table-cell');
-                        dojo.place('<span style="display:table-cell;vertical-align:middle;">Exp:&nbsp;</span>', expressionTextbox.domNode, "before");
+                        dojo.place('<span style="display:table-cell;vertical-align:middle">Exp:&nbsp;</span>', expressionTextbox.domNode, "before");
                     }
                 }
 
@@ -830,7 +827,7 @@ crisVocabulary.directive("crisVocabularyVersion", function() {
     }
 });
 
-crisVocabulary.controller("PageController", function ($scope) {
+crisVocabulary.controller("PageController", ['$scope', '$uibModal', function ($scope, $uibModal) {
 
     $scope.ContributorDefinition = {list: true, type: "text", isDefinition: true, name: "contributor"};
 
@@ -1042,13 +1039,14 @@ crisVocabulary.controller("PageController", function ($scope) {
         $scope.$watch('[template.selectedTerm, template.definition.term, template.id]', function(newValue, oldValue){
             var selectedTermCurrent = newValue[0];
             var selectedTermPrevious = oldValue[0];
-            if (selectedTermCurrent && selectedTermCurrent.isNew) {
-                $scope.template.isInEditMode = true;
-                return;
-            }
+            
             if (selectedTermCurrent && selectedTermPrevious && selectedTermCurrent.$$uuid === selectedTermPrevious.$$uuid && selectedTermCurrent.version === selectedTermPrevious.version) {
                 var newVal = angular.copy(selectedTermCurrent);
                 var oldVal = angular.copy(selectedTermPrevious);
+                if (newVal.type === 'composite') {
+                    delete newVal.validation;
+                    delete oldVal.validation;
+                }
                 removeUniqueId(newVal);
                 removeUniqueId(oldVal);
 
@@ -1074,7 +1072,7 @@ crisVocabulary.controller("PageController", function ($scope) {
             }
 
             // Check if there is a change in number of terms for the template
-            if (newValue[2] === oldValue[2] && newValue[1] && oldValue[1]) {
+            if (newValue[2] === oldValue[2] && newValue[1] && oldValue[1] && $scope.template.isInEditMode === false) {
                 var currentTermCount = 0;
                 var currentTerms = angular.copy(newValue[1]);
                 while (currentTerms.length) {
@@ -1175,11 +1173,13 @@ crisVocabulary.controller("PageController", function ($scope) {
                     $scope.errors.message = parseDataMessage(data, "Saved Successfully");
                     $scope.template.isInEditMode = false;
                 }
-                var templateDetails = angular.fromJson(data.template);
-                dojo.mixin($scope.template, templateDetails);
-                $scope.template.definition.version = templateDetails["versionNumber"]["$uuid"];
-                $scope.template.definition.id = templateDetails.id;
-                $scope.headTemplateVersion = templateDetails["versionNumber"]["$uuid"];
+                if (data.template) {
+                    var templateDetails = angular.fromJson(data.template);
+                    dojo.mixin($scope.template, templateDetails);
+                    $scope.template.definition.version = templateDetails["versionNumber"]["$uuid"];
+                    $scope.template.definition.id = templateDetails.id;
+                    $scope.headTemplateVersion = templateDetails["versionNumber"]["$uuid"];
+                }
 
             	$scope.templateGrid.setQuery(query);
             	$scope.attachToGrid.setQuery(query);
@@ -1195,7 +1195,7 @@ crisVocabulary.controller("PageController", function ($scope) {
     $scope.findInvalidAliases = function (term, invalidAliases) { // Find invalid characters in the aliases or names of a template or vocabulary's terms
         // A term alias or name must contain only the specified characters: [a-zA-Z0-9], underscore
         var compositeTermName = arguments[2];
-        var regex = new RegExp("^(?!_)[a-zA-Z0-9_]*$");
+        var regex = new RegExp("^(?!_)[a-zA-Z0-9_]+$");
         dojo.forEach(term.term, function(term) {
             var _alias = term.alias || term.useAlias || term.name;
             var isValid = regex.test(_alias);
@@ -1514,19 +1514,33 @@ crisVocabulary.controller("PageController", function ($scope) {
 
     $scope.previewTemplate = function () {
         if ($scope.template.definition) {
-            var dialog = new dijit.Dialog({
-                title: "Template Preview",
-                content: '<div style="max-height:700px;overflow:auto;"><cris-dataset term="term" dataset="data" context="context" message="message" readOnly="false"><!----></cris-dataset></div>',
-                style: "width: 850px;min-height:600px;max-height:800px;background-color:#FFF;"
+            
+            var scope = $scope.$new(true);
+            scope.term = getTerm($scope.template.definition.uuid, $scope.template.definition.version, true);
+            scope.data = instantiateTerm(scope.term, {});
+            scope.context = scope.data;
+            
+            var modalTemplate = '<div class="modal-header"> \
+                                    <b>Template</b>:&nbsp{{term.name}} \
+                                </div> \
+                                <div class="modal-body" style="max-height:80vh;overflow-y:auto;"> \
+                                    <cris-dataset term="term" dataset="data" context="context" message="message" readOnly="false"><!----></cris-dataset>  \
+                                </div> \
+                                <div class="modal-footer"> \
+                                    <span class="pull-right"><input type="button" value="Close" class="btn btn-warning" ng-click="close()" /></span> \
+                                </div>';
+            
+            $uibModal.open({
+                animation: true,
+                template: modalTemplate,
+                scope: scope,
+                windowClass : 'largeModal',
+                controller: function ($scope, $uibModalInstance) {
+                     $scope.close = function () {
+                         $uibModalInstance.close();
+                     };
+                }
             });
-            angular.injector(['ng', 'crisVocabulary']).invoke(['$compile', function ($compile) {
-                var scope = $scope.$new(true);
-                scope.term = getTerm($scope.template.definition.uuid, $scope.template.definition.version, true);
-                scope.data = instantiateTerm(scope.term, {});
-                scope.context = scope.data;
-                $compile(dialog.domNode)(scope);
-            }]);
-            dialog.show();
         }
     };
 
@@ -1559,6 +1573,10 @@ crisVocabulary.controller("PageController", function ($scope) {
                                                 {name: 'readOnly', prettyName: 'Read Only'},
                                                 {name: 'list', prettyName: 'List'},
                                                 {name: 'validation', prettyName: 'Validation'}];
+                                            
+                if (selectedTerm.type === 'attachTo') {
+                    updatableTermProperties = [ {name: 'description', prettyName: 'Description'}];
+                }
 
                 var htmlStr = "";
                 dojo.forEach(updatableTermProperties, function(property) {
@@ -1625,4 +1643,4 @@ crisVocabulary.controller("PageController", function ($scope) {
             deleteTermCallback();
         }
     }
-});
+}]);

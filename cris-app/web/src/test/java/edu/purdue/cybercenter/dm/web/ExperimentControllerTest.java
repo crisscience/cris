@@ -1,7 +1,6 @@
 package edu.purdue.cybercenter.dm.web;
 
 import edu.purdue.cybercenter.dm.util.Helper;
-import java.util.List;
 import java.util.Map;
 import static org.junit.Assert.*;
 import org.junit.BeforeClass;
@@ -30,7 +29,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
         if (experimentMap == null || experimentMap.isEmpty())
             throw new RuntimeException("Improper inputs");
 
-        assertEquals(14, experimentMap.size());
+        assertEquals(16, experimentMap.size());
         assertEquals("experimentId", expectedMap.get("id"), experimentMap.get("id"));
         assertEquals("assetTypeId", expectedMap.get("assetTypeId"), experimentMap.get("assetTypeId"));
         assertEquals("projectId", ((Map<String, Object>) expectedMap.get("projectId")).get("$ref"), ((Map<String, Object>) experimentMap.get("projectId")).get("$ref"));
@@ -42,7 +41,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void testCreateExperiment() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(jsonNewExperiment).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(jsonNewExperiment).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isCreated());
     }
@@ -52,7 +51,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testCreateExperimentNonExistProject() throws Exception {
         Map<String, Object> map = Helper.deserialize(jsonNewExperiment, Map.class);
         ((Map<String, Object>) map.get("projectId")).put("$ref", "/projects/10000");
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(Helper.deepSerialize(map)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(Helper.deepSerialize(map)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         String response = resultActions.andReturn().getResponse().getContentAsString();
@@ -67,7 +66,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testCreateExperimentNoProjectId() throws Exception {
         Map<String, Object> map = Helper.deserialize(jsonNewExperiment, Map.class);
         map.remove("projectId");
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(Helper.deepSerialize(map)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(Helper.deepSerialize(map)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         String response = resultActions.andReturn().getResponse().getContentAsString();
@@ -82,7 +81,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testCreateExperimentDeprecatedProject() throws Exception {
         Map<String, Object> map = Helper.deserialize(jsonNewExperiment, Map.class);
         ((Map<String, Object>) map.get("projectId")).put("$ref", "/projects/5005"); // deprecated Project
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(Helper.deepSerialize(map)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = post("/experiments").content(Helper.deepSerialize(map)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
 
         String response = resultActions.andReturn().getResponse().getContentAsString();
@@ -94,10 +93,10 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void testRetrieveExperiment() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/7001").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/7001").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         System.out.println(resultActions.andReturn().getResponse().getContentAsString());
 
         Map<String, Object> experimentMap = Helper.deserialize(resultActions.andReturn().getResponse().getContentAsString(), Map.class);
@@ -110,7 +109,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     @Test
     public void testRetrieveExperimentNonExistProject() throws Exception{
         // Deprecating the Project first
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5001").accept(MediaType.APPLICATION_JSON).session(httpSession); //.accept(MediaType.APPLICATION_JSON)
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/projects/5001").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession); //.accept(MediaType.APPLICATION_JSON_UTF8)
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
 
@@ -118,12 +117,12 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
 
         projectMap.put("statusId", 0); // to deprecate the project
 
-        mockHttpServletRequestBuilder = put("/projects/5001").content(Helper.deepSerialize(projectMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = put("/projects/5001").content(Helper.deepSerialize(projectMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
 
         //Test retrieval of experiment whose project has been deprecated
-        mockHttpServletRequestBuilder = get("/experiments/7001").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = get("/experiments/7001").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
     }
@@ -132,10 +131,10 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testUpdateExperiment() throws Exception{
         String experimentUpdate = "{id : 7001, name : \"NSF Modified Fund 12345678 Experiment 1\", description : \"This is a test project. This is an update\", \"assetTypeId\":5, \"statusId\":1, \"tenantId\":1, projectId: {$ref: \"/projects/5001\"}}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
 
         Map<String, Object> experimentMap = Helper.deserialize(contents, Map.class);
@@ -152,13 +151,13 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testUpdateExperimentNonExistProject() throws Exception{
         String experimentUpdate = "{id : 7001, name : \"NSF Modified Fund 12345678 Experiment 1\", description : \"This is a test project. This is an update\", \"assetTypeId\":5, \"statusId\":1, \"tenantId\":{\"$ref\":\"/tenants/1\"}, projectId: {$ref: \"/projects/10000\"}}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         String contents = resultActions.andReturn().getResponse().getContentAsString();
 
         resultActions.andExpect(status().isNotFound());
         assertEquals("Unable to Update the experiment", Helper.deserialize(contents, Map.class).get("status"));
-        //resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        //resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         //System.out.println(contents);
     }
 
@@ -167,13 +166,13 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testUpdateExperimentNoProjectId() throws Exception{
         String experimentUpdate = "{id : 7001, name : \"NSF Modified Fund 12345678 Experiment 1\", description : \"This is a test project. This is an update\", \"assetTypeId\":5, \"statusId\":1, \"tenantId\":{\"$ref\":\"/tenants/1\"}}";//, projectId: {$ref: \"/projects/10000\"}
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         String contents = resultActions.andReturn().getResponse().getContentAsString();
 
         resultActions.andExpect(status().isNotFound());
         assertEquals("Unable to Update the experiment", Helper.deserialize(contents, Map.class).get("status"));
-        //resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        //resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         //System.out.println(contents);
     }
 
@@ -182,18 +181,18 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testUpdateExperimentDeprecatedProject() throws Exception{
         String experimentUpdate = "{id : 7001, name : \"NSF Modified Fund 12345678 Experiment 1\", description : \"This is a test project. This is an update\", \"assetTypeId\":5, \"statusId\":1, \"tenantId\":{\"$ref\":\"/tenants/1\"}, projectId: {$ref: \"/projects/5005\"}}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7001").content(experimentUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         String contents = resultActions.andReturn().getResponse().getContentAsString();
 
         resultActions.andExpect(status().isNotFound());
-        //resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        //resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         System.out.println(contents);
     }
 
     @Test
     public void testDeprecateExperiment() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/7001").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/7001").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
 
@@ -203,10 +202,10 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
         experimentMap.put("statusId", 0); // to deprecate the project
         expectedMap.put("statusId", 0); // to validate deprecation
 
-        mockHttpServletRequestBuilder = put("/experiments/7001").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        mockHttpServletRequestBuilder = put("/experiments/7001").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         experimentMap = Helper.deserialize(contents, Map.class);
 
@@ -221,10 +220,10 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
         experimentMap.put("statusId", 1); // to deprecate the project
         expectedMap.put("statusId", 1); // to validate deprecation
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7007").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7007").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8));
         String contents = resultActions.andReturn().getResponse().getContentAsString();
         experimentMap = Helper.deserialize(contents, Map.class);
 
@@ -233,7 +232,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
 
     @Test
     public void testRetrieveNonExperiment() throws Exception{
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/7008").accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/7008").accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
     }
@@ -243,7 +242,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
     public void testUpdateNonExperiment() throws Exception{
         String experimentUpdate = "{id : 7008, name : \"NSF Modified Fund 12345678 Experiment 1\", description : \"This is a test project. This is an update\", \"assetTypeId\":5, \"statusId\":1, \"tenantId\":{\"$ref\":\"/tenants/1\"}, projectId: {$ref: \"/projects/5001\"}}";
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7008").content(experimentUpdate).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7008").content(experimentUpdate).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
     }
@@ -257,7 +256,7 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
         experimentMap.put("statusId", 0); // to deprecate the project
         expectedMap.put("statusId", 0); // to validate deprecation
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7008").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7008").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
     }
@@ -271,95 +270,8 @@ public class ExperimentControllerTest extends BaseWithAdminUserControllerTest {
         experimentMap.put("statusId", 0); // to deprecate the project
         expectedMap.put("statusId", 0); // to validate deprecation
 
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7008").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON).session(httpSession);
+        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = put("/experiments/7008").content(Helper.deepSerialize(experimentMap)).accept(MediaType.APPLICATION_JSON_UTF8).session(httpSession);
         ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
         resultActions.andExpect(status().isNotFound());
-    }
-
-    // Without any parameters like projectId.
-    @Test
-    public void experimentsJsonNames1() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/json/names").accept(MediaType.APPLICATION_JSON).session(httpSession);
-
-        ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
-
-        resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
-
-        String content = resultActions.andReturn().getResponse().getContentAsString();
-        List<Map<String, Object>> list = Helper.deserialize(content, List.class);
-
-        assertEquals("experiments", 7, list.size());
-        assertEquals("first id", 0, (list.get(0)).get("id"));
-        assertEquals("first name", "--ALL--", (list.get(0)).get("name"));
-    }
-
-    @Test
-    public void experimentsJsonNames2() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/json/names/?projectId=0").accept(MediaType.APPLICATION_JSON).session(httpSession);
-
-        ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
-
-        resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
-
-        String content = resultActions.andReturn().getResponse().getContentAsString();
-        List<Map<String, Object>> list = Helper.deserialize(content, List.class);
-
-        assertEquals("experiments", 7, list.size());
-        assertEquals("first id", 0, (list.get(0)).get("id"));
-        assertEquals("first name", "--ALL--", (list.get(0)).get("name"));
-    }
-
-    @Test
-    public void experimentsJsonNames3() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/json/names/?projectId=5001").accept(MediaType.APPLICATION_JSON).session(httpSession);
-
-        ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
-
-        resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
-
-        String content = resultActions.andReturn().getResponse().getContentAsString();
-        List<Map<String, Object>> list = Helper.deserialize(content, List.class);
-
-        assertEquals("experiments", 3, list.size());
-        assertEquals("first id", 0, (list.get(0)).get("id"));
-        assertEquals("first name", "--ALL--", (list.get(0)).get("name"));
-    }
-
-    // Note that if projectId does not exist, it works like projectId = 0.
-    @Test
-    public void experimentsJsonNames4() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/json/names/?projectId=12").accept(MediaType.APPLICATION_JSON).session(httpSession);
-
-        ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
-
-        resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
-
-        String content = resultActions.andReturn().getResponse().getContentAsString();
-        List<Map<String, Object>> list = Helper.deserialize(content, List.class);
-
-        assertEquals("experiments", 7, list.size());
-        assertEquals("first id", 0, (list.get(0)).get("id"));
-        assertEquals("first name", "--ALL--", (list.get(0)).get("name"));
-    }
-
-    @Test
-    public void experimentsJsonNames5() throws Exception {
-        MockHttpServletRequestBuilder mockHttpServletRequestBuilder = get("/experiments/json/names/?projectId=5002").accept(MediaType.APPLICATION_JSON).session(httpSession);
-
-        ResultActions resultActions = mockMvc.perform(mockHttpServletRequestBuilder);
-
-        resultActions.andExpect(status().isOk());
-        resultActions.andExpect(content().contentType(MediaType.APPLICATION_JSON));
-
-        String content = resultActions.andReturn().getResponse().getContentAsString();
-        List<Map<String, Object>> list = Helper.deserialize(content, List.class);
-
-        assertEquals("experiments", 2, list.size());
-        assertEquals("first id", 0, (list.get(0)).get("id"));
-        assertEquals("first name", "--ALL--", (list.get(0)).get("name"));
     }
 }

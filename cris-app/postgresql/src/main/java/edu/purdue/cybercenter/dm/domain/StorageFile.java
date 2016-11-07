@@ -37,7 +37,7 @@ public class StorageFile extends AbstractCrisAsset {
         setAssetTypeId(EnumAssetType.StorageFile.getIndex());
     }
 
-    public static StorageFile toStorageFile(String storageFileId) {
+    public static Integer toStorageFileId(String storageFileId) {
         String[] fields = storageFileId.split(":");
         String sId;
         if (fields.length == 1) {
@@ -50,8 +50,7 @@ public class StorageFile extends AbstractCrisAsset {
 
         Integer id;
         id = Integer.parseInt(sId);
-        StorageFile storageFile = StorageFile.findStorageFile(id);
-        return storageFile;
+        return id;
     }
 
     /*********************************************************
@@ -82,17 +81,14 @@ public class StorageFile extends AbstractCrisAsset {
     @NotNull
     private String location;
 
-    @ManyToOne
-    @JoinColumn(name = "project_id", referencedColumnName = "id")
-    private Project projectId;
+    @Column(name = "project_id")
+    private Integer projectId;
 
-    @ManyToOne
-    @JoinColumn(name = "experiment_id", referencedColumnName = "id")
-    private Experiment experimentId;
+    @Column(name = "experiment_id")
+    private Integer experimentId;
 
-    @ManyToOne
-    @JoinColumn(name = "job_id", referencedColumnName = "id")
-    private Job jobId;
+    @Column(name = "job_id")
+    private Integer jobId;
 
     public Storage getStorageId() {
         return storageId;
@@ -126,27 +122,27 @@ public class StorageFile extends AbstractCrisAsset {
         this.location = location;
     }
 
-    public Project getProjectId() {
+    public Integer getProjectId() {
         return projectId;
     }
 
-    public void setProjectId(Project projectId) {
+    public void setProjectId(Integer projectId) {
         this.projectId = projectId;
     }
 
-    public Experiment getExperimentId() {
+    public Integer getExperimentId() {
         return experimentId;
     }
 
-    public void setExperimentId(Experiment experimentId) {
+    public void setExperimentId(Integer experimentId) {
         this.experimentId = experimentId;
     }
 
-    public Job getJobId() {
+    public Integer getJobId() {
         return jobId;
     }
 
-    public void setJobId(Job jobId) {
+    public void setJobId(Integer jobId) {
         this.jobId = jobId;
     }
 

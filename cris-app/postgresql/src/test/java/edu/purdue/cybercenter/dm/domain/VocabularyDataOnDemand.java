@@ -91,7 +91,7 @@ public class VocabularyDataOnDemand {
     }
 
 	public void setImageId(Vocabulary obj, int index) {
-        SmallObject imageId = smallObjectDataOnDemand.getRandomSmallObject();
+        Integer imageId = smallObjectDataOnDemand.getRandomSmallObject().getId();
         obj.setImageId(imageId);
     }
 
@@ -104,7 +104,7 @@ public class VocabularyDataOnDemand {
     }
 
 	public void setOwnerId(Vocabulary obj, int index) {
-        Group ownerId = groupDataOnDemand.getRandomGroup();
+        Integer ownerId = groupDataOnDemand.getRandomGroup().getId();
         obj.setOwnerId(ownerId);
     }
 

@@ -27,13 +27,17 @@ public interface CrisAsset {
 
     String getDescription();
 
-    Group getOwnerId();
+    Integer getOwnerId();
 
-    void setOwnerId(Group ownerId);
+    void setOwnerId(Integer ownerId);
 
-    SmallObject getImageId();
+    Boolean getIsGroupOwner();
 
-    void setImageId(SmallObject imageId);
+    void setIsGroupOwner(Boolean isGroupOwner);
+
+    Integer getImageId();
+
+    void setImageId(Integer imageId);
 
 //    UUID getUuid();
 //    void setUuid(UUID uuid);

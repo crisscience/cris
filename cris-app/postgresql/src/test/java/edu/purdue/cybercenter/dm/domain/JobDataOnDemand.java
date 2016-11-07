@@ -33,9 +33,6 @@ public class JobDataOnDemand {
     private ProjectDataOnDemand projectDataOnDemand;
 
 	@Autowired
-    private ResourceDataOnDemand resourceDataOnDemand;
-
-	@Autowired
     private TenantDataOnDemand tenantDataOnDemand;
 
 	@Autowired
@@ -50,7 +47,6 @@ public class JobDataOnDemand {
         setName(obj, index);
         setParentId(obj, index);
         setProjectId(obj, index);
-        setResourceId(obj, index);
         setStatusId(obj, index);
         setTenantId(obj, index);
         setTimeCreated(obj, index);
@@ -97,11 +93,6 @@ public class JobDataOnDemand {
 	public void setProjectId(Job obj, int index) {
         Project projectId = projectDataOnDemand.getRandomProject();
         obj.setProjectId(projectId);
-    }
-
-	public void setResourceId(Job obj, int index) {
-        Resource resourceId = resourceDataOnDemand.getRandomResource();
-        obj.setResourceId(resourceId);
     }
 
 	public void setStatusId(Job obj, int index) {

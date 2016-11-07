@@ -43,7 +43,9 @@ import org.activiti.engine.task.Task;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -76,6 +78,9 @@ public class WorkflowService {
 
     @Autowired
     private StorageService storageService;
+
+    @Autowired
+    private DomainObjectService domainObjectService;
 
     public Map<String, Object> makeContextFromJobAndTask(Job job, String sTaskId) {
         Map<String, Object> context = new HashMap<>();
@@ -147,13 +152,33 @@ public class WorkflowService {
         }
 
         if (name.startsWith("[") && name.endsWith("]")) {
-            List<String> names = (List<String>) Helper.deserialize(name, List.class);
+            List tmpNames = Helper.deserialize(name, List.class);
+            List<String> names = flattenStorageFileList(tmpNames);
             for (String n : names) {
                 placeFile(n, path, dirPath, job, processDefinition, context);
             }
         } else {
             placeFile(name, path, dirPath, job, processDefinition, context);
         }
+    }
+
+    private List<String> flattenStorageFileList(List tmpNames) {
+        // there are two cases: (1) a list of storage files (2) a list of a list of storage files
+        List<String> names = new ArrayList<>();
+
+        for (Object o : tmpNames) {
+            if (o == null) {
+                // do nothing
+            } else if (o instanceof String) {
+                names.add((String) o);
+            } else if (o instanceof List) {
+                for (String n : (List<String>) o) {
+                    names.add(n);
+                }
+            }
+        }
+
+        return names;
     }
 
     private void placeFile(String name, String path, String dirPath, Job job, ProcessDefinition processDefinition, Map<String, Object> context) {
@@ -171,7 +196,8 @@ public class WorkflowService {
                 StorageFileManager storageFileManager = storageService.getStorageFileManager(AccessMethodType.FILE);
                 // Get file from Storage
                 //StorageService.get(name, isDir ? path + name.substring(12) : path);
-                StorageFile storageFile = StorageFile.toStorageFile(fixedName);
+                Integer id = StorageFile.toStorageFileId(fixedName);
+                StorageFile storageFile = domainObjectService.findById(id, StorageFile.class);
                 storageFileManager.getFile(storageFile, path, true);
             } catch (Exception ex) {
                 throw new RuntimeException("Unable to place storage file: " + fixedName + " to: " + path, ex);
@@ -200,7 +226,7 @@ public class WorkflowService {
                 TermName termName = new TermName(evaledTerm);
                 UUID uuid = termName.getUuid();
                 String q = termName.getQueryString();
-                Map subQuery = Helper.deserialize(q, Map.class);
+                Map subQuery = (Map<String, Object>) DatasetUtils.deserialize(q);
                 if (subQuery == null) {
                     subQuery = new HashMap();
                 }
@@ -217,8 +243,11 @@ public class WorkflowService {
         }
     }
 
-    public void collectFiles(String filesToCollect, String dirPath, Job job, String activityId, Map<String, Object> context) {
+    @PreAuthorize(DatasetService.PRE_AUTHORIZE_SAVE)
+    public Map<String, Object> collectFiles(String filesToCollect, String dirPath, Job job, String activityId, Map<String, Object> value) {
+        Map<String, Object> context = value;
         String[] namedPaths = filesToCollect.split(FileGroupSeparater);
+        Map<String, Object> filesDataset = new HashMap<>();
         for (String namedPath : namedPaths) {
             int index = namedPath.indexOf(FileSrcDstSeparater);
             if (index != -1) {
@@ -253,6 +282,12 @@ public class WorkflowService {
                     try {
                         StorageFileManager storageFileManager = storageService.getStorageFileManager(AccessMethodType.FILE);
                         sfs = storageFileManager.putFile(AccessMethodType.FILE + ":" + f.getAbsolutePath(), null, true);
+                        for (StorageFile storageFile : sfs) {
+                            storageFile.setProjectId((Integer) value.get(MetaField.ProjectId));
+                            storageFile.setExperimentId((Integer) value.get(MetaField.ExperimentId));
+                            storageFile.setJobId((Integer) value.get(MetaField.JobId));
+                            storageFile.merge();
+                        }
                     } catch (Exception ex) {
                         throw new RuntimeException("Unable to collect file(s): " + f.getAbsolutePath(), ex);
                     }
@@ -293,6 +328,7 @@ public class WorkflowService {
                                 }
                                 Map<String, Object> dataset = (Map<String, Object>) DatasetUtils.deserialize(json);
                                 dataset.putAll(context);
+                                fixMetaDataUnsecured(uuid, dataset);
                                 datasetService.putValue(uuid, version, dataset);
                             }
                         } catch (IOException ex) {
@@ -300,18 +336,44 @@ public class WorkflowService {
                         }
                     }
                 } else {
-                    for (StorageFile storageFile : storageFiles) {
-                        int contextId = datasetService.makeContextId(null, null, job.getId(), activityId, name, null);
-                        context.put(MetaField.ContextId, contextId);
+                    // find if the term is a list
+                    Term template = termService.dbTermToTerm(termService.findByUuidAndVersionNumber(uuid, version));
+                    Term term = termService.getSubTerm(template, termName.getAlias());
+                    boolean isList = termService.fileIsList(term);
+                    if (!isList && storageFiles.size() > 1) {
+                        throw new RuntimeException("too many files for term: " + termName.getAlias() + ": " + storageFiles.size());
+                    }
 
-                        Map<String, Object> dataset = new HashMap<>();
-                        dataset.put(termName.getAlias(), "StorageFile:" + storageFile.getId());
-                        dataset.putAll(context);
-                        datasetService.putValue(uuid, version, dataset);
+                    List<String> sFiles = new ArrayList<>();
+                    for (StorageFile storageFile : storageFiles) {
+                        sFiles.add("StorageFile:" + storageFile.getId());
+                    }
+                    if (!sFiles.isEmpty()) {
+                        Map<String, Object> sf = new HashMap<>();
+                        String alias = termName.getAlias();
+                        String[] parts = alias.split("\\.");
+                        Map<String, Object> current = sf;
+                        for (int i = 0; i < parts.length; i++) {
+                            if (i == parts.length - 1) {
+                                // last one
+                                current.put(parts[i], isList ? sFiles : sFiles.get(0));
+                            } else {
+                                current.put(parts[i], new HashMap<>());
+                                current = (Map) current.get(parts[i]);
+                            }
+                        }
+
+                        if (filesDataset.get(uuid.toString()) != null) {
+                            Helper.mergeMaps((Map) filesDataset.get(uuid.toString()), sf);
+                        } else {
+                            filesDataset.put(uuid.toString(), sf);
+                        }
                     }
                 }
             }
         }
+
+        return filesDataset;
     }
 
     public void updateJobTemplateUuids(String uuid, String processInstanceId) {
@@ -446,6 +508,31 @@ public class WorkflowService {
         return saveData(data, delegateExecution, null, context);
     }
 
+    private void fixMetaDataUnsecured(UUID uuid, Map<String, Object> data) {
+        // IsGroupOwner, OwnerId
+        // ProjectId, ExperimentId, JobId, TaskId, ContextId
+        ObjectId id = (ObjectId) data.get(MetaField.Id);
+        if (id != null) {
+            Map<String, Object> origData = datasetService.findByIdUnsecured(uuid, id);
+            if (origData != null) {
+                data.put(MetaField.IsGroupOwner, origData.get(MetaField.IsGroupOwner));
+                data.put(MetaField.OwnerId, origData.get(MetaField.OwnerId));
+
+                data.put(MetaField.ProjectId, origData.get(MetaField.ProjectId));
+                data.put(MetaField.ExperimentId, origData.get(MetaField.ExperimentId));
+                data.put(MetaField.JobId, origData.get(MetaField.JobId));
+                data.put(MetaField.TaskId, origData.get(MetaField.TaskId));
+                data.put(MetaField.ContextId, origData.get(MetaField.ContextId));
+            }
+        }
+    }
+
+    private void fixMetaDataUnsecured(UUID uuid, List<Map<String, Object>> data) {
+        for (Map<String, Object> item : data) {
+            fixMetaDataUnsecured(uuid, item);
+        }
+    }
+
     private Map<String, Object> saveData(Map<String, Object> data, DelegateExecution delegateExecution, String processInstanceId, Map<String, Object> context) {
         Integer projectId = (Integer) context.get(MetaField.ProjectId);
         Integer experimentId = (Integer) context.get(MetaField.ExperimentId);
@@ -477,6 +564,7 @@ public class WorkflowService {
                             version = UUID.fromString(template.getVersion());
                         }
                         ((Map) value).putAll(context);
+                        fixMetaDataUnsecured(uuid, (Map) value);
                         savedValue = datasetService.putValue(uuid, version, (Map) value);
                     } else if (value instanceof List && !((List) value).isEmpty()) {
                         UUID versionFromDataset = (UUID) ((Map) ((List) value).get(0)).get(MetaField.TemplateVersion);
@@ -485,6 +573,7 @@ public class WorkflowService {
                             Term template = termService.getTerm(uuid, null, false);
                             version = UUID.fromString(template.getVersion());
                         }
+                        fixMetaDataUnsecured(uuid, (List) value);
                         savedValue = datasetService.putValues(uuid, version, (List) value, context);
                     } else {
                         throw new RuntimeException("Dataset value malformed: " + value.toString());

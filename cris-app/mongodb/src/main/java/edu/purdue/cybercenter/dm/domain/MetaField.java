@@ -19,6 +19,10 @@ public class MetaField {
     public static final String TimeUpdated = "_time_updated";
     public static final String CreatorId = "_creator_id";
     public static final String UpdaterId = "_updater_id";
+    public static final String CreatorGroupId = "_creator_group_id";
+    public static final String UpdaterGroupId = "_updater_group_id";
+    public static final String IsGroupOwner = "_is_group_owner";
+    public static final String OwnerId = "_owner_id";
     public static final String ContextId = "_context_id";
 
     public static final String UserId = "_user_id"; // this represents the current user id and it can be saved as _creator_id or updater_id

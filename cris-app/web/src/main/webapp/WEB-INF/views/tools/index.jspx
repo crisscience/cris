@@ -5,261 +5,246 @@
 
     <spring:url value="/tools" var="url"/>
     <spring:url value="/tools/parameters" var="urlParameters"/>
+    
+    <!-- Scripts for the TinyMCE Rich Text Editor -->
+    <script src="${jsRoot}/tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
+    <script src="${jsRoot}/tinymce/angular-ui-tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
 
     <script type="text/javascript">
         // <![CDATA[
-        cris.require('dijit/form/FilteringSelect');
-        cris.require('dijit/form/Form');
-        cris.require("dijit/form/Button");
-        cris.require("dijit/form/RadioButton");
-        cris.require("dijit/form/DateTextBox");
-        cris.require("dijit/form/TextBox");
-        cris.require("dijit/form/Textarea");
-        cris.require("dojox/data/JsonRestStore");
-
-        function updateToolDetail(item) {
-            dojo.byId("id").innerHTML = item.id || "";
-            dijit.byId("name").setValue(item.name || "");
-            dijit.byId("idDescription").setValue(item.description || "");
-            dijit.byId("content").setValue(item.content || "");
-            dojo.byId("timeCreated").innerHTML = item.timeCreated && item.timeCreated.$date ? dateIsoToLocale(item.timeCreated.$date) : "";
-            dojo.byId("lastUpdated").innerHTML = item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
-        }
-
-        function updateTool(item) {
-            store.setValue(item, "name", dijit.byId("name").getValue());
-            store.setValue(item, "description", dijit.byId("idDescription").getValue());
-            store.setValue(item, "content", dijit.byId("content").getValue());
-        }
-
-        function isModified(item) {
-            var isModified = false;
-
-            var name = dijit.byId("name").getValue();
-            var description = dijit.byId("idDescription").getValue();
-            var content = dijit.byId("content").getValue();
-
-            if ((item.name !== name)) {
-                isModified = true;
-            } else if (item.description !== description) {
-                isModified = true;
-            } else if (item.commandLIne !== content) {
-                isModified = true;
+        angular.module('crisTool', ["angular-dojo","ui.tinymce"]).controller("ToolController", ['$scope', '$http', '$uibModal', function($scope, $http, $uibModal) {
+            $scope.url = "${url}/?sort(+name)";
+            $scope.gridColumnDefs = [
+                {field: 'id', name: 'id', displayName: 'ID', width: 60},
+                {field: 'name', name: 'name', displayName: 'Name', minWidth: 160},
+                {field: 'timeUpdated', name: 'timeUpdated', displayName: 'Last Updated', enableFiltering: false, width: 115, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity,isDate:true}) CUSTOM_FILTERS}}</div>'}
+            ];
+        
+            // Settings for the TinyMCE text editor
+            $scope.tinymceOptions = {
+                menubar: false,
+                statusbar: false,
+                height:140
             }
-
-            return isModified;
-        }
-
-        function saveItem(item) {
-            var modified = isModified(item);
-            if (modified) {
-                updateTool(item);
-                var pd = createProgressDialog();
-                store.save({
-                    onComplete: function(data) {
-                        pd.hide();
-                        if (data.error) {
-                            showMessage(data.error);
-                        } else if (data.message) {
-                            showMessage(data.message);
-                        }
-                        updateToolDetail(data[0].content);
-                    },
-                    onError: function(error) {
-                        pd.hide();
-                        showMessage("Failed to save changes. " + error.responseText);
-                    }
-                });
-            } else {
-                showMessage("No change is made");
-                return;
-            }
-        }
-
-        function deleteItem(item) {
-            var pd = createProgressDialog();
-            store.deleteItem(item);
-            store.save({
-                onComplete: function(data) {
-                    var xhr = data[0].deferred.ioArgs.xhr.response;
-                    if(xhr ==""){
-                        grid.setQuery({});
-                        pd.hide();
-                    }else{
-                        var object = JSON.parse(xhr);
-                        if(object.message){
-                            updateHtml(item);
-                            grid.setQuery({});
-                            pd.setContent("Failed to save changes. " + object.message);
-                        }
-                    }
-                },
-                onError: function(error) {
-                    pd.setContent("Failed to delete tool. " + error);
+            clearDetails();
+            
+            $scope.formatDisplayValue = function (value, rowData, isDate) {
+                if (isDate) {
+                    return value ? dateIsoToLocale(value.$date) : "";
                 }
-            });
-        }
-
-        creatingNew = false;
-
-        cris.ready(function() {
-            store = createJsonRestStore("${url}");
-
-            var editor = new dijit.Editor({height: "5"}, "idDescription");
-            editor.startup();
-
-            var layout = [{cells: [
-                        {field: 'id', name: 'ID', datatype: "number", width: '50px'},
-                        {field: 'name', name: 'name', width: 'auto'},
-                        {field: 'timeUpdated', name: 'Time Updated', width: '100px',
-                            dataTypeArgs: {
-                                datePattern: "yyyy-M-d"
-                            },
-                            get: function(row, item) {
-                                if (!item) {
-                                    return "Loading...";
-                                }
-                                return item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
-                            }}
-                    ]}];
-
-            var asc = true;
-            var args = {
-                sortFields: [{attribute: "name", descending: !asc}]
             };
-
-            grid = createGrid(store, layout, "idGrid", args);
-            grid.setSortIndex(1, asc);
-            if ("${filter}" !== "") {
-                grid.setQuery({filter: "${filter}"});
-            }
-
-            dojo.connect(grid, "onSelected", function(index) {
-                dojo.byId("detailPrompt").innerHTML = "Edit an existing tool";
-                creatingNew = false;
-                var item = grid.getItem(index);
-                updateToolDetail(item);
-            });
-
-            var buttonNew = dijit.byId("idNewButton");
-            dojo.connect(buttonNew, "onClick", function(evt) {
-                dojo.byId("detailPrompt").innerHTML = "Create a new tool";
-                creatingNew = true;
-                grid.selection.deselectAll();
-                updateToolDetail({});
-            });
-
-            var buttonDelete = dijit.byId("idDeleteButton");
-            dojo.connect(buttonDelete, "onClick", function(evt) {
-                var item = grid.selection.getSelected("row")[0];
-                if (!item) {
-                    showMessage("Please select a tool");
-                    return;
-                }
-
-                var yes = showConfirm("Do you want to delete tool " + item.name + "?");
-                if (!yes) {
-                    return;
-                }
-
-                deleteItem(item);
-
-                item = grid.selection.getSelected("row")[0];
-                if (item) {
-                    updateToolDetail(item);
+        
+            $scope.rowSelectCallback = function (rowData) {
+                $scope.currentAction = "Edit an existing tool";
+                $scope.isNewTool = false;
+                
+                $scope.record = angular.copy(rowData);
+                $scope.selectedRecord = rowData;
+                $scope.toggleDetailsView(true);
+            };
+            
+            $scope.save = function () {
+                var data;
+                var method;
+                if ($scope.isNewTool) {
+                    if (!$scope.record.name) {
+                        showMessageModal({uibModal: $uibModal, message: "You must specify a name for the tool"});
+                        return;
+                    }
+                    data = $scope.record;
+                    method = "POST";
                 } else {
-                    updateToolDetail({});
-                }
-            });
-
-            var buttonSave = dijit.byId("idSaveButton");
-            dojo.connect(buttonSave, "onClick", function(evt) {
-                var item;
-                if (creatingNew) {
-                    item = store.newItem();
-                } else {
-                    if (grid.selection.getSelectedCount("row") >= 1) {
-                        item = grid.selection.getSelected("row")[0];
+                    if ($scope.selectedRecord) {
+                        if (!isModified()) {
+                            showMessageModal({uibModal: $uibModal, message: "No change is made"});
+                            return;
+                        }
+                        data = $scope.selectedRecord;
+                        data.name = $scope.record.name;
+                        data.description = $scope.record.description;
+                        data.content = $scope.record.content;
+                        method = "PUT";
                     } else {
-                        showMessage("Please select a tool");
+                        showMessageModal({uibModal: $uibModal, message: "Please select a tool"});
                         return;
                     }
                 }
-
-                saveItem(item);
-            });
-
-            var buttonRun = dijit.byId("idRunButton");
-            dojo.connect(buttonRun, "onClick", function(evt) {
-                if (grid.selection.getSelectedCount("row") >= 1) {
-                    var item = grid.selection.getSelected("row")[0];
-                    window.location.href = "${url}/run/" + item.id;
+                $scope.isNewTool = false;
+                
+                $http({
+                    url: "${url}" + (method === "PUT" ? "/" + data.id : ""),
+                    method: method,
+                    data: data
+                }).then(function successCallback(result) {
+                    refreshGrid(true);
+                }, function errorCallback(error) {
+                    
+                });
+            };
+            
+            $scope.run = function () {
+                if ($scope.selectedRecord) {
+                    window.location.href = "${url}/run/" + $scope.selectedRecord.id;
                 } else {
-                    showMessage("Please select a tool");
+                    showMessageModal({uibModal: $uibModal, message: "Please select a tool"});
                 }
-            });
-
-        });
-
-        angular.module('crisTool', ['angular-dojo']);
-        angular.module('crisTool').controller("ToolController", ["$scope", function($scope) {
-
+            };
+            
+            $scope.deleteRecord = function () {
+                if (!$scope.selectedRecord) {
+                    showMessageModal({uibModal: $uibModal, message: "Please select a tool"});
+                    return;
+                }
+                
+                showYesNoModal({uibModal: $uibModal, message: "Do you want to delete tool " + $scope.selectedRecord.name + "?", okCallback: function () {
+                    // do delete
+                    $http({
+                        url: "${url}" + "/" + $scope.selectedRecord.id,
+                        method: 'DELETE'
+                    }).then(function successCallback(result) {
+                        var response = result.data;
+                        if (response === "") {
+                            refreshGrid();
+                            clearDetails();
+                        } else {
+                            if (response.message) {
+                                showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + response.message});
+                            }
+                        }
+                    }, function errorCallback(error) {
+                        showMessageModal({uibModal: $uibModal, message: "Failed to delete tool. " + error.data.message});
+                    });
+                }});
+            };
+            
+            $scope.createNewTool = function () {
+                $scope.isNewTool = true;
+                clearSelected();
+                clearDetails();
+                $scope.toggleDetailsView(true);
+                $scope.currentAction = "Create a new tool";
+            };
+        
+            $scope.getTimeCreated = function (record) {
+                return record && record.timeCreated && record.timeCreated.$date ? dateIsoToLocale(record.timeCreated.$date) : "";
+            };
+            
+            $scope.getLastUpdated = function (record) {
+                return record && record.timeUpdated && record.timeUpdated.$date ? dateIsoToLocale(record.timeUpdated.$date) : "";
+            };
+            
+            // On smaller screens toggle between tools view and details view
+            $scope.toggleDetailsView = function (doShow, clearSelection) {
+                if (doShow) {
+                    $('#detailsView').removeClass('hidden-xs hidden-sm');
+                    $('#toolsView').addClass('hidden-xs hidden-sm');
+                } else {
+                    $('#detailsView').addClass('hidden-xs hidden-sm');
+                    $('#toolsView').removeClass('hidden-xs hidden-sm');
+                    if (clearSelection) {
+                        clearSelected();
+                    }
+                }
+            }
+            
+            function refreshGrid (restoreSelection) {
+                if ($scope.gridRef) {
+                    if (restoreSelection && $scope.selectedRecord) {
+                        $scope.gridRef.refreshGrid(function () {
+                            $scope.gridRef.selectRow($scope.selectedRecord.id, "id");
+                        });
+                    } else {
+                        $scope.gridRef.refreshGrid();
+                    }
+                }
+            }
+            
+            function isModified () {
+                var modified = false;
+                if ($scope.record.name !== $scope.selectedRecord.name) {
+                    modified = true;
+                }
+                if ($scope.record.content !== $scope.selectedRecord.content) {
+                    modified = true;
+                }
+                if ($scope.record.description !== $scope.selectedRecord.description) {
+                    modified = true;
+                }
+                return modified;
+            }
+            
+            function clearSelected () {
+                if ($scope.gridRef) {
+                    $scope.gridRef.clearSelection();
+                }
+                $scope.selectedRecord = null;
+            }
+            
+            function clearDetails () {
+                $scope.record = {};
+                $scope.currentAction = "No tool selected";
+            }
         }]);
 
         cris.bootstrapAngular("idTool", "crisTool");
         // ]]>
     </script>
-
     <div id="idTool" data-ng-controller="ToolController">
-        <div style="width: 49%; float: left">
-            <h2>Tools</h2>
-
-            <input id="idNewButton" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'New'"/>
-            <input id="idDeleteButton" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Delete'"/>
-            <br/>
-            <div id="idGrid"><!-- fix ff problem --></div>
-        </div>
-
-        <div style="width: 50%; float: right">
-            <form id="idForm" data-dojo-type="dijit/form/Form">
-                <h2>Details</h2>
-                <div id="detailPrompt" style="text-align: center">No tool selected</div>
+        <div class="row">
+            <div id="toolsView" class="col-xs-12 col-sm-10 col-md-5 col-sm-offset-1">
+                <h2 style="margin:0">Tools</h2>
                 <div>
-                    <table style="width: 100%">
+                    <button type="button" class="btn btn-primary" ng-click="createNewTool()">New</button>
+                    &amp;nbsp;&amp;nbsp;
+                    <button type="button" class="btn btn-warning" ng-click="deleteRecord()" ng-disabled="!selectedRecord">Delete</button>
+                </div>
+                <br />
+                <div>
+                    <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>
+                </div>
+            </div>
+            <div id="detailsView" class="col-xs-12 col-sm-10 col-md-5 hidden-xs hidden-sm">
+                <div class="hidden-md hidden-lg">
+                    <button type="button" class="btn btn-default" ng-click="toggleDetailsView(null, true)"><span class="glyphicon glyphicon-chevron-left"></span>&amp;nbsp;Back to Tools List</button>
+                </div>
+                <h2 style="margin:0">Details</h2>
+                <div class="text-center">{{currentAction}}</div>
+                <div ng-show="selectedRecord || isNewTool">
+                    <table class="table table-striped">
                         <tr>
-                            <td style="width: 30%">ID:</td><td id="id" style="width: 70%"><!-- fix ff problem --></td>
+                            <td style="width: 30%">ID:</td>
+                            <td style="width: 70%">{{record.id}}</td>
                         </tr>
                         <tr>
-                            <td>Name:</td><td class="tdTextBox"><input id="name" data-dojo-type="dijit.form.TextBox"/></td>
+                            <td>Name:</td>
+                            <td><input type="text" ng-model="record.name" class="form-control" /></td>
                         </tr>
                         <tr>
-                            <td style="text-align: center" colspan="2">Description</td>
+                            <td colspan="2">
+                                <div style="width:100%;" class="text-center">Description</div>
+                                <span ui-tinymce="tinymceOptions" ng-model="record.description"><!----></span>
+                            </td>
                         </tr>
                         <tr>
-                            <td class="tdTextArea" colspan="2"><div id="idDescription"><!-- --></div></td>
+                            <td colspan="2">
+                                <div style="width:100%;" class="text-center">HTML Code</div>
+                                <textarea rows="10" class="form-control" ng-model="record.content"><!----></textarea>
+                            </td>
                         </tr>
                         <tr>
-                            <td style="text-align: center" colspan="2">HTML Code</td>
+                            <td>Time Created:</td><td>{{getTimeCreated(record)}}</td>
                         </tr>
                         <tr>
-                            <td class="tdTextArea" colspan="2"><input id="content" data-dojo-type="dijit/form/SimpleTextarea" data-dojo-props="rows: '10'"/></td>
-                        </tr>
-                        <tr>
-                            <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
-                        </tr>
-                        <tr>
-                            <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
+                            <td>Last Updated:</td><td>{{getLastUpdated(record)}}</td>
                         </tr>
                     </table>
+                    <div class="pull-right">
+                        <button type="button" class="btn btn-primary" ng-click="save()">Save</button>
+                        &amp;nbsp;
+                        <button type="button" class="btn btn-primary" ng-click="run()" ng-disabled="!selectedRecord">Run</button>
+                    </div>
                 </div>
-
-                <div style="float: right">
-                    <input id="idSaveButton" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label : "Save"'/>
-                    <input id="idRunButton" type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label : "Run"'/>
-                </div>
-            </form>
+            </div>
         </div>
-
-        <br style="clear: both"/>
     </div>
 </jsp:root>

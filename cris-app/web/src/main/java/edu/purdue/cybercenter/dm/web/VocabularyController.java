@@ -49,7 +49,7 @@ public class VocabularyController {
         return "vocabularys/index";
     }
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
         Session session = DomainObjectHelper.getHbmSession();
@@ -65,7 +65,7 @@ public class VocabularyController {
     @ResponseBody
     public Object importVocabulary(MultipartHttpServletRequest request, HttpServletResponse response) {
         String error = null;
-        edu.purdue.cybercenter.dm.domain.Vocabulary vocabulary = null;
+        edu.purdue.cybercenter.dm.domain.Vocabulary dbVocabulary = null;
 
         List<MultipartFile> files = WebHelper.multipartFileMapToList(request.getMultiFileMap());
         if (files.size() == 1) {
@@ -73,9 +73,23 @@ public class VocabularyController {
             if (!mpFile.isEmpty()) {
                 try {
                     String xmlVocabulary = new String(mpFile.getBytes());
-                    vocabulary = vocabularyService.saveXml(xmlVocabulary, mpFile.getOriginalFilename());
-                    if (vocabulary == null) {
-                        error = "All terms in the Vocabulary are already in the system. Vocabulary is not imported.";
+                    Vocabulary vocabulary = vocabularyService.convertXmlToVocabulary(xmlVocabulary);
+                    String sUuid = vocabulary.getUuid();
+                    String sVersion = vocabulary.getVersion();
+                    String sForceImport = request.getParameter("force");
+                    boolean force = (sForceImport != null && sForceImport.equals("true"));
+
+                    if (force) {
+                        dbVocabulary = vocabularyService.save(vocabulary, mpFile.getOriginalFilename());
+                    } else if (sUuid != null && sVersion != null) {
+                        edu.purdue.cybercenter.dm.domain.Vocabulary existing = vocabularyService.findByUuidAndVersion(UUID.fromString(sUuid), UUID.fromString(sVersion));
+                        if (existing == null) {
+                            dbVocabulary = vocabularyService.save(vocabulary, mpFile.getOriginalFilename());
+                        } else {
+                            error = "vocabulary version already exists. Please use the force flag to allow system to generate a new version number";
+                        }
+                    } else {
+                        error = "missing uuid/version. populate these fields or use force flag";
                     }
                 } catch (IOException ex) {
                     error = "Failed to import the Vocabulary: " + ex.getMessage();
@@ -109,7 +123,7 @@ public class VocabularyController {
 
         String message;
         if (StringUtils.isEmpty(error)) {
-            message = DomainObjectUtils.toJson(vocabulary, request.getContextPath());
+            message = DomainObjectUtils.toJson(dbVocabulary, request.getContextPath());
         } else {
             message = String.format("{\"hasError\":true,\"message\":\"%s\"}", error);
         }
@@ -137,7 +151,7 @@ public class VocabularyController {
         }
     }
 
-    @RequestMapping(value = "/save", method = {RequestMethod.PUT, RequestMethod.POST}, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/save", method = {RequestMethod.PUT, RequestMethod.POST}, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object save(HttpServletRequest request, HttpServletResponse response) {
         String json = request.getParameter("vocabulary");
@@ -152,7 +166,7 @@ public class VocabularyController {
         return result;
     }
 
-    @RequestMapping(value = "/load/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/load/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object loadById(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Vocabulary dbVocabulary;
@@ -167,7 +181,7 @@ public class VocabularyController {
         return result;
     }
 
-    @RequestMapping(value = "/load/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/load/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object loadByUuid(@PathVariable("uuid") String uuid, @PathVariable("version") String version, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Vocabulary dbVocabulary = vocabularyService.findByUuidAndVersion(UUID.fromString(uuid), UUID.fromString(version));
@@ -192,7 +206,7 @@ public class VocabularyController {
         return result;
     }
 
-    @RequestMapping(value = "/head/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/head/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object makeCurrent(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         edu.purdue.cybercenter.dm.domain.Vocabulary dbVocabulary = vocabularyService.findById(id);
@@ -200,7 +214,7 @@ public class VocabularyController {
         return Helper.serialize(dbVocabulary);
     }
 
-    @RequestMapping(value = "/status/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/status/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     @CacheEvict(value = "vocabulary", allEntries = true)
     public Object changeStatus(@PathVariable("id") Integer id, @RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
@@ -212,7 +226,7 @@ public class VocabularyController {
         return result;
     }
 
-    @RequestMapping(value = "/versions/{uuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/versions/{uuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object getVersions(@PathVariable("uuid") UUID uuid, HttpServletRequest request, HttpServletResponse response) {
         List<Map<String, Object>> results = getVersionsByUuid(uuid);

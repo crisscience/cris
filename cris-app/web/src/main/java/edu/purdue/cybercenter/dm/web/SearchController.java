@@ -66,7 +66,7 @@ public class SearchController {
         return "search/index";
     }
 
-    @RequestMapping(value = "/search", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/search", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String search(HttpServletRequest request, HttpServletResponse response) {
         if (elasticsearchClient == null) {
@@ -131,7 +131,10 @@ public class SearchController {
             String termAlias = (String) map.get("termAlias");
             String op = (String) map.get("op");
             String field = ((String) map.get("field"));
-            String input = map.get("input") != null ? ((String) map.get("input")).toLowerCase() : map.get("hiddenInput") != null ? ((String) map.get("hiddenInput")).toLowerCase() : null;
+            Object input = map.get("input") != null ? map.get("input") : (map.get("hiddenInput") != null ? map.get("hiddenInput") : null);
+            if (input != null && input instanceof String) {
+                input = ((String) input).toLowerCase();
+            }
 
             if (StringUtils.isEmpty(field) || "template".equals(field)) {
                 if (StringUtils.isEmpty(termAlias)) {
@@ -160,7 +163,7 @@ public class SearchController {
                 qb = constantScoreQuery(existsFilter(termAlias));
                 // numeric ops: ncluding number, date/time
             } else if (op.equals("range") && input != null) {
-                String range = input.replaceAll(" ", "");
+                String range = ((String) input).replaceAll(" ", "");
                 boolean includeLower = range.charAt(0) == '[';
                 boolean includeUpper = range.charAt(range.length() - 1) == ']';
                 range = range.substring(1, range.length() - 1);
@@ -182,9 +185,9 @@ public class SearchController {
             } else if (op.equals("not contain")) {
                 qb = boolQuery().mustNot(matchPhraseQuery(termAlias, input));
             } else if (op.equals("starts with")) {
-                qb = prefixQuery(termAlias, input);
+                qb = prefixQuery(termAlias, (String) input);
             } else if (op.equals("not start with")) {
-                qb = boolQuery().mustNot(prefixQuery(termAlias, input));
+                qb = boolQuery().mustNot(prefixQuery(termAlias, (String) input));
             } else if (op.equals("ends with")) {
                 qb = wildcardQuery(termAlias, "*" + input);
             } else if (op.equals("not end with")) {

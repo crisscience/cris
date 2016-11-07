@@ -8,7 +8,6 @@ import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.User;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.acls.domain.GrantedAuthoritySid;
 import org.springframework.security.acls.domain.PrincipalSid;
@@ -35,14 +34,15 @@ public class CustomSidRetrievalStrategyImpl extends SidRetrievalStrategyImpl {
 
         Object principal = authentication.getPrincipal();
         User user = ((UserDetailsAdapter) principal).getUser();
+        user = User.findUser(user.getId());
         List<Group> groups = user.getMemberGroups();
 
         List<Sid> sids = new ArrayList<>(groups.size() + 1);
         sids.add(new PrincipalSid(user.getId().toString()));
 
-        for (Group group : groups) {
+        groups.stream().forEach((group) -> {
             sids.add(new GrantedAuthoritySid(group.getId().toString()));
-        }
+        });
 
         return sids;
     }

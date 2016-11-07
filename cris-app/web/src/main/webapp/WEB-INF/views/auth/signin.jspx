@@ -11,24 +11,26 @@
     <spring:url value="/auth/verify" var="urlVerify"/>
     <spring:url value="/auth/problem" var="urlProblem"/>
 
-    <style type="text/css">
-        .dijitOffScreen {
-            visibility: visible !important;
+    <script type="text/javascript">
+        angular.module("crisSignIn", []);
+        angular.module("crisSignIn").controller("crisSignInController", function($scope) {
+            $scope.passwordType = 'password';
+        });
+
+        cris.ready(function() {
+            cris.bootstrapAngular("idSignIn", "crisSignIn");
+        });
+    </script>
+    <style>
+        label {
+            min-width: 100px;
+        }
+        input.form-control {
+            min-width: 300px !important;
         }
     </style>
 
-    <script type="text/javascript">
-        cris.require([
-            "dijit/form/Form",
-            "dijit/form/ValidationTextBox",
-            "dijit/form/Button"
-        ]);
-
-        cris.ready(function() {
-        });
-    </script>
-
-    <div class="half">
+    <div id="idSignIn" data-ng-controller="crisSignInController" class="col-md-6">
         <h2>Sign In</h2>
 
         <div>
@@ -41,38 +43,55 @@
         <hr/>
         <br/>
 
-        <div>
-            <form action='${urlVerify}' method='POST' data-dojo-type="dijit.form.Form">
-                <div class="instruction">
-                    ${wsSigninInstruction}
-                </div>
-                <br/>
+        <form action='${urlVerify}' method='POST' class="form-inline">
+            <div>
+                ${wsSigninInstruction}
+            </div>
+            <br/>
 
-                <c:if test="${not empty param.authFailed}">
-                    <c:choose>
-                        <c:when test='${fn:split(SPRING_SECURITY_LAST_EXCEPTION, ":")[0] == "org.springframework.security.authentication.DisabledException"}'>
+            <c:if test="${not empty param.authFailed}">
+                <c:choose>
+                    <c:when test='${fn:split(SPRING_SECURITY_LAST_EXCEPTION, ":")[0] == "org.springframework.security.authentication.DisabledException"}'>
+                        <c:if test="${not empty wsAuthFailedDisabled}">
+                            <span class="errors">${wsAuthFailedDisabled}</span>
+                        </c:if>
+                        <c:if test="${empty wsAuthFailedDisabled}">
                             <span class="errors">Your account is disabled. (it is usually the case after you just signed up). Please contact <a href="mailto:${wsEmailAccountProblem}?subject=Sign In Problem: Account Disabled">${wsEmailAccountProblem}</a> for resolution.</span>
-                        </c:when>
-                        <c:otherwise>
+                        </c:if>
+                    </c:when>
+                    <c:otherwise>
+                        <c:if test="${not empty wsAuthFailedGeneral}">
+                            <span class="errors">${wsAuthFailedGeneral}</span>
+                        </c:if>
+                        <c:if test="${empty wsAuthFailedGeneral}">
                             <span class="errors">Invalid username or password. Please try again.</span>
-                        </c:otherwise>
-                    </c:choose>
-                    <p />
-                </c:if>
+                        </c:if>
+                    </c:otherwise>
+                </c:choose>
+                <p />
+            </c:if>
 
+            <div class="form-group">
                 <label for="username">Username:</label>
-                <input id="username" type="text" name="username" data-dojo-type="dijit.form.ValidationTextBox" />
-
-                <p/>
-
+                <input type="text" name="username" id="username" class="form-control" />
+            </div>
+            <br /><br />
+            <div class="form-group">
                 <label for="password">Password:</label>
-                <input id="password" type="password" name="password" value="" data-dojo-type="dijit.form.TextBox" />
-                <div>
-                    <input type="submit" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Sign In'"/>&amp;nbsp;
-                    <input type="reset" data-dojo-type="dijit.form.Button" data-dojo-props="label: 'Reset'"/>
+                <input type="{{passwordType}}" name="password" id="password" class="form-control" />
+                <div class="form-horizontal">
+                    <p>
+                        <span class="hidden-xs" style="padding-left:100px;"><!----></span>
+                        Show Password:&amp;nbsp;<input type="checkbox" class="checkbox-inline" ng-model="passwordType" ng-true-value="'text'" ng-false-value="'password'" />
+                    </p>
                 </div>
-            </form>
-        </div>
+            </div>
+            <div>
+                <input type="submit" class="btn btn-primary" value="Sign In" />
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+                <input type="reset" class="btn btn-primary" value="Reset" />
+            </div>
+        </form>
 
         <p/>
         <div>

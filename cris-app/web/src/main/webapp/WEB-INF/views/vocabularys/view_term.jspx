@@ -11,7 +11,7 @@
 
         <script type="text/ng-template" id="view_vocabulary_metadata">
         <div>
-            <table class="form" style="width: 100%">
+            <table class="table-striped" style="width: 100%">
                 <tr>
                     <td style="width: 30%">ID:</td>
                     <td style="width: 70%">
@@ -72,7 +72,7 @@
 
         <script type="text/ng-template" id="view_term_attachto">
         <div>
-            <table class="form" style="width: 100%">
+            <table class="table-striped" style="width: 100%">
                 <tr>
                     <td style="width: 30%">UUID:</td>
                     <td style="width: 70%">
@@ -83,6 +83,10 @@
                     <td>Version:</td>
                     <td>
                         <input type='text' data-dojo-widget='dijit/form/ValidationTextBox' data-dojo-props="disabled: 'true'" data-ng-model='ngModel.version'/>
+                        <!-- Update Term To Latest Version -->
+                        <div data-ng-show="!rootParentScope.template.selectedTerm.isLatest &amp;&amp; rootParentScope.template.selectedTerm.isTermValid">
+                            <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Update Term to Latest Version"' data-ng-click="rootParentScope.updateTermToLatestVersion(true)"/>
+                        </div>
                         
                         <!-- Delete Invalid Term Button -->
                         <div data-ng-hide="rootParentScope.template.selectedTerm.isTermValid">
@@ -176,7 +180,7 @@
 
         <script type="text/ng-template" id="view_term_reference">
         <div>
-            <table class="form" style="width: 100%">
+            <table class="table-striped" style="width: 100%">
                 <tr>
                     <td style="width: 30%">UUID:</td>
                     <td style="width: 70%">
@@ -274,7 +278,7 @@
 
         <script type="text/ng-template" id="view_term_composite">
         <div>
-            <table class="form" style="width: 100%">
+            <table class="table-striped" style="width: 100%">
                 <tr ng-show="ngModel.id">
                     <td style="width: 30%">ID:</td>
                     <td style="width: 70%">
@@ -374,7 +378,7 @@
 
         <script type="text/ng-template" id="view_term_simple">
         <div>
-            <table class="form" style="width: 100%">
+            <table class="table-striped" style="width: 100%">
                 <tr ng-show="ngModel.id">
                     <td style="width: 30%">ID:</td>
                     <td style="width: 70%">
@@ -465,7 +469,7 @@
         
         <script type="text/ng-template" id="view_term_composite_reference_child">
         <div>
-            <table class="form" style="width: 100%">
+            <table class="table-striped" style="width: 100%">
                 <tr>
                     <td style="width: 30%">UUID:</td>
                     <td style="width: 70%">

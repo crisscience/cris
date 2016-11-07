@@ -4,6 +4,7 @@
  */
 package edu.purdue.cybercenter.dm.web.filter;
 
+import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.util.DomainObjectHelper;
 import edu.purdue.cybercenter.dm.web.util.WebHelper;
@@ -12,7 +13,6 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
-import java.util.List;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -22,17 +22,9 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import org.apache.tiles.Attribute;
-import org.apache.tiles.AttributeContext;
-import org.apache.tiles.TilesContainer;
-import org.apache.tiles.servlet.context.ServletUtil;
 
 public class RequestFilter implements Filter {
 
-    private static final boolean debug = false;
-    private static final String ViewRoot = "/WEB-INF/views/";
-    private static final String Tile_Menu = "menu";
-    private static final String Page_Menu = "menu";
     // The filter configuration object we are associated with.  If
     // this value is null, this filter instance is not currently
     // configured.
@@ -48,11 +40,6 @@ public class RequestFilter implements Filter {
     @Override
     public void init(FilterConfig filterConfig) {
         this.filterConfig = filterConfig;
-        if (filterConfig != null) {
-            if (debug) {
-                log("RequestFilter: Initializing filter");
-            }
-        }
     }
 
     /**
@@ -73,10 +60,6 @@ public class RequestFilter implements Filter {
      */
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-
-        if (debug) {
-            log("RequestFilter:doFilter()");
-        }
 
         doBeforeProcessing((HttpServletRequest) request, (HttpServletResponse) response);
 
@@ -155,29 +138,11 @@ public class RequestFilter implements Filter {
         edu.purdue.cybercenter.dm.threadlocal.UserId.set(userId);
         request.setAttribute("user", user);
 
-        Boolean headless = (Boolean) httpSession.getAttribute("headless");
-        if (headless == null || !headless) {
-            // Setup menu
-            String managerOrStaff = "_user";
-            String providerOrConsumer = "";
-            if (user.isAdmin()) {
-                String view = request.getParameter("view");
-                List<String> views = (List<String>) httpSession.getAttribute("views");
-                if (view != null && views.contains(view.toLowerCase())) {
-                    httpSession.setAttribute("currentView", view.toLowerCase());
-                } else {
-                    view = (String) httpSession.getAttribute("currentView");
-                }
-                if (view != null && view.equalsIgnoreCase("user")) {
-                    managerOrStaff = "_user";
-                } else {
-                    managerOrStaff = "_admin";
-                }
-                providerOrConsumer = "";
-            }
-            TilesContainer container = ServletUtil.getContainer(httpSession.getServletContext());
-            AttributeContext attributeContext = container.getAttributeContext(request, response);
-            attributeContext.putAttribute(Tile_Menu, new Attribute(ViewRoot + Page_Menu + managerOrStaff + providerOrConsumer + ".jspx"));
+        Integer groupId = (Integer) httpSession.getAttribute("groupId");
+        Group group = Group.findGroup(groupId);
+        if (group != null) {
+            edu.purdue.cybercenter.dm.threadlocal.GroupId.set(groupId);
+            request.setAttribute("group", group);
         }
 
         org.hibernate.Session hSession = DomainObjectHelper.getHbmSession();
@@ -194,10 +159,6 @@ public class RequestFilter implements Filter {
     }
 
     private void doAfterProcessing(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        if (debug) {
-            log("RequestFilter:DoAfterProcessing");
-        }
-
     }
 
     private void sendProcessingError(Throwable t, ServletResponse response) {
@@ -236,10 +197,6 @@ public class RequestFilter implements Filter {
         } catch (IOException ex) {
         }
         return stackTrace;
-    }
-
-    private void log(String msg) {
-        filterConfig.getServletContext().log(msg);
     }
 
 }

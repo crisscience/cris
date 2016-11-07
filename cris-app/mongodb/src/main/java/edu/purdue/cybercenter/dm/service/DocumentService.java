@@ -20,6 +20,12 @@ public interface DocumentService {
     public static final String AGGREGATOR_DISTINCT = "$distinct";
     public static final String AGGREGATOR_GROUP = "$group";
 
+    public static final String IS_ADMIN = "_is_admin";
+    public static final String PROJECT_IDS = "_project_ids";
+    public static final String EXPERIMENT_IDS = "_experiment_ids";
+    public static final String OWNER_PROJECT_IDS = "_owner_project_ids";
+    public static final String OWNER_EXPERIMENT_IDS = "_owner_experiment_ids";
+
     // this set of methods does not have dataset state parameter and default to "Operational"
     // simply call the next set of metheds with state equals "Operational"
     public abstract Map<String, Object> findById(UUID termUuid, ObjectId id);

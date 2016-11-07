@@ -6,8 +6,6 @@
 package edu.purdue.cybercenter.dm.repository;
 
 import edu.purdue.cybercenter.dm.domain.StorageAccessMethod;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.querydsl.QueryDslPredicateExecutor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -15,7 +13,7 @@ import org.springframework.stereotype.Repository;
  * @author xu222
  */
 @Repository
-public interface StorageAccessMethodRepository extends JpaRepository<StorageAccessMethod, Integer>, QueryDslPredicateExecutor<StorageAccessMethod> {
+public interface StorageAccessMethodRepository extends CrisRepository<StorageAccessMethod> {
 
     StorageAccessMethod findByType(String type);
 }

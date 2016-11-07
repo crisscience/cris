@@ -8,442 +8,305 @@
     <spring:url value="/reports/export" var="urlExport"/>
     <spring:url value="/reports/run" var="urlRun"/>
     <spring:url value="/reports/parameters" var="urlParameters"/>
-    <spring:url value="/templates/json/names" var="urlTempNames"/>
+    <spring:url value="/templates/json/names/?sort(+name)" var="urlTempNames"/>
     <spring:url value="/download/" var="urlDownload"/>
-
-    <div style="width: 100%; height: 600px">
-        <div data-dojo-type="dijit.layout.TabContainer" style="width: 100%; height: 100%;">
-            <!--
-            <div data-dojo-type="dijit.layout.ContentPane" data-dojo-props='title : "Design", selected : "true"'>
-                <h4>TODO: Design Reports</h4>
-            </div>
-            -->
-
-            <div data-dojo-type="dijit.layout.ContentPane" title="Import">
+    
+    
+    <div id="idReport" data-ng-controller="ReportController">
+        <div class="row">
+            <div class="col-xs-12 col-sm-10 col-md-5 col-sm-offset-1">
+                <div class="hidden-md hidden-lg"  ng-show="selectedRecord">
+                    <button type="button" class="btn btn-default" ng-click="toggleDetailsView(null, true)"><span class="glyphicon glyphicon-chevron-left"></span>&amp;nbsp;Back to Reports List</button>
+                </div>
                 <h2>Import Report</h2>
-                <form id="form" method="POST" enctype="multipart/form-data" data-dojo-type="dijit.form.Form">
-                    Report File:
-                    <input id="idFileName" name="detailFileName" type="text" placeholder="report file (*.prpt)" data-dojo-type="dijit.form.TextBox" readonly=''/>
-                    <input id="idFile" name="file" data-dojo-type="dojox.form.Uploader" data-dojo-props='multiple : false, label : "Browse..."' style="width: 75px;"/>
-                    <input id="buttonUpload" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label : "Upload" '/>&amp;nbsp
-                    <input id="buttonReset" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label : "Reset"'/>&amp;nbsp
-                </form>
-
-                <div>
-                    <div class="halfMinus floatLeft">
-                        <h2>Reports</h2>
-                        <div id="idGrid"><!-- --></div>
-                    </div>
-
-                    <div class="half floatRight">
-                        <h2>Details</h2>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 30%">ID:</td>
-                                <td id="detailId" style="width: 70%"><!-- --></td>
-                            </tr>
-                            <tr>
-                                <td>Name:</td>
-                                <td><span id="detailName"> <!-- --></span></td>
-                            </tr>
-                            <tr>
-                                <td>Description:</td>
-                                <td><span id="detailDesc"> <!-- --></span></td>
-                            </tr>
-                            <tr>
-                                <td>Version Number:</td>
-                                <td><span id="detailVerNum"> <!-- --></span></td>
-                            </tr>
-                            <tr>
-                                <td>Time Created:</td>
-                                <td id="detailTimeCreated"><!-- --></td>
-                            </tr>
-                            <tr>
-                                <td>Last Updated:</td>
-                                <td id="detailLastUpdated"><!-- --></td>
-                            </tr>
-                            <tr>
-                                <td>Export:</td>
-                                <td id="detailExport"><a id="detailExportUrl" href="uninitialized"></a></td>
-                            </tr>
-                            <tr>
-                                <td colspan="2"><button id="generateReport" type="button"></button></td>
-                            </tr>
-                        </table>
+                <div class="form-group">
+                    <label>Report File:&amp;nbsp;&amp;nbsp;</label>
+                    <div style="display: inline-block;">
+                        <form method="POST" ng-submit="uploadFile()">
+                            <div style="display:inline-block;">
+                                <cris-file-uploader ng-model="dummyFile" path="reportToUpload" is-multiple="false"></cris-file-uploader>
+                            </div>
+                            &amp;nbsp;
+                            <div style="display:inline-block;vertical-align: top;">
+                                <button type="submit" class="btn btn-primary" ng-disabled="!fileToUpload">Upload</button>
+                            </div>
+                            &amp;nbsp;
+                            <div style="display:inline-block;vertical-align: top;">
+                                <button type="button" class="btn btn-primary" ng-click="resetUploader()" ng-disabled="!fileToUpload">Reset</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div data-dojo-type="dijit/Dialog" data-dojo-id="generateReportDialog" title="Generate Report">
-        <table class="form" id="reportParameterTable">
-            <tr>
-                <td>Template:</td>
-                <td class="tdTextBox">
-                    <input id="idUseEmbedded"/>Use Embedded UUID
-                    <input id="idSelectTemplate"/>
-                </td>
-            </tr>
-            <tr>
-                <td>Output File Type:</td>
-                <td class="tdTextBox">
-                    <input id="idSelectType" />
-                </td>
-            </tr>
-            <tr class="parameter">
-                <td>Description:</td><td style="text-align: center"><input id="descSaveAsTemplate" dojoType="dijit.form.TextBox" type="text" /></td>
-            </tr>
-        </table>
-        <div class="dijitDialogPaneActionBar">
-            <div id ="generateReportActionBar">
-                <button data-dojo-type="dijit/form/Button" type="submit" id="okGenerateReport">Generate</button>
-                <button data-dojo-type="dijit/form/Button" type="button" id="cancelGenerateReport">Cancel</button>
+        <div class="row">
+            <div id="reportsView" class="col-xs-12 col-sm-10 col-md-5 col-sm-offset-1">
+                <h2>Reports</h2>
+                <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" enable-filtering="true" sort-field="sortField" sort-direction="asc" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>
+            </div>
+            <div id="detailsView" class="col-xs-12 col-sm-10 col-md-5 hidden-xs hidden-sm">
+                <h2>Details</h2>
+                <div ng-show="selectedRecord">
+                    <table class="table table-striped">
+                        <tr>
+                            <td style="width: 30%">ID:</td>
+                            <td style="width: 70%">{{record.id}}</td>
+                        </tr>
+                        <tr>
+                            <td>Name:</td>
+                            <td>{{record.name}}</td>
+                        </tr>
+                        <tr>
+                            <td>Description:</td>
+                            <td>{{record.description}}</td>
+                        </tr>
+                        <tr>
+                            <td>Version Number:</td>
+                            <td>{{record.versionNumber}}</td>
+                        </tr>
+                        <tr>
+                            <td>Time Created:</td>
+                            <td>{{getTimeCreated(record)}}</td>
+                        </tr>
+                        <tr>
+                            <td>Last Updated:</td>
+                            <td>{{getLastUpdated(record)}}</td>
+                        </tr>
+                        <tr>
+                            <td>Export:</td>
+                            <td><a href="${urlExport}/{{record.id}}" ng-show="record">{{record.name}}</a></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td><button type="button" class="btn btn-primary" ng-click="generateReport()" ng-disabled="!record.id">Generate Report</button></td>
+                        </tr>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
     
     <script type="text/javascript">
         // <![CDATA[
-        cris.require("dojo/_base/connect");
-        cris.require("dojo/_base/array");
-        cris.require("dojo/parser");
-        cris.require("dojo/request");
-        cris.require("dijit/layout/TabContainer");
-        cris.require("dijit/layout/ContentPane");
-        cris.require("dijit/form/Form");
-        cris.require("dijit/form/Button");
-        cris.require("dijit/form/TextBox");
-        cris.require("dijit/form/CheckBox");
-        cris.require("dijit/form/SimpleTextarea");
-        cris.require("dijit/form/FilteringSelect");
-        cris.require("dijit/registry");
-        cris.require("dojox/data/JsonRestStore");
-        cris.require("dojox/form/Uploader");
-        cris.require("dojox/grid/EnhancedGrid");
-        cris.require("dojox/grid/enhanced/plugins/Pagination");
-        cris.require("dojox/grid/enhanced/plugins/Selector");
-        cris.require("dojox/grid/enhanced/plugins/Filter");
-        cris.require("dojox/html/entities");
-        cris.require("dojo/behavior");
-        cris.require("dojo/io/iframe");
-        cris.require("dojox/widget/SortList");
-        cris.require("dijit/form/MultiSelect");
-        cris.require("dojo/dom");
-        cris.require("dojo/json");
-        cris.require("dojo/store/Memory");
-
-        cris.report = {};
-
-        // Report generating dialog.
-        cris.report.generate = {
-            useEmbedded: null,
-            storeTemplates: null,
-            templateList: null,
-            parameters: null,
-            storeType: null,
-            typeList: null,
-
-            // Initialize the dialog.
-            init: function() {
-                var this_ = this;
-
-                dojo.connect(dojo.byId("cancelGenerateReport"), "onclick", this.hideGenerateReportDialog);
-                dojo.connect(dojo.byId("okGenerateReport"), "onclick", this, this.requestReport);
-
-                // Button that opens the pop-up window in the main table.
-                var generateReportButton = new dijit.form.Button({
-                    label: "Generate Report",
-                    onClick: function() {
-                        this_.getParameters();
-                    }
-                }, "generateReport");
-
-                // Fetch template list.
-                this.storeTemplates = new dojox.data.JsonRestStore({
-                    target: "${urlTempNames}",
-                    idAttribute: "id"
-                });
-
-                // Template list combobox.
-                this.templateList = new dijit.form.FilteringSelect({
-                    name: "templateId",
-                    store: this.storeTemplates,
-                    fetchProperties: {sort: [{attribute: "name"}]},
-                    autoComplete: true,
-                    onChange: function(val) {
-                    }
-                }, "idSelectTemplate");
-                this.templateList.reset();
-                this.templateList.startup();
-                dojo.style("idSelectTemplate", "visibility", "hidden");
-
-                // For file types.
-                this.storeType = new dojo.store.Memory({
-                    data: [
-                        {id: "zip", name: "html"},
-                        {id: "pdf", name: "pdf"},
-                        {id: "rtf", name: "rtf"},
-                        {id: "xls", name: "xls"},
-                        {id: "xlsx", name: "xlsx"}
-                    ],
-                    idProperty: "id"
-                });
-
-                this.typeList = new dijit.form.FilteringSelect({
-                    id: "idSelectType",
-                    name: "selectType",
-                    value: "pdf",
-                    store: this.storeType,
-                    fetchProperties: {sort: [{attribute: "name"}]},
-                    autoComplete: true,
-                    onChange: function(val) {
-                    }
-                }, "idSelectType");
-                this.typeList.reset();
-                this.typeList.startup();
-
-                // Chickbox whether the embedded uuid is used or not.
-                this.useEmbedded = new dijit.form.CheckBox({
-                    name: "useEmbedded",
-                    value: "Use Embedded UUID",
-                    checked: true,
-                    onChange: function(b) {
-                        if (b) {
-                            dojo.style("idSelectTemplate", "visibility", "hidden");
-                        } else {
-                            dojo.style("idSelectTemplate", "visibility", "visible");
-                        }
-                    }
-                }, "idUseEmbedded");
-            },
-
-            // Get parameters for the selected report template.
-            getParameters: function() {
-                var this_ = this;
-                var item = cris.report.upload.item;
-                if (item === null)
-                    return;
-                var xhrArgs = {
-                    url: "${urlParameters}/" + item.id,
-                    handleAs: "json",
-                    load: function(data) {
-                        this_.parameters = dojo.clone(data);
-                        this_.updateParameters();
-                        this_.showGenerateReportDialog();
-                    },
-                    error: function(error) {
-                        console.log("An unexpected error occurred: " + error);
-                    }
-                };
-                dojo.xhrGet(xhrArgs);
-            },
-            hideGenerateReportDialog: function() {
-                generateReportDialog.hide();
-            },
-            showGenerateReportDialog: function() {
-                generateReportDialog.show();
-            },
-            updateParameters: function() {
-                var parameterList = dojo.query(".parameter");
-                dojo.forEach(parameterList, function(entry) {
-                    dojo.destroy(entry);
-                });
-
-                var table = dojo.byId("reportParameterTable");
-                for (var key in this.parameters) {
-                    var nodeTr = dojo.create("tr");
-                    dojo.attr(nodeTr, "class", "parameter");
-                    var nodeTd1 = dojo.create("td");
-                    var nodeTd2 = dojo.create("td");
-                    dojo.attr(nodeTd1, "innerHTML", key);
-                    var textbox = dojo.create("input");
-                    dojo.attr(textbox, "type", "text");
-                    dojo.attr(textbox, "id", key);
-                    dojo.attr(textbox, "value", "");
-                    nodeTd2.appendChild(textbox);
-                    nodeTr.appendChild(nodeTd1);
-                    nodeTr.appendChild(nodeTd2);
-                    table.appendChild(nodeTr);
+        angular.module('crisReport', ["angular-dojo"]).controller('ReportController', ['$scope', '$http', '$uibModal', function ($scope, $http, $uibModal){
+            // Uploader emits this event with the list of files to upload. We need the files for manipulating the request payload
+            $scope.$on('FilesToUpload', function (event, data) {
+                if (data.uploaderName === 'reportToUpload') {
+                    $scope.fileToUpload = data.fileList[0];
                 }
-                ;
-
-            },
-            requestReport: function() {
-                var item = cris.report.upload.item;
-                var itemId = item.id;
-                var embedded = dijit.registry.byId("idUseEmbedded").get("checked");
-                var uuid = dijit.registry.byId("idSelectTemplate").get("value");
-                var type = dijit.registry.byId("idSelectType").get("value");
-                var url = "${urlRun}/" + itemId + "?outputType=" + type;
-                if (!embedded)
-                    url += "&uuid=" + uuid;
-                for (var key in this.parameters) {
-                    url += "&" + key + "=" + dojo.byId(key).value;
-                }
-
-                window.location.assign(url);
-            }
-        };
-
-        // Main window.
-        cris.report.upload = {
-            store: null,
-            grid: null,
-            item: null,
-            updateHtml: function() {
-                if (this.item === null)
-                    return;
-                var item = this.item;
-                dojo.byId("detailId").innerHTML = this.store.getValue(item, "id") || "";
-                dojo.byId("detailName").innerHTML = this.store.getValue(item, "name") || "";
-                dojo.byId("detailDesc").innerHTML = this.store.getValue(item, "description") || "";
-                dojo.byId("detailVerNum").innerHTML = this.store.getValue(item, "versionNumber") || "";
-                dojo.byId("detailTimeCreated").innerHTML = stringDateTime(this.store.getValue(item, "timeCreated")) || "";
-                dojo.byId("detailLastUpdated").innerHTML = stringDateTime(this.store.getValue(item, "timeUpdated")) || "";
-                dojo.byId("detailExportUrl").href = (item && item.id) ? "${urlExport}/" + item.id : "";
-                dojo.byId("detailExportUrl").innerHTML = (item && item.name) ? item.name : "";
-            },
-            isModified: function() {
-                var modified = false;
-
-                var files = dijit.byId("idFile").getFileList();
-                if (files.length === 1) {
-                    modified = true;
-                }
-
-                return modified;
-            },
-            uploadReport: function() {
-                var pd = createProgressDialog();
-
-                // send item + file to the backend using PUT/POST
-                dojo.io.iframe.send({
-                    url: "${urlImport}",
-                    method: "POST",
-                    form: "form",
-                    handleAs: "json",
-                    load: function(data) {
-                        cris.report.upload.grid.setQuery({});
-                        if (data.error) {
-                            pd.setContent("Error: " + data.error);
-                        } else {
-                            pd.hide();
-                        }
-                    },
-                    error: function(error) {
-                        pd.setContent("Failed to save changes. " + error);
-                    }
-                });
-            },
-            behavior: {
-                "#idGrid": {
-                    onclick: function(evt) {
-                        dojo.publish("cris/reports/newSelection", []);
-                    }
-                },
-                "#idFile": {
-                    onchange: function(evt) {
-                        var files = dijit.byId("idFile").getFileList();
-                        if (files[0]) {
-                            dijit.byId("idFileName").setValue(files[0].name);
-                        }
-                    }
-                },
-                "#buttonUpload": {
-                    onclick: function(evt) {
-                        if (cris.report.upload.isModified()) {
-                            var yes = showConfirm("Do you want to import the report file?");
-                            if (!yes) {
-                                return;
-                            }
-                        } else {
-                            showMessage("Please select a report file (*.prpt).");
-                            return;
-                        }
-
-                        cris.report.upload.uploadReport();
-                    }
-                },
-                "#buttonReset": {
-                    onclick: function(evt) {
-                        dijit.byId("idFile").reset();
-                        dijit.byId("idFileName").setValue("");
-                    }
-                }
-            },
-            init: function() {
-                var this_ = this;
-                this.store = createJsonRestStore("${url}");
-
-                var layout = [{
-                        cells: [{
-                                field: 'id',
-                                name: 'ID',
-                                datatype: "number",
-                                width: '50px'
-                            }, {
-                                field: 'name',
-                                name: 'Name',
-                                width: 'auto'
-                            }, {
-                                field: 'timeUpdated',
-                                name: 'Last Updated',
-                                datatype: "date",
-                                width: '100px',
-                                get: function(row, item) {
-                                    if (!item) {
-                                        return "Loading...";
-                                    }
-                                    return stringDate(item.timeUpdated);
+            });
+            
+            $scope.url = "${url}"; // reports url
+            $scope.gridColumnDefs = [
+                {field: 'id', name: 'id', displayName: 'ID', width: 60},
+                {field: 'name', name: 'name', displayName: 'Name', minWidth: 160},
+                {field: 'timeUpdated', name: 'timeUpdated', displayName: 'Last Updated', enableFiltering: false, width: 115, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity,isDate:true}) CUSTOM_FILTERS}}</div>'}
+            ];
+            $scope.sortField = 'name';
+            $scope.record = {};
+            
+            // File types
+            $scope.outputFileTypes = [
+                                        {id: "zip", name: "html"},
+                                        {id: "pdf", name: "pdf"},
+                                        {id: "rtf", name: "rtf"},
+                                        {id: "xls", name: "xls"},
+                                        {id: "xlsx", name: "xlsx"}
+                                    ];
+            $scope.selectedType = "pdf"; // default file type
+            
+            // report uploader
+            $scope.uploadFile = function () {
+                if ($scope.fileToUpload) {
+                    showYesNoModal({
+                        message: 'Do you want to import the report file?', 
+                        okCallback: function(){
+                            var progressModal = showProgressModal({uibModal: $uibModal});
+                            $http({
+                                method: 'POST',
+                                url: '${urlImport}',
+                                headers: {'Content-Type': undefined}, // This is needed because we are manually appending file data to the request payload
+                                transformRequest: function (data) {
+                                    // We need to manually append file data to request data since server handling of file is expecting submission of a form containing the file.
+                                    var formData = new FormData();
+                                    formData.append('detailFileName', data.file);
+                                    return formData;
+                                },
+                                data: {
+                                    file: $scope.fileToUpload
                                 }
-                            }]
-                    }];
-
-                var asc = true;
-                var args = {
-                    sortFields: [{
-                            attribute: "name",
-                            descending: !asc
-                        }],
-                    rowsPerPage: 10,
-                    pageSizes: []
-                };
-                this.grid = createGrid(this.store, layout, "idGrid", args);
-                this.grid.setSortIndex(1, asc);
-                if ("${filter}" !== "") {
-                    this.grid.setQuery({
-                        filter: "${filter}"
+                            }).then(function(success){
+                                progressModal.close();
+                                var response = success.data;
+                                if (response.error) {
+                                    showMessageModal({uibModal: $uibModal, message: "Error: " + response.error});
+                                } else {
+                                    $scope.record = {};
+                                    $scope.resetUploader();
+                                    refreshGrid();
+                                }
+                            }, function(error){
+                                progressModal.close();
+                                showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + error.data.message});
+                            });
+                        },
+                        uibModal: $uibModal
                     });
+                } else {
+                    showMessageModal({uibModal: $uibModal, message: "Please select a report file (*.prpt)."});
                 }
-
-                this.updateHtml({});
-
-                dojo.behavior.add(this.behavior);
-                dojo.behavior.apply();
-
-                dojo.connect(dijit.byId("idFile"), "onChange", function(evt) {
-                    var files = dijit.byId("idFile").getFileList();
-                    if (files[0]) {
-                        dijit.byId("idFileName").setValue(files[0].name);
+            };
+            
+            $scope.formatDisplayValue = function (value, rowData, isDate) {
+                if (isDate) {
+                    return dateIsoToLocale(value.$date);
+                }
+            };
+            
+            $scope.rowSelectCallback = function (rowData) {
+                $scope.record = angular.copy(rowData);
+                $scope.selectedRecord = rowData;
+                $scope.toggleDetailsView(true);
+            };
+            
+            $scope.generateReport = function () {
+                // first fetch parameters pertaining to the selected report record
+                $http({
+                    method: 'GET',
+                    url: "${urlParameters}/" + $scope.record.id,
+                    transformResponse: function (data, headersGetter, status) {
+                        // Some reponse jsons are malformed, e.g. { head: 'class java.lang.String', subhead: 'class java.lang.String' }, 
+                        // which causes json-to-object conversion by the default $http transformer to fail. We therefore need to correct these malformed jsons here before converting them to objects.
+                        data = data.replace(/ /g, '').replace(/([\w\-\.]+)(?=(\:|\}))/g, '"$1"').replace(/'/g, '"');
+                        var transformed = JSON.parse(data);
+                        return transformed;
+                    },
+                }).then(function (success) {
+                    var data = success.data;
+                    $scope.parameters = data;
+                    var parametersTemplate = '';
+                    for (var key in data) {
+                        parametersTemplate += '<tr><td style="vertical-align:middle;">' + key + '</td><td><input id="' + key + '" type="text" value="" class="form-control"/></td></tr>'
                     }
-                });
-
-                dojo.subscribe("cris/reports/newSelection", this, function(evt) {
-                    if (this.grid.selection.getSelectedCount("row") >= 1) {
-                        this_.item = this.grid.selection.getSelected("row")[0];
-                        this.updateHtml();
-                    }
+                    
+                    $scope.useEmbedded = true; // use embedded uuid for template
+                    // Now open report generator dialog
+                    var modalTemplate = '<div> \
+                                            <div class="modal-header bg-info text-center"><h4>Generate Report</h4></div> \
+                                            <div class="modal-body"> \
+                                                <table class="table"> \
+                                                    <tr> \
+                                                        <td style="width:20%;vertical-align:middle;">Template:</td>  \
+                                                        <td> \
+                                                            <div class="form-horizontal"> \
+                                                                <input type="checkbox" ng-model="useEmbedded" ng-true-value="true" ng-false-value="false" class="checkbox-inline" /> \
+                                                                <label style="display:initial;">&nbsp;Use Embedded UUID</label> \
+                                                            </div><br /> \
+                                                            <div ng-hide="useEmbedded"> \
+                                                                <cris-url-dropdown url="${urlTempNames}" ng-model="selectedTemplate" id-field="id" name-field="name"></cris-url-dropdown> \
+                                                            </div> \
+                                                        </td> \
+                                                    </tr> \
+                                                    <tr> \
+                                                        <td style="vertical-align:middle;">Output File Type:</td> \
+                                                        <td> \
+                                                            <cris-dropdown items="{{outputFileTypes}}" ng-model="selectedType"></cris-dropdown> \
+                                                        </td> \
+                                                    </tr> \
+                                                    ' + parametersTemplate + ' \
+                                                </table> \
+                                            </div> \
+                                            <div class="modal-footer"> \
+                                                <span class="pull-left"><input type="button" value="Generate" class="btn btn-primary" ng-click="ok()" /></span> \
+                                                <span class="pull-right"><input type="button" value="Cancel" class="btn btn-warning" ng-click="cancel()" /></span> \
+                                            </div> \
+                                        </div>';
+                    $uibModal.open({
+                        animation: true,
+                        template: modalTemplate,
+                        scope: $scope,
+                        size: 'md',
+                        controller: function ($scope, $uibModalInstance) {
+                            $scope.ok = function () { // Callback to finally generate report
+                                var embedded = $scope.useEmbedded;
+                                var uuid = $scope.selectedTemplate;
+                                var type = $scope.selectedType;
+                                var url = "${urlRun}/" + $scope.record.id + (type ? "/?outputType=" + type : "/?");
+                                if (!embedded) {
+                                    url += (uuid ? "&uuid=" + uuid : "") ;
+                                }
+                                if ($scope.parameters) {
+                                    for (var key in $scope.parameters) {
+                                        var val = $('#' + key).val();
+                                        if (val !== '') {
+                                            url += "&" + key + "=" + val;
+                                        }
+                                    }
+                                }
+                                window.location.assign(url);
+                                
+                                $uibModalInstance.close();
+                            };
+                            $scope.cancel = function () {
+                                $uibModalInstance.dismiss();
+                            };
+                        }
+                    });
+                }, function (error) {
+                    
                 });
             }
-        };
-
-        cris.ready(function() {
-            cris.report.upload.init();
-            cris.report.generate.init();
-        });
-        // ]]>
+            
+            // On smaller screens toggle between projects view and details view
+            $scope.toggleDetailsView = function (doShow, clearSelection) {
+                if (doShow) {
+                    $('#detailsView').removeClass('hidden-xs hidden-sm');
+                    $('#reportsView').addClass('hidden-xs hidden-sm');
+                } else {
+                    $('#detailsView').addClass('hidden-xs hidden-sm');
+                    $('#reportsView').removeClass('hidden-xs hidden-sm');
+                    if (clearSelection) {
+                        clearSelected();
+                    }
+                }
+            }
+            
+            // Clear reference to selected record during pagination
+            $scope.$watch('gridRef.grid.selection.selectedCount', function (newValue, oldValue) {
+                if (newValue !== oldValue && newValue === 0) {
+                    $scope.selectedRecord = null;
+                }
+            });
+            
+            $scope.resetUploader = function () {
+                // Tell uploader to reset
+                $scope.fileToUpload = null;
+                $scope.$broadcast('ResetSingleFileUploader');
+            }
+            
+            $scope.getTimeCreated = function (record) {
+                return record && record.timeCreated && record.timeCreated.$date ? dateIsoToLocale(record.timeCreated.$date) : "";
+            };
+            
+            $scope.getLastUpdated = function (record) {
+                return record && record.timeUpdated && record.timeUpdated.$date ? dateIsoToLocale(record.timeUpdated.$date) : "";
+            };
+            
+            function refreshGrid () {
+                if ($scope.gridRef) {
+                    $scope.gridRef.refreshGrid();
+                }
+            }
+            
+            function clearSelected () {
+                if ($scope.gridRef) {
+                    $scope.gridRef.clearSelection();
+                }
+                $scope.selectedRecord = null;
+            }
+        }]);
+        cris.bootstrapAngular("idReport", "crisReport");
+            // ]]>
     </script>
 
 </jsp:root>

@@ -44,21 +44,21 @@ public class TermController {
     @Autowired
     private TermService termService;
 
-    @RequestMapping(value = "/fetchDetails/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/fetchDetails/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object fetchTermDetails(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         String result = fetchTermDetails(id);
         return result;
     }
 
-    @RequestMapping(value = "/fetchDetails/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/fetchDetails/{uuid}/{version}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object fetchTermDetails(@PathVariable("uuid") String uuid, @PathVariable("version") String version, HttpServletRequest request, HttpServletResponse response) {
         String result = fetchTermDetails(uuid, version);
         return result;
     }
 
-    @RequestMapping(value = "/fetchDetails", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/fetchDetails", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object fetchTermDetails(HttpServletRequest request, HttpServletResponse response) {
         String id = request.getParameter("id");
@@ -100,13 +100,13 @@ public class TermController {
         return result;
     }
 
-    @RequestMapping(value = "/fetchAllTerms", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/fetchAllTerms", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String fetchAllTerms(HttpServletRequest request, HttpServletResponse response) {
         return fetchAllTerms(request, response, false);
     }
 
-    @RequestMapping(value = "/fetchAllTemplates", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/fetchAllTemplates", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String fetchAllTemplates(HttpServletRequest request, HttpServletResponse response) {
         return fetchAllTerms(request, response, true);

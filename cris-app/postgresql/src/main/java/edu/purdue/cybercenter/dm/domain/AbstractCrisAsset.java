@@ -6,8 +6,6 @@
 package edu.purdue.cybercenter.dm.domain;
 
 import javax.persistence.Column;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
 import javax.persistence.MappedSuperclass;
 import javax.persistence.PrePersist;
 import javax.persistence.PreUpdate;
@@ -36,13 +34,14 @@ public class AbstractCrisAsset extends AbstractCrisEntity implements CrisAsset {
     @Column(name = "description")
     private String description;
 
-    @ManyToOne
-    @JoinColumn(name = "image_id", referencedColumnName = "id")
-    private SmallObject imageId;
+    @Column(name = "image_id")
+    private Integer imageId;
 
-    @ManyToOne
-    @JoinColumn(name = "owner_id", referencedColumnName = "id")
-    private Group ownerId;
+    @Column(name = "owner_id")
+    private Integer ownerId;
+
+    @Column(name = "is_group_owner")
+    private Boolean isGroupOwner;
 
     @PrePersist
     void prePersistAsset() {
@@ -93,23 +92,33 @@ public class AbstractCrisAsset extends AbstractCrisEntity implements CrisAsset {
     }
 
     @Override
-    public SmallObject getImageId() {
+    public Integer getImageId() {
         return this.imageId;
     }
 
     @Override
-    public void setImageId(SmallObject imageId) {
+    public void setImageId(Integer imageId) {
         this.imageId = imageId;
     }
 
     @Override
-    public Group getOwnerId() {
+    public Integer getOwnerId() {
         return this.ownerId;
     }
 
     @Override
-    public void setOwnerId(Group ownerId) {
+    public void setOwnerId(Integer ownerId) {
         this.ownerId = ownerId;
+    }
+
+    @Override
+    public Boolean getIsGroupOwner() {
+        return isGroupOwner;
+    }
+
+    @Override
+    public void setIsGroupOwner(Boolean isGroupOwner) {
+        this.isGroupOwner = isGroupOwner;
     }
 
     @Override

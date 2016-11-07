@@ -8,8 +8,6 @@ package edu.purdue.cybercenter.dm.repository;
 import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.GroupUser;
 import edu.purdue.cybercenter.dm.domain.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.querydsl.QueryDslPredicateExecutor;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -17,7 +15,7 @@ import org.springframework.stereotype.Repository;
  * @author xu222
  */
 @Repository
-public interface GroupUserRepository extends JpaRepository<GroupUser, Integer>, QueryDslPredicateExecutor<GroupUser> {
+public interface GroupUserRepository extends CrisRepository<GroupUser> {
 
     GroupUser findByGroupIdAndUserId(Group groupId, User userId);
 }

@@ -1,3 +1,5 @@
+/* global cris, dojo, dijit, dojox, gridx */
+
 /**********************************************************
  * Render a template
  **********************************************************/
@@ -89,6 +91,10 @@ function instantiateTerm(term, value, doNotUseDefaultValue) {
             // user false for the default value of boolean
             result = false;
         }
+        if (type === "file" && result !== null && term.properties.multiple === "true" && typeof result === 'string') {
+            // Default value for multiple files is comma separated string.
+            result = result.split(',');
+        }
     } else if (angular.isObject(term) && term.terms) {
         // terms contains a list of terms
         result = {};
@@ -171,25 +177,14 @@ function generateIconLinks(actions, scope, isField, isArrayContainer, isArrayEle
 }
 
 function makeTermLabel(term, scope) {
-    var id = dijit.registry.getUniqueId("cris.vocabulary.info");
-    var info = term.description || term.alias || term.name;
-    var context = {
-        id: id,
-        info: info
-    };
-    var htmlTemplate = "<span id='{id}'>";
-    var html = dojo.replace(htmlTemplate, context);
-    html += "{{prettyPrint(term.alias, '_')}}";
-    htmlTemplate = '<div data-dojo-widget="dijit/Tooltip" data-dojo-props="connectId: \'{id}\', position: [\'above\']">{info}</div>';
-    html += dojo.replace(htmlTemplate, context);
 
+    var info = term.description || term.alias || term.name;
+    info = info.replace('"', '&#34').replace("'", "&#39;");
+    var html = "<span uib-popover='" + info + "' popover-trigger='mouseenter' popover-append-to-body='true' popover-placement='auto left-top'>{{prettyPrint(term.alias, '_')}}</span>";
     html += "<span style='color:red;font-weight:bold;' ng-show='isRequired()'>&nbsp;*</span>";
 
-    // user defined icon for object field
     var iconLick = generateIconLinks(scope.actions, scope, true, false, false);
     html += iconLick;
-
-    html += "</span>";
 
     return html;
 }
@@ -220,10 +215,11 @@ function makeRemoveButton(scope)  {
     return html;
 }
 
-angular.module("dataset", ['angular-dojo']);
+angular.module("dataset", ['angular-dojo', 'ui.grid', 'ui.grid.autoResize', 'ui.grid.selection']);
 
 // Service provides methods that controllers share
-angular.module("dataset").factory('datasetService', ['$parse', function($parse) {
+angular.module("dataset").factory('datasetService', ['$parse', '$http', '$uibModal', function($parse, $http, $uibModal) {
+    var storageFileMap = {};
     return{
         addItem: function(value) {
             // build a value object from term
@@ -235,15 +231,12 @@ angular.module("dataset").factory('datasetService', ['$parse', function($parse) 
         },
         removeItem: function(index) {
             var _this = this;
-            showConfirmYesNo({title: "Confirm", message: "Do you want to remove item: " + index + "?",
-                buttons: [
-                    {label: "Yes", callBack: function() {
-                        _this.dataset.splice(index, 1);
-                        _this.$apply();
-                    }},
-                    {label: "No", callBack: function() {
-                    }}
-                ]
+            showYesNoModal({
+                message: 'Do you want to remove item: ' + index + '?',
+                okCallback: function(){
+                    _this.dataset.splice(index, 1);
+                },
+                uibModal: $uibModal
             });
         },
         prettyPrint: function(text, delimit) {
@@ -254,10 +247,14 @@ angular.module("dataset").factory('datasetService', ['$parse', function($parse) 
             }
         },
         isShow: function() {
+            if (this.overrideHidden) {
+                return true;
+            }
+
             var yes;
             var showExpression = this.term.showExpression;
             if (showExpression) {
-               var evalValue = $parse(showExpression)(this.context);
+                var evalValue = $parse(showExpression)(this.context);
                yes = (evalValue === undefined || evalValue === null ? false : evalValue);
             } else {
                yes = true;
@@ -285,6 +282,39 @@ angular.module("dataset").factory('datasetService', ['$parse', function($parse) 
             } else {
                 return !term_['required'] ? false : true;
             }
+        },
+        fetchStorageFileName: function (storageFile) {
+            if (storageFileMap[storageFile]) {
+                return storageFileMap[storageFile];
+            } else {
+                var fileId = storageFile.substring(storageFile.indexOf(':') + 1, storageFile.length);
+                var fileName = storageFile;
+                if (typeof fileId !== 'undefined') {
+                    fileName = storageFileMap[storageFile] = $http({
+                                    method: 'GET',
+                                    url: cris.baseUrl + "storagefiles/" + fileId
+                                });
+                }
+                return fileName;
+            }
+        },
+        fetchStorageFileNames: function (storageFiles) {
+            var result = {};
+            for (var i = 0; i < storageFiles.length; i++) {
+                var storageFile = storageFiles[i];
+                if (storageFileMap[storageFile]) {
+                    result[storageFile] = storageFileMap[storageFile];
+                } else {
+                    var fileId = storageFile.substring(storageFile.indexOf(':') + 1, storageFile.length);
+                    if (typeof fileId !== 'undefined') {
+                        result[storageFile] = storageFileMap[storageFile] = $http({
+                            method: 'GET',
+                            url: cris.baseUrl + "storagefiles/" + fileId
+                        });
+                    }
+                }
+            }
+            return result;
         }
     };
 }]);
@@ -308,21 +338,33 @@ angular.module("dataset").directive("crisDataset", function($compile) {
             // user defined actions: an array of {icon: "", text: "", onHover: "", onClick: ""}
             // the callbacks will be provided with term, data, message and readOnly information
             actions: "=",
-            key: "="
+            key: "=",
+            isGridContent: "@",
+            overrideReadOnly: "=",
+            overrideHidden: "="
         },
         template: "",
         link: function (scope, element, attrs) {
             console.log("==== crisDataset ====");
 
-            if (typeof scope.key !== 'undefined') { // From member directive
+            if (typeof scope.key !== 'undefined') { // From member directive or grid cell
                 var isList = scope.term["list"] ? true : false;
                 var isNode = scope.term["isDefinition"] ? true : false;
                 var template = "";
                 if ((scope.term.grid === true && !isNode) || (scope.term.grid === true && isList)) {
                     var termLabel = makeTermLabel(scope.term, scope);
-                    template = "<ul><li data-ng-show='isShow()'><span class='termNameLabel'>" + termLabel + "</span><cris-grid term='term' dataset='dataset' message='message' context='context' path='{{path}}'><!----></cris-grid></li></ul>";
+                    if (!scope.isGridContent) {
+                        template = "<div class='form-group row form-horizontal' data-ng-show='isShow()'> \
+                                        <label class='control-label col-md-2 col-lg-1'>" + termLabel + "</label>  \
+                                        <div class='col-md-10 col-lg-11'> \
+                                            <cris-grid term='term' dataset='dataset' message='message' context='context' path='{{path}}' read-only='readOnly' override-hidden='overrideHidden' override-read-only='overrideReadOnly'><!----></cris-grid> \
+                                        </div> \
+                                    </div>";
+                    } else { // Widget in grid cell doesn't need a label
+                        template = "<div data-ng-show='isShow()'><cris-grid term='term' dataset='dataset' message='message' context='context' path='{{path}}' read-only='readOnly' override-hidden='overrideHidden' override-read-only='overrideReadOnly'><!----></cris-grid></div>";
+                    }
                 } else {
-                    template = "<collection term='term' dataset='dataset' message='message' context='context' read-only='readOnly' show='{{show}}' actions='actions' path='{{path}}' ><!----></collection>";
+                    template = "<collection term='term' dataset='dataset' message='message' context='context' read-only='readOnly' show='{{show}}' actions='actions' path='{{path}}' is-grid-content='{{isGridContent}}' override-hidden='overrideHidden' override-read-only='overrideReadOnly'><!----></collection>";
                 }
                 element.append(template);
                 $compile(element.contents())(scope);
@@ -331,33 +373,24 @@ angular.module("dataset").directive("crisDataset", function($compile) {
                 var content = null;
                 scope.$watchCollection('term', function () {
                     if (content) {
-                        scopeClone.$destroy();
-                        scopeClone = null;
-
-                        if (content[0]) {
-                            destroyNodeWidgets(content[0]); // Destroy element widgets before removing element from DOM
-                        }
                         content.remove();
                         content = null;
+
+                        scopeClone.$destroy();
+                        scopeClone = null;
                     }
 
                     var template = "";
-                    if (scope.term.grid === true) {
-                        template = "<cris-grid term='term' dataset='dataset' message='message' context='context' path='{{path}}'><!----></cris-grid>";
-                    } else if (scope.term.grid === false) {
-                        template = "<collection term='term' dataset='dataset' message='message' context='context' read-only='readOnly' show='{{show}}' actions='actions' path='{{path}}' ><!----></collection>";
+                    if (scope.term && scope.term.grid === true) {
+                        template = "<cris-grid term='term' dataset='dataset' message='message' context='context' path='{{path}}' read-only='readOnly' show='{{show}}' override-hidden='overrideHidden' override-read-only='overrideReadOnly'><!----></cris-grid>";
+                    } else if (scope.term && scope.term.grid === false) {
+                        template = "<collection term='term' dataset='dataset' message='message' context='context' read-only='readOnly' show='{{show}}' actions='actions' path='{{path}}' override-hidden='overrideHidden' override-read-only='overrideReadOnly'><!----></collection>";
                     }
                     scopeClone = scope.$new();
                     element.append(template);
                     content = $compile(element.contents())(scopeClone);
                 });
             }
-
-            scope.$on('$destroy', function() {
-                if (element[0]) {
-                    destroyNodeWidgets(element[0]);
-                }
-            });
         },
         controller: ["$scope", "datasetService", function($scope, datasetService) {
             $scope.prettyPrint = datasetService.prettyPrint;
@@ -367,7 +400,7 @@ angular.module("dataset").directive("crisDataset", function($compile) {
     };
 });
 
-angular.module("dataset").directive("crisGrid", ['$compile', '$parse', 'datasetService', function ($compile, $parse, datasetService) {
+angular.module("dataset").directive("crisGrid", ['$interval', '$timeout', function ($interval, $timeout) {
     return {
         restrict: "E",
         replace: true,
@@ -376,876 +409,477 @@ angular.module("dataset").directive("crisGrid", ['$compile', '$parse', 'datasetS
             context: '=',
             dataset: '=',
             message: '=',
-            path: '@'
+            show: "@",
+            path: '@',
+            readOnly: "=?",
+            overrideReadOnly: "=",
+            overrideHidden: "="
         },
-        template: '<div style="height:100%;width:100%;overflow:auto;"></div>',
+        template: '<div> \
+                        <div ng-hide="noErrorMsgs" class="text-danger">Highlighted cells have validation errors. Hover mouse over cell for details.</div> \
+                        <div ng-if="term.list"> \
+                            <div ng-hide="readOnly" style="padding:5px;width:100%;border:1px solid #d4d4d4;"><img class="inlineIcon" src="' + cris.imagesRoot + '/famfamfam_silk_icons_v013/icons/add.png" data-ng-click="addToDataset(isNode)"/>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;<img class="inlineIcon" src="' + cris.imagesRoot + '/famfamfam_silk_icons_v013/icons/delete.png" data-ng-click="removeFromDataset()"/></div> \
+                            <div ng-if="!isNode" ui-grid="gridConfig" ui-grid-auto-resize ng-attr-ui-grid-selection ng-style="{height: (gridHeight ? gridHeight : 50) + 40 + \'px\'}"></div> \
+                            <div ng-if="isNode" ui-grid="gridConfig" ui-grid-auto-resize ng-attr-ui-grid-selection ng-style="{height: (gridHeight ? gridHeight : 50) + \'px\', width: gridConfig.columnDefs[0].minWidth + 40 + \'px\'}"></div> \
+                        </div> \
+                        <div ng-if="!term.list" ui-grid="gridConfig" ui-grid-auto-resize ng-style="{height: (gridHeight ? gridHeight : 50)+ 40 + \'px\'}"></div> \
+                   </div>',
         link: function (scope, element, attrs) {
+            var isList = scope.term && scope.term["list"] ? true : false;
+            var isNode = scope.term && scope.term["isDefinition"] ? true : false;
+            scope.isNode = isNode;
+            scope.noErrorMsgs = true;
+            scope.rowHeightsMap = {}; // Holds refs to each row heights. Note: we need this for managing row heights because by default angular ui-grid does not support variable row heights
 
-            // If server-side validation fails, re-create grid. Cells with invalid data will be highlighted.
-            scope.$watch('message', function () {
-                if (scope.message && errorExists()) {
-                    makeCrisGrid();
-                    scope.gridHasErrors = true; // Set flag for displaying error notification above grid
+            if (!scope.path) {
+                scope.path = scope.term.uuid;
+            }
+            if (scope.path.endsWith(scope.term.alias) === false && scope.path !== scope.term.uuid) {
+                scope.path = scope.path + '.' + scope.term.alias;
+            }
+
+            if (!scope.message) {
+                scope.message = {};
+            }
+
+            var columnDefs = [];
+            scope.gridConfig = {
+                columnDefs: columnDefs,
+                appScopeProvider: scope,
+                enableColumnMenus: false,
+                enableHorizontalScrollbar: isNode ? 0 : 1,
+                enableVerticalScrollbar: 0,
+                showHeader: isNode ? false : true,
+                rowHeight: 30,
+                excessColumns: 30, // num of columns to render outside of viewport before virtualization
+                onRegisterApi: function (gridApi)  {
+                    console.dir('******* GRID API *********')
+                    console.dir(gridApi);
+                    scope.gridApi = gridApi;
+                },
+                rowTemplate: '<span ng-repeat="col in colContainer.renderedColumns track by col.colDef.name" class="ui-grid-cell" ng-class="{\'ui-grid-row-header-cell\': col.isRowHeader }" ng-style="{height: (grid.appScope.rowHeightsMap[rowRenderIndex] ? grid.appScope.rowHeightsMap[rowRenderIndex] : 30) + \'px\'}" ui-grid-cell></span>'
+            }
+            var columnHideTimeout = null;
+
+            var term = scope.term;
+            if (isList && isNode) { // Simple list grid
+                scope.termCopy = angular.copy(term);
+                scope.termCopy.list = false;
+                scope.termCopy.grid = false;
+
+                scope.initColumnDefs(scope.termCopy, null, columnDefs, true);
+
+                if (!scope.dataset) {
+                    scope.dataset = [];
                 }
-
-                function arrayIsValid(message) {
-                    var hasError = false;
-                    message.forEach(function (item) {
-                        if (item[""] && item[""].valid === false) {
-                            hasError = true;
-                        }
-                        if (!hasError) {
-                            hasError = objectIsValid(item);
-                        }
-                    });
-                    return hasError;
-                }
-
-                function objectIsValid(message) {
-                    var hasError = false;
-                    var propertyNames = Object.getOwnPropertyNames(message);
-                    propertyNames.forEach(function (name) {
-                        if (name.trim() && !(message[name] instanceof Array) && message[name] && message[name][""].valid === false) {
-                            hasError = true;
-                        } else if (name && message[name] instanceof Array && message[name].length) {
-                            hasError = arrayIsValid(message[name]);
-                        }
-                    });
-                    return hasError;
-                }
-
-                function errorExists() {
-                    var hasError = false;
-                    if (scope.message[""]) { // Grid of type "not list"
-                        return objectIsValid(scope.message);
-                    } else if (scope.message instanceof Array && scope.message.length) { // Grid of type "list"
-                        return arrayIsValid(scope.message);
+                scope.gridConfig.data = scope.dataset;
+            } else { // Composite term
+                if (!isList && !isNode) { // Non-list composite grid
+                    for (var i = 0; i < term.terms.length; i++) {
+                        scope.initColumnDefs(term.terms[i], i, columnDefs);
                     }
-                    return hasError;
+
+                    if (!scope.dataset) {
+                        scope.dataset = {};
+                    }
+                    scope.gridConfig.data = [scope.dataset];
+
+                    // Show Hide columns
+                    columnHideTimeout = null;
+                    scope.$watch('context', function () {
+                        if (columnHideTimeout) {
+                            $timeout.cancel(columnHideTimeout);
+                            columnHideTimeout = null;
+                        }
+                        columnHideTimeout = $timeout(function ( ) {
+                            var cellNodes = angular.element(element.find('div.ui-grid-row')[0]).find('> div > .ui-grid-cell > .ui-grid-cell-contents > cris-dataset').find('> collection > div, > div');
+                            var cellNodeContainers = angular.element(element.find('div.ui-grid-row')[0]).find('> div > .ui-grid-cell');
+                            var headerCells = element.find('div.ui-grid-header-cell-row > div.ui-grid-header-cell');
+
+                            for (var i = 0; i < cellNodes.length; i++) {
+                                var doHide = angular.element(cellNodes[i]).hasClass('ng-hide');
+                                if (doHide) {
+                                    headerCells[i].style.display = "none";
+                                    cellNodeContainers[i].style.display = "none";
+                                } else {
+                                    headerCells[i].style.display = "";
+                                    cellNodeContainers[i].style.display = "";
+                                }
+                            }
+                        }, 300, false);
+                    }, true);
+
+                } else if (isList && !isNode) { // List composite grid
+                    for (var i = 0; i < term.terms.length; i++) {
+                        scope.initColumnDefs(term.terms[i], i, columnDefs, true);
+                    }
+
+                    if (!scope.dataset || !(scope.dataset instanceof Array)) {
+                        scope.dataset = [];
+                    }
+                    scope.gridConfig.data = scope.dataset;
+
+                    // Show Hide columns
+                    columnHideTimeout = null;
+                    scope.$watch('context', function () {
+                        if (columnHideTimeout) {
+                            $timeout.cancel(columnHideTimeout);
+                            columnHideTimeout = null;
+                        }
+                        columnHideTimeout = $timeout(function ( ) {
+                            if (scope.dataset instanceof Array) {
+                                scope.showHideColumns();
+                            }
+                        }, 300, false);
+                    }, true);
+                }
+            }
+
+            // Adjust grid height when dataset size changes
+            var resizeTimeout = null;
+            scope.$watch('dataset.length', function () {
+                if (resizeTimeout) {
+                    $timeout.cancel(resizeTimeout);
+                    resizeTimeout = null;
+                }
+
+                resizeTimeout = $timeout(function ( ) {
+                    scope.gridHeightResize();
+                }, 300, false);
+            });
+
+            // Reset msg indicator whenever message object changes
+            scope.$watch('message', function(newValue, oldValue) {
+                if (!angular.equals(newValue, oldValue)) {
+                    scope.noErrorMsgs = true;
                 }
             });
 
-            makeCrisGrid();
-
-            function makeCrisGrid() {
-                require([
-                    'dojo/store/Memory',
-                    'dojo/store/Observable',
-                    'gridx/Grid',
-                    'gridx/core/model/cache/Sync',
-                    'gridx/modules/CellWidget',
-                    'gridx/modules/Edit',
-                    'gridx/modules/IndirectSelect',
-                    'gridx/modules/RowHeader',
-                    'gridx/modules/select/Row',
-                    'dijit/Toolbar',
-                    'gridx/modules/Bar',
-                    'gridx/modules/HiddenColumns'
-                ], function(Store, Observable) {
-                    var isList = scope.term && scope.term["list"] ? true : false;
-                    var isNode = scope.term && scope.term["isDefinition"] ? true : false;
-
-                    if (!scope.path) {
-                        scope.path = scope.term.uuid;
-                    }
-                    if (scope.path.indexOf('.') === -1) {
-                        scope.path = scope.path + '.' + scope.term.alias;
-                    }
-
-                    var grid = null;
-                    var term = scope.term;
-                    if (isList && isNode) { // Simple list grid
-                        var column = scope.defineGridColumn(term);
-                        column.width = '140px';
-                        column.initializeCellWidget = function (cellWidget, cell) {
-                            var id = cell.row.id;
-                            var template = "<node term='term' dataset='dataset[" + id + "]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{path}}[" + id + "]' context='context'></node>";
-
-                            if ((scope.message instanceof Array) && scope.message[id] && scope.message[id][""] && !scope.message[id][""].valid) {
-                                dojo.setStyle(cell.node(), 'backgroundColor', '#FFB2B2'); // Highlight cell
-                                new dijit.Tooltip({
-                                    connectId: [cell.node()],
-                                    label: scope.message[id][""].errorList[0].errorMessage
-                                });
-                            }
-                            dojo.empty(cellWidget.domNode);
-                            dojo.place(template, cellWidget.domNode, "only");
-                            $compile(cellWidget.domNode)(scope);
-
-                            // ReadOnly expression watch
-                            scope.$watch(function() {
-                                return scope.isReadOnly();
-                            }, function(newValue, oldValue) {
-                                if (newValue !== oldValue && !newValue) {
-                                    var widgets = dijit.findWidgets(cellWidget.domNode);
-                                    if (widgets.length) {
-                                        widgets[0].set('disabled', false);
-                                    }
-                                } else if (newValue !== oldValue && newValue) {
-                                    var widgets = dijit.findWidgets(cellWidget.domNode);
-                                    if (widgets.length) {
-                                        widgets[0].set('disabled', true);
-                                    }
-                                }
-                            });
-
-                            // Watch isRequired expression
-                            scope.$watch(function() {
-                                return scope.isRequired();
-                            }, function(newValue, oldValue) {
-                                if (newValue !== oldValue && !newValue) {
-                                    var widgets = dijit.findWidgets(cellWidget.domNode);
-                                    if (widgets.length) {
-                                        widgets[0].set('required', false);
-                                    }
-                                } else if (newValue !== oldValue && newValue) {
-                                    var widgets = dijit.findWidgets(cellWidget.domNode);
-                                    if (widgets.length) {
-                                        widgets[0].set('required', true);
-                                    }
-                                }
-                            });
-                        };
-
-                        var store = new Store({
-                            idProperty: 'id'
-                        })
-                        grid = scope.constructGrid(true, [column], store, {headerHidden: true});
-
-                        grid.store.setData = function (data) { // Override "setData"
-                            this.index = {};
-                            this.data = [];
-                            for (var i = 0; i < data.length; i++) {
-                                var storeItem = {};
-                                storeItem.id = i;
-                                storeItem[term.alias] = data[i];
-                                this.data.push(storeItem);
-                                this.index[i] = storeItem;
-                            }
-                        };
-
-                        grid.store.add = function () { // Override "add"
-                            scope.dataset.unshift("");
-                            if (!scope.message) {
-                                scope.message = [];
-                            }
-                            scope.message.unshift({}); // persist order of highlighted cells (those with errors)
-                            this.setData(scope.dataset);
-                        };
-
-                        grid.store.remove = function (id) { // Override "remove"
-                            if (id >= 0) {
-                                delete this.index[id];
-                                this.data.splice(id, 1);
-                                scope.dataset.splice(id, 1);
-                                this.setData(scope.dataset);
-                            }
-                        }
-
-                        // Set initial data
-                        if (!scope.dataset) {
-                            scope.dataset = [];
-                        }
-                        grid.store.setData(scope.dataset);
-                        grid.model.clearCache();
-                        grid.body.refresh();
-                    } else {
-                        // For 5 or few terms, each without child terms, equally distribute width
-                        var termCount = 0;
-                        var hasChildTerms = false;
-                        var gridProperties = {};
-                        for (var i = 0; i < term.terms.length; i++) {
-                            hasChildTerms = hasChildTerms || (term.terms[i].terms && term.terms[i].terms.length > 0);
-                            termCount++
-                        }
-                        var columnWidth = null;
-                        if (!hasChildTerms && termCount <= 5) {
-                            gridProperties.autoWidth = false;
-                            columnWidth = (100 / termCount) + '%';
-                        }
-                        
-                        var gridColumns = [];
-                        for (var i = 0; i < term.terms.length; i++) {
-                            var column = scope.defineGridColumn(term.terms[i], columnWidth);
-                            gridColumns.push(column);
-                            scope.columnHideWatch(term.terms[i], i+1);
-                        }
-
-                        if (!isList && !isNode) { // Non list composite grid
-                            var data_ = scope.dataset ? scope.dataset : {};
-
-                            var storeData = {};
-                            var columnNames = Object.getOwnPropertyNames(data_);
-                            columnNames.forEach(function (name) {
-                                storeData[name] = data_[name];
-                            });
-                            storeData.id = 1; // Gridx requires an id
-                            storeData._message_ = scope.message;
-
-                            var store = new Observable(new Store({
-                                idProperty: 'id',
-                                data: [storeData]
-                            }));
-                            var results = store.query({});
-
-                            // Observe for changes and update underlying dataset
-                            results.observe(function (item) {
-                                var propertyNames = Object.getOwnPropertyNames(data_);
-                                propertyNames.forEach(function (name) {
-                                    data_[name] = item[name]
-                                });
-                            }, true);
-                            grid = scope.constructGrid(false, gridColumns, store, gridProperties);
-                            
-                        } else if (isList && !isNode) { // List composite grid
-                            
-                            var store = new Observable(new Store({
-                                idProperty: 'id'
-                            }));
-                            grid = scope.constructGrid(true, gridColumns, store, gridProperties);
-
-                            grid.store.setData = function (data) { // Override "setData"
-                                this.index = {};
-                                this.data = [];
-                                for (var i = 0; i < data.length; i++) {
-                                    var item = {};
-                                    var columnNames = Object.getOwnPropertyNames(data[i]);
-                                    columnNames.forEach(function (name) {
-                                        item[name] = data[i][name];
-                                    });
-                                    item.id = i;
-                                    item._message_ = scope.message;
-                                    this.data.push(item);
-                                    this.index[i] = item;
-                                }
-                            };
-
-                            grid.store.add = function () { // Override "add"
-                                var empty = instantiateTerm(scope.term, {});
-                                var newItem = {};
-
-                                var propertyNames = Object.getOwnPropertyNames(empty);
-                                propertyNames.forEach(function (name) {
-                                    newItem[name] = empty[name];
-                                });
-                                scope.dataset.unshift(newItem);
-
-                                if (!scope.message) {
-                                    scope.message = [];
-                                }
-                                scope.message.unshift({}); // persist order of highlighted cells (those with errors)
-                                this.setData(scope.dataset);
-                            };
-
-                            grid.store.remove = function (id) { // Override remove
-                                if (id >= 0) {
-                                    delete this.index[id];
-                                    this.data.splice(id, 1);
-                                    scope.dataset.splice(id, 1);
-                                    this.setData(scope.dataset);
-                                }
-                            };
-
-                            // Set initial data
-                            if (!scope.dataset) {
-                                scope.dataset = [];
-                            }
-                            grid.store.setData(scope.dataset);
-                            grid.model.clearCache();
-                            grid.body.refresh();
-
-                            var results = store.query({});
-
-                            // Observe for changes and update underlying dataset
-                            results.observe(function (item) {
-                                var idProperty = grid.store.idProperty;
-                                var index = item[idProperty];
-                                delete item[idProperty];
-                                scope.dataset[index] = item;
-                            }, true);
-                        }
-                    }
-                    dojo.empty(element[0]);
-                    if (grid) {
-                        grid.placeAt(element[0]);
-                        grid.startup();
-                        scope.crisGrid = grid;
-                        scope.hideGridColumns(); // Evaluate show expression on initial load of empty grid
-                        
-                        // Cache ids of all grids on page
-                        if (document._crisGridIds_) {
-                            var exists = false;
-                            document._crisGridIds_.forEach(function (_id) {
-                                if (grid.id === _id) {
-                                    exists = true;
-                                }
-                            });
-                            if (!exists) {
-                                document._crisGridIds_.push(grid.id);
-                            }
-                        } else {
-                            document._crisGridIds_ = [grid.id];
-                        }
-
-                        // Custom event handler resizes all grids on page. This fixes several resize issues: 1) Some single-column grids are taller than content height, even with the 'autoHeight' grid property. 
-                        // 2) For nested grids, if inner grid changes size, the outer grid needs resizing as well to fit content
-                        angular.element(document).unbind('_onCrisGridResizeOnUpdate_').bind('_onCrisGridResizeOnUpdate_', function (event, id, rowHeight) {
-                            setTimeout(function(){ 
-                                for (var i = document._crisGridIds_.length - 1; i >= 0; i--) {
-                                    var gridId = document._crisGridIds_[i];
-                                    var grid_ = dijit.registry.byId(gridId);
-                                    var gridInDom = dojo.byId(gridId) ? true : false; // Grid is in dom 
-                                    if (typeof grid_ !== 'undefined' && gridInDom) {
-                                        grid_.resize();
-                                    }
-                                }
-                            }, 350); // Delay event handling by a few milliseconds, otherwise grid resize won't work sometimes as it may be called when grid hasn't completly renderd in dom
-                            event.stopPropagation();
-                        });
-
-                        dojo.ready(function() {
-                            // Delay event by a few milliseconds for proper grid resize in event handler
-                            setTimeout(function(){ angular.element(document).trigger('_onCrisGridResizeOnUpdate_'); }, 50);    
-                        });
-
-                        // Scope watch at grid level...
-
-                        // Gridx bug workaround: If grid is displayed as part of list (ul,li), and grid term has showExpression,
-                        // switching from hidden to display won't show grid unless window or grid is resized.
-                        if (scope.term.showExpression) {
-                            scope.$watch(function () {
-                                return scope.isShow();
-                            }, function (show) {
-                                if (show) {
-                                    angular.element(document).trigger('_onCrisGridResizeOnUpdate_');
-                                }
-                            })
-                        }
-                    }
-                });
-            }
-            // Append general error message. Hidden if no grid errors.
-            if (!element.prev().hasClass("crisGridErrorMessage")) {
-                scope.errorMessage = 'Highlighted cells have validation errors. Hover mouse over cell for details.';
-                var messageDiv = angular.element('<div data-ng-show="gridHasErrors" class="error crisGridErrorMessage" ng-bind="errorMessage"></div>');
-                messageDiv.insertBefore(element);
-                $compile(messageDiv)(scope);
-            }
+            // Clean up before scope destroy
+            scope.$on('$destroy', function () {
+                $timeout.cancel(columnHideTimeout);
+                $timeout.cancel(resizeTimeout);
+            });
         },
-        controller: ["$scope", "$compile", "$parse", "datasetService", function($scope, $compile, $parse, datasetService) {
-            $scope.isShow = datasetService.isShow.bind($scope);
-            $scope.isReadOnly = datasetService.isReadOnly.bind($scope);
-            $scope.isRequired = datasetService.isRequired.bind($scope);
-            
-            $scope.defineGridColumn = function (term, columnWidth) {
-                var columnDefinition = {};
-                columnDefinition.widgetsInCell = true;
-                columnDefinition.field = term.alias;
-                columnDefinition.name = makeGridHeaderLabel(term);
-                columnDefinition.width = columnWidth ? columnWidth : gridColumnWidth(term) + 'px';
-                var rowRequired = []; // keeps track of required flag for each cell in column (in multi-row grid)
-                var scopePath = $scope.path;
+        controller: ["$scope", "$element", "$parse", "datasetService", function($scope, $element, $parse, datasetService) {
 
-                columnDefinition.decorator = function () {
-                    return '<div></div>';
-                };
-                columnDefinition.initializeCellWidget = function (cellWidget, cell) {
-                    // TODO: This callback fires many times. This is not good for performance because this is were we create widgets.
-                    // Find a way to cache widgets.
-                    var newScope = $scope.$new(true);
-                    newScope.term = term;
-                    newScope.dataset = cell.grid.store.data[cell.row.index()][cell.column.field()];
-                    newScope.readOnly = datasetService.isReadOnly.call(newScope);
-                    newScope.show = $scope.show;
-                    newScope.path = scopePath;
-                    var path = "path ? (path + \".\" + term.alias) : term.uuid";
+            $scope.initColumnDefs = function (term, termIndex, columnDefsArray, isList) {
+                var columnDef = {};
+                var termName = $scope.makeGridHeaderLabel(term); // prettified term name
+                var rawTermName = (term.alias || term.name || term.useAlias); // term name as written in term definition
+                var path = $scope.path;
+                var isGridContent = true;
+                var isNode = $scope.term && $scope.term["isDefinition"] ? true : false; // Grid is of single node (non-composite term)
 
-                    // Each grid row must have a unique context
-                    // For a list grid, the context will have a reference to the current row data using underscore notation E.g. _CompositeTerm == CompositeTerm[rowIndex]
-                    var rowContext = cell.grid['_crisGridRow[' + cell.row.index() + ']_'];
-                    if (rowContext) {
-                        newScope.context = rowContext;
-                    } else {
-                        newScope.context =angular.copy($scope.context);
-                        var _path = newScope.path.substring(newScope.path.indexOf('.') + 1); // Remove template id from term path
-                        if (_path === $scope.term.alias) { // Top level of context
-                            if ($scope.term.list) {
-                                $scope.$watch('context["' + $scope.term.alias + '"][' + cell.row.index() + ']', function(value) {
-                                    if (value) {
-                                        newScope.context['_' + _path] = value;
-                                    }
-                                }, true);
-                            } else {
-                                $scope.$watch('context["' + $scope.term.alias + '"]', function(value) {
-                                    if (value) {
-                                        dojo.mixin(newScope.context[_path], value);
-                                    }
-                                }, true);
-                            }
-                        } else {
-                            _path = _path.substring(0, _path.lastIndexOf('.')); // Move term path one level up E.g Term1.Term2.Term3 to Term1.Term2
+                columnDef.name = termName;
+                columnDef.field = termName;
+                columnDef.rawTermName = rawTermName;
+                columnDef.term = term;
+                columnDef.minWidth = $scope.gridColumnWidth(term);
+                columnDef.enableSorting = false;
 
-                           // Replace indexes in path with underscore notation. E.G. From A.B[0].C.D[6] to A._B.C._D
-                            _path = _path.replace(/\b[a-zA-Z0-9_]+\[[0-9]+\]/g, function(val) {
-                                return '_' + val.replace(/\[[0-9]+\]/g, "");
-                            });
-
-                            if ($scope.term.list) {
-                                $scope.$watch('context.' + _path, function(value) {
-                                    if (value) {
-                                        var subContext = $parse(_path)(newScope.context);
-                                        subContext['_' + $scope.term.alias] = value[$scope.term.alias][cell.row.index()];
-                                        dojo.mixin(subContext, value);
-                                    }
-                                }, true);
-                            } else {
-                                $scope.$watch('context.' + _path, function(value) {
-                                    if (value) {
-                                        var subContext = $parse(_path)(newScope.context);
-                                        dojo.mixin(subContext, value);
-                                    }
-                                }, true);
-                            }
-                        }
-
-                        // Update row context if context data that is not part of grid data changes
-                        $scope.$watch('context', function(newValue, oldValue) {
-                            if (newValue && !angular.equals(newValue, oldValue)) {
-                                var propNames = Object.getOwnPropertyNames(newValue);
-                                dojo.forEach(propNames, function(name) {
-                                    if (name !== $scope.term.alias) {
-                                        if (typeof newValue[name] === 'object' && newValue[name] !== null) {
-                                            dojo.mixin(newScope.context[name], newValue[name]);
-                                        } else {
-                                            newScope.context[name] = newValue[name];
-                                        }
-                                    }
-                                });
-                            }
-                        }, true);
-
-                        cell.grid['_crisGridRow[' + cell.row.index() + ']_'] = newScope.context;
-                    }
-
-                    if ($scope.term.list) {
-                        newScope.path = newScope.path + '[' + cell.row.index() + ']'; // Add row index to path
-                    }
-
-                    var message = cell.grid.store.data[cell.row.index()]._message_;
-                    if (message instanceof Array && message.length && message[cell.row.index()]) {
-                        newScope.message = message ? message[cell.row.index()][cell.column.field()] : "";
-                    } else {
-                        newScope.message = message ? message[cell.column.field()] : "";
-                    }
-
-                    // If error message, highlight and add tooltip to cell
-                    if (newScope.message && newScope.message[""] && !newScope.message[""].valid) {
-                        dojo.setStyle(cell.node(), 'backgroundColor', '#FFB2B2');
-
-                        new dijit.Tooltip({
-                            connectId: [cell.node()],
-                            label: newScope.message[""].errorList[0].errorMessage
-                        });
-                    }
-
-                    // Watch for edit changes
-                    newScope.$watch('dataset', function (newValue, oldValue) {
-                        if (newValue !== oldValue) {
-                            var cellData = cell.grid.store.data[cell.row.index()][cell.column.field()];
-                            if (cellData instanceof Array && newValue instanceof Array) { // Multiselects, etc.
-                                while (cellData.length) {
-                                    cellData.pop();
-                                }
-                                newValue.forEach(function (item) {
-                                    cellData.push(item);
-                                });
-                            } else { // Single value fields (Date, textbox, checkbox)
-                                cell.grid.store.data[cell.row.index()][cell.column.field()] = newValue;
-
-                                // Notify this cell's parent grid of the data update
-                                if (cell.grid.store.notify) {
-                                    cell.grid.store.notify(cell.grid.store.data[cell.row.index()], cell.row.id);
-                                }
-                            }
-                        }
-                    });
-
-                    newScope.addItem = datasetService.addItem.bind(newScope);
-                    newScope.removeItem = datasetService.removeItem.bind(newScope);
-                    newScope.prettyPrint = datasetService.prettyPrint;
-                    newScope.isShow = datasetService.isShow.bind(newScope);
-                    newScope.isReadOnly = datasetService.isReadOnly.bind(newScope);
-                    newScope.isRequired = datasetService.isRequired.bind(newScope);
-
-                    // Required expression watch...display/hide required asterisk in header
-                    newScope.$watch(function() {
-                        return newScope.isRequired();
-                    }, function(newValue, oldValue) {
-                        rowRequired = rowRequired.slice(0, cell.grid.rows().length);
-                        rowRequired[cell.row.index()] = newValue ? true : false;
-                        if (rowRequired.indexOf(true) !== -1) {
-                            angular.element(cell.column.headerNode()).find('.crisGridRequiredFlag').css({'visibility' : 'visible'});
-                        } else {
-                            angular.element(cell.column.headerNode()).find('.crisGridRequiredFlag').css({'visibility' : 'hidden'});
-                        }
-                    });
-
-                    // Hide grid cells or columns based on show-expression
-                    if (newScope.term.showExpression) {
-                        var cellScope = newScope.$new(true);
-                        cellScope.term = newScope.term;
-                        cellScope.context = newScope.context;
-                        cellScope.isShow = datasetService.isShow.bind(cellScope);
-                        
-                        cellScope.$watch(function () {
-                            return cellScope.isShow();
-                        }, function (show) {
-                            if (cellWidget.cell.row.id === cell.row.id) { // Important! only evaluate the watch for this cell in this column
-                                var cellsToHide = cell.grid["_crisGridColumn" + cell.column.id  + "CellsToHide_"];
-                                if (!cellsToHide) {
-                                    cellsToHide = cell.grid["_crisGridColumn" + cell.column.id  + "CellsToHide_"] = [];
-                                }
-
-                                var index = cellsToHide.indexOf(cell.row.id)
-                                if (!show) {
-                                    if (index < 0) {
-                                        cellsToHide.push(cell.row.id);
-                                    }
-                                    dojo.setStyle(cellWidget.domNode, 'visibility', 'hidden');
-                                } else {
-                                    if (index > -1) {
-                                        cellsToHide.splice(index, 1);
-                                    }
-                                    //dojo.setStyle(cellWidget.domNode, 'visibility', 'visible');
-                                    dojo.setStyle(cellWidget.domNode, 'visibility', 'inherit');
-                                }
-
-                                // Cleanup old references for cells-to-hide if rows are added/removed
-                                if (cell.grid.rowCount() - 1 === cell.row.id) {
-                                    var _cellsToHide = angular.copy(cellsToHide);
-                                    dojo.forEach(_cellsToHide, function(cellId) {
-                                        var _widget = cell.grid.cellWidget.getCellWidget(cellId, cell.column.id);
-                                        if ((_widget && dojo.getStyle(_widget.domNode, 'visibility') !== 'hidden') || !_widget) {
-                                            var index = cellsToHide.indexOf(cellId);
-                                            if (index !== -1) {
-                                                cellsToHide.splice(index, 1);
-                                            }
-                                        }
-                                    });
-                                }
-                                
-                                // Gridx has hiddenColumnsModule for hiding columns but it does not work well if grid has inner grids; e.g. hiding column 0 of parent grid also hides column 0 of all inner grid.
-                                var columnIdentifier = cell.grid.id + '-' + cell.column.id;
-                                var headerAndCellNodes = dojo.query('#' + columnIdentifier + '.gridxCell, [aria-describedby^="' + columnIdentifier + '"].gridxCell', cell.grid.domNode);
-                                if (cellsToHide.length === cell.grid.rowCount()) { // All cells in column are hidden, therefore hide entire column
-                                    dojo.forEach(headerAndCellNodes, function(node) {
-                                        dojo.setStyle(node, 'display', 'none');
-                                    });
-                                    cell.grid.resize();
-                                } else { // Not all cells in column are hidden, therefore unhide column
-                                    dojo.forEach(headerAndCellNodes, function(node) {
-                                       if (dojo.getStyle(node, 'display') === 'none') {
-                                           dojo.setStyle(node, 'display', '');
-                                       }
-                                    });
-                                    cell.grid.resize();
-                                }
-                            }
-                        });
-                        cellScope.$apply();
-                    }
-
-                    var isList = term && term["list"] ? term && term["list"] : false;
-                    var isNode = term && term["isDefinition"] ? term && term["isDefinition"] : false;
-                    if (typeof newScope.dataset === "undefined" || newScope.dataset === null) {
-                        if (isList) {
-                            newScope.dataset = [];
-                        } else if (!isNode) {
-                            newScope.dataset = {};
-                        } else {
-                            newScope.dataset = null;
-                        }
-                    }
-
-                    var template = "";
-                    var termLabel = makeTermLabel(newScope.term, newScope);
-                    var htmlAddButton = null;
-                    var htmlRemoveButton = null;
-                    if (isList && !newScope.readOnly) {
-                        htmlAddButton = makeAddButton(newScope);
-                        htmlRemoveButton = makeRemoveButton(newScope);
-
-                        // add a add button for list item
-                        termLabel += ":&nbsp;" + htmlAddButton;
-                    }
-                    
-                    if (isNode) {
-                        if (!isList) {
-                            newScope.message = ""; // For grid, do not display error message alongside node. Instead cell will be highlighted and a tooltip added.
-                            template = "<span data-ng-show='isShow()'><node term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context'></node></span>";
-                        } else {
-                            dojo.setStyle(cell.node(), 'vertical-align', 'top');
-                            if (term.grid) {
-                                template = "<cris-grid term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context' ></cris-grid>";
-                            } else {
-                                template = "<span data-ng-show='isShow()'><span class='termNameLabel'>" + termLabel + "</span><ul><li ng-repeat='item in dataset track by $index'><span class='termIndexLabel'>{{$index}}:&nbsp;" + htmlRemoveButton + "</span><node term='term' dataset='dataset[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context'></node></li></ul></span>";
-                            }
-                        }
-                    } else { // Composite
-                        if (!isList && !term.grid) {
-                            template = "<span data-ng-show='isShow()' style='display:inline-block'><member term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context'></member></span>";
-                        } else if (isList && !term.grid) {
-                            dojo.setStyle(cell.node(), 'vertical-align', 'top'); 
-                            template = "<span data-ng-show='isShow()'><span class='termNameLabel'>" + termLabel + "</span><ul><li ng-repeat='item in dataset track by $index'><span class='termIndexLabel'>{{$index}}:&nbsp;" + htmlRemoveButton + "</span><span style='display:inline-block'><member term='term' dataset='dataset[$index]' message='message[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context'></member></span></li></ul></span>";
-                        } else {
-                            dojo.setStyle(cell.node(), 'vertical-align', 'top'); 
-                            template = "<cris-grid term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context' ></cris-grid>";
-                        }
-                    }
-                    
-                    // If cell content increases in size, resize grid to fit content
-                    // This is the case when a non-grid composite list term is in the cell. Adding/removing items affects grid height
-                    newScope.cellWidgetDomNode = cell.widget().domNode;
-                    newScope.$watch('cellWidgetDomNode.scrollHeight', function (newValue, oldValue) {
-                        if (newValue && oldValue && newValue !== oldValue) {
-                            angular.element(document).trigger('_onCrisGridResizeOnUpdate_');
-                        }
-                    });
-
-                    dojo.empty(cellWidget.domNode);
-                    dojo.place(template, cellWidget.domNode, "only");
-                    $compile(cellWidget.domNode)(newScope);
-                };
-
-                function gridColumnWidth(term) { // Estimate width of grid column
-                    var pixelCount = 0;
-                    var termArray = [];
-                    termArray.push(term);
-
-                    while (termArray.length) {
-                        var term_ = termArray.pop();
-                        if (term_.terms && term_.grid) {
-                            term_.terms.forEach(function (t) {
-                                termArray.push(t);
-                            });
-                            pixelCount += 80; // Additional offset pixels if cell has grid
-                        } else {
-                            // Get sum of all leaf term pixels
-                            if (term_.terms) { // term is composite but not grid
-                                pixelCount += 300;
-                                
-                                // Loop through child terms of non-grid composite term. Adjust width based on whether some child terms are composite themselves.
-                                var largestChild = null;
-                                dojo.forEach(term_.terms, function(t_){
-                                    if (t_.terms && (!largestChild
-                                            || (t_.grid && largestChild.grid && largestChild.terms.length < t_.terms.length)
-                                            || (t_.grid && !largestChild.grid) || (t_.terms.length > largestChild.terms.length))) {
-                                        largestChild = t_;
-                                    }
-                                });
-                                if (largestChild) {
-                                    pixelCount = 70;
-                                    pixelCount += gridColumnWidth(largestChild);
-                                }
-                            } else if (term_.grid) { // term is leaf node and grid
-                                pixelCount += 190;
-                            } else { // leaf term is neither composite nor a grid
-                                pixelCount += 160;
-                            }
-                        }
-                    }
-                    return pixelCount;
+                if (isList && isNode) { // node list grid
+                    columnDef.cellTemplate = "<div class='ui-grid-cell-contents' title='{{grid.appScope.getTooltip(grid.appScope.message[rowRenderIndex], " + isNode + ")}}' style='overflow-y:auto;background-color:{{(grid.appScope.message[rowRenderIndex][\"\"].valid === false) ? \"#FFB2B2\" : \"transparent\"}}'><cris-dataset term='grid.appScope.termCopy' dataset='grid.appScope.dataset[rowRenderIndex]' message='grid.appScope.message[rowRenderIndex]' path='" + path + "[{{rowRenderIndex}}]' context='grid.appScope.context' is-grid-content='" + isGridContent + "' show='{{grid.appScope.show}}' read-only='grid.appScope.readOnly' override-hidden='grid.appScope.overrideHidden' override-read-only='grid.appScope.overrideReadOnly' key='1'></cris-dataset></div>";
+                } else if (isList && !isNode) { // composite list grid
+                    columnDef.cellTemplate = "<div class='ui-grid-cell-contents' title='{{grid.appScope.getTooltip(grid.appScope.message[rowRenderIndex]." + rawTermName + ", grid.appScope.isNodeTerm(grid.appScope.term.terms[" + termIndex + "]))}}' style='overflow-y:auto;background-color:{{(grid.appScope.message[rowRenderIndex]." + rawTermName + "[\"\"].valid === false) ? \"#FFB2B2\" : \"transparent\"}}'><cris-dataset term='grid.appScope.term.terms[" + termIndex + "]' dataset='grid.appScope.dataset[rowRenderIndex]." + rawTermName + "' message='grid.appScope.message[rowRenderIndex]." + rawTermName + "' path='" + path + "[{{rowRenderIndex}}]' context='grid.appScope.context' is-grid-content='" + isGridContent + "' show='{{grid.appScope.show}}' read-only='grid.appScope.readOnly' override-hidden='grid.appScope.overrideHidden' override-read-only='grid.appScope.overrideReadOnly' key='1'>{{grid.appScope.updateContext(\"" + path + "\",grid.appScope.context,rowRenderIndex)}}</cris-dataset></div>";
+                } else { // non-composite grid
+                    columnDef.cellTemplate = "<div class='ui-grid-cell-contents' title='{{grid.appScope.getTooltip(grid.appScope.message." + rawTermName + ", grid.appScope.isNodeTerm(grid.appScope.term.terms[" + termIndex + "]))}}' style='overflow-y:auto;background-color:{{(grid.appScope.message." + rawTermName + "[\"\"].valid === false) ? \"#FFB2B2\" : \"transparent\"}}'><cris-dataset term='grid.appScope.term.terms[" + termIndex + "]' dataset='grid.appScope.dataset." + rawTermName + "' message='grid.appScope.message." + rawTermName + "' path='" + path + "' context='grid.appScope.context' is-grid-content='" + isGridContent + "' show='{{grid.appScope.show}}' read-only='grid.appScope.readOnly' override-hidden='grid.appScope.overrideHidden' override-read-only='grid.appScope.overrideReadOnly' key='1'></cris-dataset></div>";
                 }
 
-                function makeGridHeaderLabel(term) {
-                    var label = term.alias ? term.alias : "";
-                    label = prettyPrint(label, '_');
-                    if (term.unit) {
-                        label += ' (' + term.unit + ')';
-                        term.unit = null; // remove unit to prevent node directive from displaying it too.
-                    }
-                    var visibility = datasetService.isRequired.call({context: $scope.context}, term) ? 'visible' : 'hidden';
-                    label += '<span class="crisGridRequiredFlag" style="color:red;font-weight:bold;visibility:' + visibility + ';">&nbsp;*</span>';
-                    return label;
+                columnDef.headerCellTemplate = '<div ng-class="{ \'sortable\': sortable }" ui-grid-one-bind-aria-labelledby-grid="col.uid + \'-header-text \' + col.uid + \'-sortdir-text\'" aria-sort="{{col.sort.direction == asc ? \'ascending\' : ( col.sort.direction == desc ? \'descending\' : (!col.sort.direction ? \'none\' : \'other\'))}}"> \
+                                                    <div role="button" tabindex="0" class="ui-grid-cell-contents ui-grid-header-cell-primary-focus" col-index="renderIndex" title="TOOLTIP"> \
+                                                      <span class="ui-grid-header-cell-label" ui-grid-one-bind-id-grid="col.uid + \'-header-text\'"> {{ (grid.appScope.termCopy ? grid.appScope.makeGridHeaderLabel(grid.appScope.termCopy) : grid.appScope.makeGridHeaderLabel(grid.appScope.term.terms[' + termIndex + '])) CUSTOM_FILTERS }} <span ng-show="grid.appScope.termCopy ? grid.appScope.isRequired(grid.appScope.termCopy) :  grid.appScope.isRequired(grid.appScope.term.terms[' + termIndex + '])" class="text-danger">*</span> </span> \
+                                                      <span ui-grid-one-bind-id-grid="col.uid + \'-sortdir-text\'" ui-grid-visible="col.sort.direction" aria-label="{{getSortDirectionAriaLabel()}}"> \
+                                                            <i ng-class="{ \'ui-grid-icon-up-dir\': col.sort.direction == asc, \'ui-grid-icon-down-dir\': col.sort.direction == desc, \'ui-grid-icon-blank\': !col.sort.direction }" title="{{isSortPriorityVisible() ? i18n.headerCell.priority + \' \' + ( col.sort.priority + 1 )  : null}}" aria-hidden="true"> </i> \
+                                                            <sub ui-grid-visible="isSortPriorityVisible()" class="ui-grid-sort-priority-number"> {{col.sort.priority + 1}} </sub> \
+                                                      </span> \
+                                                    </div> \
+                                                    <div role="button" tabindex="0" ui-grid-one-bind-id-grid="col.uid + \'-menu-button\'" class="ui-grid-column-menu-button" ng-if="grid.options.enableColumnMenus && !col.isRowHeader  && col.colDef.enableColumnMenu !== false" ng-click="toggleMenu($event)" ng-class="{\'ui-grid-column-menu-button-last-col\': isLastCol}" ui-grid-one-bind-aria-label="i18n.headerCell.aria.columnMenuButtonLabel" aria-haspopup="true"> \
+                                                      <i class="ui-grid-icon-angle-down" aria-hidden="true"> &nbsp; </i> \
+                                                    </div> \
+                                                    <div ui-grid-filter></div> \
+                                                </div>';
+
+                columnDefsArray.push(columnDef);
+            };
+
+            $scope.makeGridHeaderLabel = function (term) {
+                var termName = (term.alias || term.name || term.useAlias);
+                termName = prettyPrint(termName, '_');
+                if (term.unit) {
+                    termName += ' [' + term.unit + ']';
                 }
+                return termName;
+            };
 
-                return columnDefinition;
-            }
-            
-            $scope.constructGrid = function (isList, columnStructure, store, optionalGridProperties) {
-                function addItem(grid) {
-                    console.log('___________Cris Grid - Add Item_________________');
-                    grid.store.add();
-                    grid.model.clearCache();
-                    grid.body.refresh();
-                    angular.element(document).trigger('_onCrisGridResizeOnUpdate_');
-                }
+            $scope.isRequired = function (term) {
+                return datasetService.isRequired.call({term: term, context: $scope.context});
+            };
 
-                function removeItem(grid) {
-                    console.log('___________Cris Grid - Remove Item_______________');
-                    var rowsSelected = grid.select.row.getSelected();
-                    var itemId = rowsSelected[0];
-                    if (typeof itemId !== 'undefined') {
-                        grid.store.remove(itemId);
-                        grid.model.clearCache();
-                        grid.body.refresh();
-                        angular.element(document).trigger('_onCrisGridResizeOnUpdate_');
-                    }
-                }
+            $scope.isShow = function (term) {
+                return datasetService.isShow.call({term: term, context: $scope.context});
+            };
 
-                // add/remove toobar icons
-                var style = dojo.create("style", {type: "text/css"}, dojo.query("head")[0]);
-                dojo.attr(style, {innerHTML: ".addIcon { background-image: url('" + cris.imagesRoot + "/famfamfam_silk_icons_v013/icons/add.png');background-repeat: no-repeat;width: 20px;height: 16px;text-align: center;}" +
-                            ".removeIcon { background-image: url('" + cris.imagesRoot + "/famfamfam_silk_icons_v013/icons/delete.png');background-repeat: no-repeat;width: 20px;height: 16px;text-align: center;"});
-
-                var addButton = new dijit.form.Button({
-                    label: "Add",
-                    iconClass: 'addIcon',
-                    showLabel: false,
-                });
-
-                var deleteButton = new dijit.form.Button({
-                    label: "Remove",
-                    iconClass: 'removeIcon',
-                    showLabel: false,
-                });
-
-                //Attach toolbar to grid
-                var toolbar = new dijit.Toolbar({}, 'toolbar');
-                toolbar.addChild(addButton);
-                toolbar.addChild(deleteButton);
-                toolbar.startup();
-
-                // Initial grid modules
-                var modules = [
-                    'gridx/modules/CellWidget',
-                    'gridx/modules/Edit',
-                    'gridx/modules/HiddenColumns'
-                ];
-
-                // Load more modules as needed
-                if (isList) {
-                    modules.push('gridx/modules/Bar');
-                    modules.push('gridx/modules/IndirectSelect');
-                    modules.push('gridx/modules/RowHeader');
-                    modules.push('gridx/modules/select/Row');
-                }
-
-                var gridProperties = {
-                    autoWidth:true,
-                    autoHeight: true,
-                    bodyRowHoverEffect: false,
-                    selectRowMultiple: false,
-                    cacheClass: 'gridx/core/model/cache/Sync',
-                    structure: columnStructure,
-                    store: store,
-                    editLazySave: false,
-                    barTop: isList ? [toolbar] : null,
-                    modules: modules
-                }
-                dojo.mixin(gridProperties, optionalGridProperties);
-
-                var grid = new gridx.Grid(gridProperties);
-
-                if (grid.barTop) {
-                    // Attach callbacks to toolbar buttons
-                    var toolbarChildren = grid.barTop[0].getChildren();
-                    for (var i = 0; i < toolbarChildren.length; i++) {
-                        if (toolbarChildren[i].label === "Add") {
-                            toolbarChildren[i].onClick = function () {
-                                addItem(grid);
-                            }
-                        } else if (toolbarChildren[i].label === "Remove") {
-                            toolbarChildren[i].onClick = function () {
-                                removeItem(grid);
-                            }
-                        }
-                    }
-                }
-
-                // Returns all widgets in grid. Without getChildren() client-side form validation won't work for grid widgets.
-                grid.getChildren = function () {
-                    var children = [];
-                    var rows = this.rows();
-                    var columns = this.columns();
-                    rows.forEach(function (row) {
-                        columns.forEach(function (col) {
-                            var cellWidget = grid.cell(row.index(), col.id).widget();
-                            if (cellWidget) {
-                                var widgetsInCell = dijit.registry.findWidgets(cellWidget.domNode);
-                                widgetsInCell.forEach(function (widget) {
-                                    children.push(widget);
-                                });
-                            }
-                        });
-                    });
-                    return children;
-                }
-                return grid;
-            }
-
-            // When defining grid columns, remember which columns to hide when grid loads
-            // This watch is for empty grids. When grid has data, the watch in initializeCellWidget method handles column hiding.
-            $scope.columnHideWatch = function(term, columnId) {
-                if (!$scope.columnsToHide) {
-                    $scope.columnsToHide = [];
-                }
-
-                if (term.showExpression) {
-                    var columnScope = $scope.$new(true);
-                    columnScope.term = term;
-                    columnScope.context = $scope.context;
-                    columnScope.isShow = datasetService.isShow.bind(columnScope);
-                    
-                    function showHide(show) {
-                        var index = $scope.columnsToHide.indexOf(columnId);
-                        if (!show) {
-                            if (index < 0) {
-                                $scope.columnsToHide.push(columnId);
-                            }
-                        } else {
-                            if (index > -1) {
-                                $scope.columnsToHide.splice(index, 1);
-                            }
-                        }
-                        $scope.hideGridColumns();
-                    }
-
-                    columnScope.$watch(function () {
-                        return columnScope.isShow();
-                    }, function (show) {
-                        showHide(show);
-                    });
-                    
-                    showHide(columnScope.isShow()); // Initial call
+            $scope.addToDataset = function (isNode) {
+                if (!isNode) {
+                    datasetService.addItem.call({term: $scope.term, dataset: $scope.dataset});
+                }  else {
+                    $scope.dataset.push(null);
                 }
             };
-            
-            $scope.hideGridColumns = function() {
-                if ($scope.columnsToHide && $scope.crisGrid && !$scope.crisGrid.store.data.length) {
-                    dojo.forEach($scope.columnsToHide, function(colId) {
-                        var headerNodeId = $scope.crisGrid.id + '-' + colId;
-                        var headerCellNode = dojo.query('[id^="' + headerNodeId + '"].gridxCell', $scope.crisGrid.domNode);
-                        if (headerCellNode.length) {
-                            dojo.setStyle(headerCellNode[0], 'display', 'none');
-                        }
-                    });
 
-                    // Unhide previously hidden columns
-                    dojo.forEach($scope.crisGrid.columns(), function(column) {
-                        var index = $scope.columnsToHide.indexOf(parseInt(column.id));
-                        if (index === -1) {
-                            var headerNodeId = $scope.crisGrid.id + '-' + parseInt(column.id);
-                            var headerCellNode = dojo.query('[id^="' + headerNodeId + '"].gridxCell', $scope.crisGrid.domNode);
-                            if (headerCellNode.length) {
-                                if (dojo.getStyle(headerCellNode[0], 'display') === 'none') {
-                                    dojo.setStyle(headerCellNode[0], 'display', '');
-                                }
+            $scope.removeFromDataset = function () {
+                var selectedRows = $scope.gridApi.selection.getSelectedGridRows();
+                while (selectedRows.length) {
+                    var row = selectedRows.pop();
+                    var idx = $scope.dataset.indexOf(row.entity);
+                    $scope.dataset.splice(idx, 1);
+                }
+            };
+
+            // Each list composite term needs to have a reference to it from the parent level. We use underscore notation for this.
+            // E.g. For parentTerm.term1[2], reference would be parentTerm._term1
+            $scope.updateContext = function (path, context, rowIndex) {
+                var _path = path.substring(path.indexOf('.') + 1); // remove template id from term path
+
+                if (_path.indexOf('.') === -1) { // top level of context
+                    context['_' + _path] = context[_path][rowIndex];
+                } else {
+                    var t = _path.substring(_path.lastIndexOf('.') + 1, _path.length);
+                    _path = _path.substring(0,_path.lastIndexOf('.'));
+                    var subContext = $parse(_path)(context);
+
+                    subContext['_' + t] = subContext[t][rowIndex];
+                }
+            };
+
+            $scope.getTooltip = function (msgObj, isNode) {
+                var msg = "";
+                if (isNode && msgObj && msgObj[''] && msgObj[''].valid === false) {
+                    msg = msgObj[''].errorList[0].errorMessage;
+                }
+                $scope.noErrorMsgs = $scope.noErrorMsgs && (msg === "");
+                return msg;
+            };
+
+            $scope.isNodeTerm = function (term) {
+                var isNode = term && term["isDefinition"] ? true : false;
+                return isNode;
+            };
+
+            // Shows/Hides columns for a list composite grid. For show/hide of a non-list composite grid see grid definition in link section.
+            $scope.showHideColumns = function () {
+                var columnShowHideMap = {};
+                var rowNum = $scope.gridConfig.data.length;
+
+                // Get header cells
+                var headerCells = $element.find('div.ui-grid-header-cell-row > div.ui-grid-header-cell');
+                var b = [];
+                var y = 1;
+                while (y <= $scope.gridApi.grid.options.columnDefs.length) {
+                    b.push(headerCells[y]);
+                    y++;
+                }
+                headerCells = b;
+
+                // if no data, only hide header nodes and exit function
+                if ($scope.dataset.length === 0) {
+                    for (var i = 0; i < $scope.term.terms.length; i++) {
+                        var isShow = $scope.isShow($scope.term.terms[i]);
+                        var headerNode = headerCells[i];
+                        if (isShow) {
+                            headerNode.style.display = "";
+                        } else {
+                            headerNode.style.display = "none";
+                        }
+                    }
+                    return;
+                }
+
+                var dataCells = {};
+                while (--rowNum >= 0) {
+                    var dataNodes = [];
+                    if ($scope.dataset instanceof Array) { // list composite grid
+                        dataNodes = angular.element($element.find('div.ui-grid-render-container-body > div.ui-grid-viewport div.ui-grid-row')[rowNum]).find('div > .ui-grid-cell');
+                    }
+
+                    for (var i = 0; i < $scope.gridApi.grid.options.columnDefs.length; i++) {
+                        var node = angular.element(dataNodes[i]).find('div > cris-dataset div')[0];
+                        var doHide = angular.element(node).hasClass('ng-hide');
+                        if (typeof columnShowHideMap[i] === 'undefined') {
+                            columnShowHideMap[i] = doHide;
+                        } else {
+                            columnShowHideMap[i] = columnShowHideMap[i] && doHide;
+                        }
+                    }
+                    dataCells[rowNum] = dataNodes;
+                }
+                //console.log('********* COLUMN SHOW-HIDE MAP')
+                //console.dir(columnShowHideMap);
+
+                // Set column display (block or none) based on whether all cells in column are hidden
+                // Do this for header node and all cell nodes in that column
+                for (var colIndex in columnShowHideMap) {
+                    var headerNode = headerCells[colIndex];
+                    if (columnShowHideMap[colIndex]) { // hide
+                        for (var rowIndex in dataCells) {
+                            var dataNode = dataCells[rowIndex][colIndex];
+                            dataNode.style.display = "none";
+                        }
+                        headerNode.style.display = "none";
+                    } else {
+                        for (var rowIndex in dataCells) {
+                            var dataNode = dataCells[rowIndex][colIndex];
+                            dataNode.style.display = "";
+                        }
+                        headerNode.style.display = "";
+                    }
+                }
+            };
+
+            $scope.gridHeightResize = function () {
+                // Resize rowHeight as cell content changes in size.
+                // By default ui-grid does not support variable row height...all rows must be the same configured height.
+                // To overcome this limitation we have to query the cell nodes, read their scrollHeights, and manually update each row height based on its tallest cell node
+                var rowHeights = {};
+                var rowNum = $scope.gridConfig.data.length;
+                while (--rowNum >= 0) {
+                    if (typeof rowHeights[rowNum] === 'undefined') {
+                        rowHeights[rowNum] = {height: 0};
+                    }
+
+                    var colNum = $scope.gridConfig.columnDefs.length;
+                    var cellNodes = [];
+                    var rowNode = null;
+                    // Query cell nodes in current row and get their scrollHeight. The highest scrollHeight will be the row height
+                    if ($scope.dataset instanceof Array) { // list composite grid
+                        //cellNodes = angular.element($element.find('div.grid' + $scope.gridApi.grid.id + ' > div.ui-grid-contents-wrapper > div.ui-grid-render-container-body > div.ui-grid-viewport > div.ui-grid-canvas > div.ui-grid-row')[rowNum]).find('> div cris-dataset > collection > div, div cris-dataset > div');
+                        rowNode = $element.find('div.grid' + $scope.gridApi.grid.id + ' > div.ui-grid-contents-wrapper > div.ui-grid-render-container-body > div.ui-grid-viewport > div.ui-grid-canvas > div.ui-grid-row')[rowNum];
+                        cellNodes = angular.element(rowNode).find('> div cris-dataset > collection > div, div cris-dataset > div');
+                        var rowHeaderNode = $element.find('div.grid' + $scope.gridApi.grid.id + ' > div.ui-grid-contents-wrapper > div.ui-grid-pinned-container-left > div.ui-grid-render-container-left > div.ui-grid-viewport > div.ui-grid-canvas > div.ui-grid-row')[rowNum];
+                        rowHeights[rowNum].nodes = [angular.element(rowNode), angular.element(rowHeaderNode)];
+                    } else { // non-list composite grid
+                        rowNode = $element.find('div.grid' + $scope.gridApi.grid.id + ' > div.ui-grid-contents-wrapper > div.ui-grid-render-container-body > div.ui-grid-viewport > div.ui-grid-canvas > div.ui-grid-row');
+                        cellNodes = rowNode.find('> div > .ui-grid-cell > .ui-grid-cell-contents > cris-dataset').find('> collection > div, > div');
+                        rowHeights[rowNum].nodes = [rowNode];
+                    }
+
+                    while(--colNum >= 0 && cellNodes.length) {
+                        if (cellNodes[colNum]) {
+                            var h = cellNodes[colNum].scrollHeight;
+                            if (h > rowHeights[rowNum].height) {
+                                rowHeights[rowNum].height = h;
                             }
                         }
-                    });
-                    $scope.crisGrid.resize();
+                    }
+
+                    // If node inner html increases or decreases, re-calculate row height and resize row and grid accordingly
+                    (function () {
+                        if (!$scope.rowNodeRefs) {
+                            $scope.rowNodeRefs = {};
+                        }
+                        if (!$scope.rowNodeRefs[rowNum]) {
+                            $scope.rowNodeRefs[rowNum] = rowHeights[rowNum].height;
+
+                            var cellNodes1 = cellNodes;
+                            var resizeTimeout = null;
+                            $scope.$watch(function () {
+                                var currentRowHeight = 0;
+                                if (cellNodes1.length) {
+                                    for (var y = 0; y < $scope.gridConfig.columnDefs.length; y++) {
+                                        if (cellNodes1[y].scrollHeight > currentRowHeight) {
+                                            currentRowHeight  = cellNodes1[y].scrollHeight;
+                                        }
+                                    }
+                                }
+                                return currentRowHeight;
+                            }, function (newValue, oldValue) {
+                                if (newValue !== oldValue && newValue !== 0) {
+                                    if (resizeTimeout) {
+                                        $timeout.cancel(resizeTimeout);
+                                        resizeTimeout = null;
+                                    }
+
+                                    resizeTimeout = $timeout(function ( ) {
+                                        $scope.gridHeightResize();
+                                    }, 50, false);
+                                }
+                            });
+
+                            $scope.$on('$destroy', function () {
+                                $timeout.cancel(resizeTimeout);
+                            });
+                        }
+                    })();
                 }
+                //console.log('--------------------------------ROW HEIGHT OBJECTS ');
+                //console.dir(rowHeights);
+
+                // The row node and all cell nodes inside it must have same height
+                var gridHeight = 0;
+                for (var rowIndex in rowHeights) {
+                    var rowNodes = rowHeights[rowIndex].nodes;
+                    var rowHeight = rowHeights[rowIndex].height + 15; // add offset for things like padding, margin, borders, etc
+                    for (var t = 0; t < rowNodes.length; t++) {
+                        // Set row node height
+                        rowNodes[t][0].style.height = rowHeight + "px";
+
+                        // Set height of each cell node in the row
+                        rowNodes[t].find('> div[ui-grid-row="row"] > .ui-grid-cell').each(function (idx, node) {
+                            node.style.height = rowHeight + "px";
+                        });
+                    }
+                    gridHeight += rowHeight;
+                    $scope.rowHeightsMap[rowIndex] = rowHeight;
+                }
+
+                // Update grid height if new height is greater than old height
+                if (gridHeight !== $scope.maxGridHeight) {
+                    $scope.gridHeight = gridHeight;
+                    $scope.maxGridHeight = gridHeight;
+                    $scope.$apply();
+                }
+            };
+
+            // Estimate minWidth for each grid column
+            $scope.gridColumnWidth = function getColWidth (term) {
+                var pixelCount = 0;
+                var termArray = [];
+                termArray.push(term);
+
+                while (termArray.length) {
+                    var term_ = termArray.pop();
+                    if (term_.terms && term_.grid) {
+                        term_.terms.forEach(function (t) {
+                            termArray.push(t);
+                        });
+                        pixelCount += 160; // Additional offset pixels if cell has grid
+                    } else {
+                        // Get sum of all leaf term pixels
+                        if (term_.terms) { // term is composite but not grid
+                            pixelCount += 310;
+
+                            // Loop through child terms of non-grid composite term. Adjust width based on whether some child terms are composite themselves.
+                            var largestChild = null;
+                            dojo.forEach(term_.terms, function(t_){
+                                if (t_.terms && (!largestChild
+                                        || (t_.grid && largestChild.grid && largestChild.terms.length < t_.terms.length)
+                                        || (t_.grid && !largestChild.grid) || (t_.terms.length > largestChild.terms.length))) {
+                                    largestChild = t_;
+                                }
+                            });
+                            if (largestChild) {
+                                pixelCount = 80;
+                                pixelCount += getColWidth(largestChild);
+                            }
+                        } else if (term_.grid || term_.list) { // term is leaf node and grid or term is node and list
+                            pixelCount += 255;
+                        } else { // leaf term is neither composite nor a grid
+                            pixelCount += 200;
+                        }
+                    }
+                }
+                return pixelCount;
             };
         }]
     };
@@ -1269,7 +903,10 @@ angular.module("dataset").directive("collection", ["$compile", "$parse", functio
             show: "@",
             // user defined actions: an array of {icon: "", text: "", onHover: "", onClick: ""}
             // the callbacks will be provided with term, data, message and readOnly information
-            actions: "="
+            actions: "=",
+            isGridContent: "@",
+            overrideReadOnly: "=",
+            overrideHidden: "="
         },
         template: "",
         link: function(scope, element, attrs) {
@@ -1304,13 +941,14 @@ angular.module("dataset").directive("collection", ["$compile", "$parse", functio
 
             var termLabel = makeTermLabel(scope.term, scope);
             var htmlAddButton = null;
-            var htmlRemoveButton = null;
+            var htmlRemoveButton = "";
             if (isList && !scope.readOnly) {
                 htmlAddButton = makeAddButton(scope);
                 htmlRemoveButton = makeRemoveButton(scope);
 
                 // add a add button for list item
-                termLabel += ":&nbsp;" + htmlAddButton;
+                //termLabel += ":&nbsp;" + htmlAddButton;
+                termLabel = htmlAddButton + '&nbsp;' + termLabel;
                 termLabel += "<span class='error' ng-show=\"message[''].valid === false\">&nbsp;* {{message[''].errorList[0].errorMessage ? 'required' : ''}}</span>";
             }
 
@@ -1321,11 +959,29 @@ angular.module("dataset").directive("collection", ["$compile", "$parse", functio
                 if (!isList) {
                     // single node
                     console.log("0000 node 0000");
-                    element.append("<ul><li data-ng-show='isShow()'><span class='termNameLabel'>" + termLabel + "</span><node term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context'></node></li></ul>");
+                    if (!scope.isGridContent) {
+                        element.append("<div class='form-group row form-horizontal' data-ng-show='isShow()'> \
+                                            <label class='control-label col-md-2 col-lg-1'>" + termLabel + "</label>\
+                                            <div class='col-md-10 col-lg-11' style='max-width:400px;'> \
+                                                <node term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context' override-read-only='overrideReadOnly'></node> \
+                                            </div> \
+                                        </div>");
+                    } else {
+                       element.append("<div data-ng-show='isShow()'><node term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context' is-grid-content='{{isGridContent}}' override-read-only='overrideReadOnly'></node></div>");
+                    }
                 } else {
                     // list node
                     console.log("1111 node 1111");
-                    element.append("<ul><li data-ng-show='isShow()'><span class='termNameLabel'>" + termLabel + "</span><ul><li ng-repeat='item in dataset track by $index'><span class='termIndexLabel'>{{$index}}:&nbsp;" + htmlRemoveButton + "</span><node term='term' dataset='dataset[$index]' message='message[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context'></node></li></ul></li></ul>");
+                    if (!scope.isGridContent) {
+                        element.append("<div class='form-group row form-horizontal' data-ng-show='isShow()'> \
+                                            <label class='control-label col-md-2 col-lg-1'>" + termLabel + "</label>  \
+                                            <div class='col-md-10 col-lg-11'> \
+                                                <ul class='list-group' style='max-width:400px;'><li class='list-group-item form-inline' ng-repeat='item in dataset track by $index'>{{$index}}:&nbsp;" + htmlRemoveButton + "&nbsp;<node term='term' dataset='dataset[$index]' message='message[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context' override-read-only='overrideReadOnly'></node></li></ul> \
+                                            </div> \
+                                        </div>");
+                    } else {
+                        element.append("<div data-ng-show='isShow()'><label>" + termLabel + "</label><ul class='list-group' style='max-width:400px;'><li class='list-group-item form-inline' ng-repeat='item in dataset track by $index'>{{$index}}:&nbsp;" + htmlRemoveButton + "&nbsp;<node term='term' dataset='dataset[$index]' message='message[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context' override-read-only='overrideReadOnly'></node></li></ul></div>");
+                    }
                 }
             } else {
                 // object(composite): {..., terms: {t1 : {}, t2 : {}, ...}}
@@ -1333,14 +989,32 @@ angular.module("dataset").directive("collection", ["$compile", "$parse", functio
                     // single member
                     console.log("2222 member 2222");
                     if (isEmpty(scope.context) || !scope.path) {
-                        element.append("<ul><member term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context'></member></ul>");
+                        element.append("<member term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context' override-hidden='overrideHidden' override-read-only='overrideReadOnly'></member>");
                     } else {
-                        element.append("<ul><li data-ng-show='isShow()'><span class='termNameLabel'>" + termLabel + "</span><member term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context'></member></li></ul>");
+                        if (!scope.isGridContent) {
+                            element.append("<div class='form-group row form-horizontal' data-ng-show='isShow()'> \
+                                                <label class='control-label col-md-2 col-lg-1'>" + termLabel + "</label>  \
+                                                <div class='col-md-10 col-lg-11'> \
+                                                    <ul class='list-group'><li class='list-group-item'><member term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context' override-hidden='overrideHidden' override-read-only='overrideReadOnly'></member></li></ul> \
+                                                </div> \
+                                            </div>");
+                        } else {
+                            element.append("<div data-ng-show='isShow()'><member term='term' dataset='dataset' message='message' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}' context='context' override-hidden='overrideHidden' override-read-only='overrideReadOnly'></member></div>");
+                        }
                     }
                 } else {
                     // list member
                     console.log("3333 node 3333");
-                    element.append("<ul><li data-ng-show='isShow()'><span class='termNameLabel'>" + termLabel + "</span><ul><li ng-repeat='item in dataset track by $index'><span class='termIndexLabel'>{{$index}}:&nbsp;" + htmlRemoveButton + "</span><member term='term' dataset='dataset[$index]' message='message[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context'>{{updateContext(term,$index,context," + path + ")}}</member></li></ul></li></ul>");
+                    if (!scope.isGridContent) {
+                        element.append("<div class='form-group row form-horizontal' data-ng-show='isShow()'> \
+                                            <label class='control-label col-md-2 col-lg-1'>" + termLabel + "</label>  \
+                                            <div class='col-md-10 col-lg-11'> \
+                                                <ul class='list-group'><li class='list-group-item' ng-repeat='item in dataset track by $index'>{{$index}}:&nbsp;" + htmlRemoveButton + "<member term='term' dataset='dataset[$index]' message='message[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context' override-hidden='overrideHidden' override-read-only='overrideReadOnly'>{{updateContext(term,$index,context," + path + ")}}</member></li></ul> \
+                                            </div> \
+                                        </div>");
+                    } else {
+                        element.append("<div data-ng-show='isShow()'><label>" + termLabel + "</label><ul class='list-group'><li class='list-group-item' ng-repeat='item in dataset track by $index'>{{$index}}:&nbsp;" + htmlRemoveButton + "<member term='term' dataset='dataset[$index]' message='message[$index]' read-only='readOnly' show='{{isShow()}}' actions='actions' path='{{" + path + "}}[{{$index}}]' context='context' override-hidden='overrideHidden' override-read-only='overrideReadOnly'>{{updateContext(term,$index,context," + path + ")}}</member></li></ul></div>");
+                    }
                 }
             }
 
@@ -1364,7 +1038,7 @@ angular.module("dataset").directive("collection", ["$compile", "$parse", functio
                     subContext['_' + term.alias] = subContext[term.alias][index];
                 }
             }
-         }]
+        }]
     };
 }]);
 
@@ -1386,7 +1060,9 @@ angular.module("dataset").directive("member", function($compile) {
             show: "@",
             // user defined actions: an array of {icon: "", text: "", onHover: "", onClick: ""}
             // the callbacks will be provided with term, data, message and readOnly information
-            actions: "="
+            actions: "=",
+            overrideReadOnly: "=",
+            overrideHidden: "="
         },
         template: "",
         link: function(scope, element, attrs) {
@@ -1400,7 +1076,7 @@ angular.module("dataset").directive("member", function($compile) {
                 scope.show = "true";
             }
 
-            element.append("<cris-dataset ng-repeat='(key, definition) in term.terms' key='key' term='term.terms[key]' dataset='dataset[term.terms[key].alias]' message='message[term.terms[key].alias]' read-only='readOnly' show='{{show}}' actions='actions' path='{{path}}' context='context'></cris-dataset>");
+            element.append("<cris-dataset ng-repeat='(key, definition) in term.terms' key='key' term='term.terms[key]' dataset='dataset[term.terms[key].alias]' message='message[term.terms[key].alias]' read-only='readOnly' show='{{show}}' actions='actions' path='{{path}}' context='context' override-hidden='overrideHidden' override-read-only='overrideReadOnly'></cris-dataset>");
             $compile(element.contents())(scope);
         },
         controller: ["$scope", function($scope) {
@@ -1423,7 +1099,9 @@ angular.module("dataset").directive("node", function($compile) {
             // whether read only
             readOnly: "=",
             // whether to show to hide
-            show: "@"
+            show: "@",
+            isGridContent: "@",
+            overrideReadOnly: "="
         },
         template: "",
         link: function(scope, element, attrs) {
@@ -1432,388 +1110,291 @@ angular.module("dataset").directive("node", function($compile) {
 
             var currentTerm = scope.term;
 
-            require([
-                "dojo/ready",
-                "dojo/json",
-                "dojo/store/Memory",
-                "dojo/data/ObjectStore",
-                "dijit/Tooltip",
-                "dijit/form/FilteringSelect",
-                "dojo/aspect"
-            ], function(ready, JSON, Memory, ObjectStore, Tooltip, FilteringSelect, aspect) {
-                if (scope.readOnly === undefined) {
-                    scope.readOnly = false;
-                }
-                if (scope.show === undefined || scope.show === null || scope.show === "") {
-                    scope.show = "true";
-                }
-                scope.require = scope.isRequired();
+            if (scope.readOnly === undefined) {
+                scope.readOnly = false;
+            }
+            if (scope.show === undefined || scope.show === null || scope.show === "") {
+                scope.show = "true";
+            }
+            scope.require = scope.isRequired();
 
-                if (currentTerm.type === "attachTo") {
-                    var idField = currentTerm["id-field"];
-                    var nameField = currentTerm["name-field"];
-                    var uuid = currentTerm.uuid;
-                    var query = currentTerm.query;
-                    var baseUrl = cris.baseUrl + "rest/objectus/" + uuid;
-                    
-                    var queryObj = {};
-                    queryObj[idField] = {$exists:true,$ne:null};
-                    queryObj[nameField] = {$exists:true,$ne:null};
-                    
-                    if (query) {
-                        var q = dojo.fromJson(query);
-                        dojo.mixin(queryObj, q);
+            // leaf nodes have values
+            // create a widget creation template
+            // Leaf node
+            //  * attach-to
+            //  * pick list
+            //  * text input
+            //  * boolean input
+            //  * date/time picker
+            //  * file upload
+            // Non-leaf node
+            //  * non-array: display name
+            //  * array: display none with a Add button
+            function getTermType(term) {
+                var type = null;
+
+                if (!term) {
+                    type = null;
+                } else if (term.validation && term.validation.validator && term.validation.validator.length > 0) {
+                    type = term.validation.validator[0].type;
+                } else {
+                    type = term.type;
+                }
+
+                return type;
+            }
+            var currentTermType = getTermType(currentTerm);
+
+            var readOnly = false;
+            if (currentTerm.value && (typeof currentTerm.value === "string") && (currentTerm.value.indexOf("${") !== -1) &&  currentTerm.value.indexOf("}") !== -1) {
+                readOnly = true;
+                var value = currentTerm.value;
+                var expression;
+                if (value.substring(0, 1) === "\"" && value.substring(value.length - 1, value.length) === "\"") {
+                    expression = value.substring(3, value.length - 2);
+                } else {
+                    expression = value.substring(2, value.length - 1);
+                }
+                var REGEXP_UUID = /\b([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/i;
+                if (REGEXP_UUID.test(expression)) {
+                    // query backend
+                    // break expression into termPath and query string
+                    var index = expression.indexOf("(");
+                    var termPath;
+                    var queryString;
+                    if (index === -1) {
+                        termPath = expression;
+                        queryString = "{}";
+                    } else {
+                        termPath = expression.substring(0, expression.indexOf("("));
+                        queryString = expression.substring(expression.indexOf("(") + 1, expression.length - 1);
                     }
-                    query = dojo.toJson(queryObj);
-                    var url = baseUrl + "/?query=" + query;
-                    scope.store = new createJsonRestStore(url, (idField || 'id'), nameField);
-                    
                     scope.$watch(function() {
-                        with (scope.context) {
+                        with(scope.context) {
                             var newValue;
-                            if (query) {
-                                newValue = dojo.toJson(eval("(" + query + ")"));
+                            if (queryString) {
+                                newValue = dojo.toJson(eval("(" + queryString + ")"));
                             } else {
                                 newValue = null;
                             }
                         };
                         return newValue;
-                    }, function(value) {
-                        console.log("**** query: " + value);
-                        url = baseUrl + "/?query=" + value;
-                        scope.store.target = url;
+                    }, function(newValue, oldValue) {
+                        if (newValue !== "null") {
+                            var requestUrl = cris.baseUrl + "rest/objectus/?" +"name=" + termPath + '&query=' + newValue;
+                            // submit the query
+                            dojo.xhrGet({
+                                url: requestUrl,
+                                handleAs: "text",
+                                load: function(data) {
+                                    var result = data;
+                                    scope.dataset = dojo.fromJson(result);
+                                    scope.message = null;
+                                    scope.$apply();
+                                },
+                                error: function(error) {
+                                    scope.dataset = null;
+                                    var errorMessage = error.responseText ? dojo.fromJson(error.responseText).message : error.message;
+                                    scope.message = buildErrorMessage(errorMessage);
+                                    scope.$apply();
+                                }
+                            });
+                        }
                     });
-                    
-                    /*
-                     * for attach-to we need to initialize the store otherwise we won't be able see the initial value if there's one
-                     */
-                    var value = scope.dataset;
-                    if (value) {
-                        scope.store.fetch({query : '?' + idField + '=' + dojo.toJson(value)});
-                    }
-                } else if (typeof currentTerm.properties !== "undefined" && currentTerm.properties && currentTerm.properties.items) {
-                    var items = currentTerm.properties.items;
-
-                    if (currentTerm.properties.isMultiSelect) {
-                        scope.store = new ObjectStore({objectStore: new Memory({idProperty: "id", data: items}), labelProperty: "name"});
-                    } else {
-                        if (!scope.isRequired()) {
-                            var a = [{id: "", name: ""}];
-                            items = a.concat(items);
-                        }
-                        scope.store = new Memory({data: items});
-                    }
                 } else {
-                    scope.store = new Memory({data: []});
-                }
+                    // expression
+                    scope.$watch('context', function(newValue){
+                        var val
+                        with(newValue) {
+                            try {
+                                val =  eval(expression);
+                            } catch (e) {
+                                val = null;
+                            }
+                        };
 
-                // leaf nodes have values
-                // create a widget creation template
-                // Leaf node
-                //  * attach-to
-                //  * pick list
-                //  * text input
-                //  * boolean input
-                //  * date/time picker
-                //  * file upload
-                // Non-leaf node
-                //  * non-array: display name
-                //  * array: display none with a Add button
-                function getTermType(term) {
-                    var type = null;
-
-                    if (!term) {
-                        type = null;
-                    } else if (term.validation && term.validation.validator && term.validation.validator.length > 0) {
-                        type = term.validation.validator[0].type;
-                    } else {
-                        type = term.type;
-                    }
-
-                    return type;
-                }
-                var currentTermType = getTermType(currentTerm);
-
-                var readOnly = false;
-                if (currentTerm.value && (typeof currentTerm.value === "string") && (currentTerm.value.indexOf("${") !== -1) &&  currentTerm.value.indexOf("}") !== -1) {
-                    readOnly = true;
-                    var value = currentTerm.value;
-                    var expression;
-                    if (value.substring(0, 1) === "\"" && value.substring(value.length - 1, value.length) === "\"") {
-                        expression = value.substring(3, value.length - 2);
-                    } else {
-                        expression = value.substring(2, value.length - 1);
-                    }
-                    var REGEXP_UUID = /\b([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/i;
-                    if (REGEXP_UUID.test(expression)) {
-                        // query backend
-                        // break expression into termPath and query string
-                        var index = expression.indexOf("(");
-                        var termPath;
-                        var queryString;
-                        if (index === -1) {
-                            termPath = expression;
-                            queryString = "{}";
+                        if (typeof (val) !== "undefined" && !(isNaN(val) && typeof val === "number")) {
+                            scope.dataset = val;
+                            scope.message = null;
                         } else {
-                            termPath = expression.substring(0, expression.indexOf("("));
-                            queryString = expression.substring(expression.indexOf("(") + 1, expression.length - 1);
+                            var invalidValue = "At least one of the dependent term has invalid value: " + val;
+                            scope.dataset = null;
+                            scope.message = buildErrorMessage(invalidValue);
                         }
-                        scope.$watch(function() {
-                            with(scope.context) {
-                                var newValue;
-                                if (queryString) {
-                                    newValue = dojo.toJson(eval("(" + queryString + ")"));
-                                } else {
-                                    newValue = null;
-                                }
-                            };
-                            return newValue;
-                        }, function(newValue, oldValue) {
-                            if (newValue !== "null") {
-                                var requestUrl = cris.baseUrl + "rest/objectus/?" +"name=" + termPath + '&query=' + newValue;
-                                // submit the query
-                                dojo.xhrGet({
-                                    url: requestUrl,
-                                    handleAs: "text",
-                                    load: function(data) {
-                                        var result = data;
-                                        scope.dataset = dojo.fromJson(result);
-                                        scope.message = null;
-                                        scope.$apply();
-                                    },
-                                    error: function(error) {
-                                        scope.dataset = null;
-                                        var errorMessage = error.responseText ? dojo.fromJson(error.responseText).message : error.message;
-                                        scope.message = buildErrorMessage(errorMessage);
-                                        scope.$apply();
-                                    }
-                                });
-                            }
-                        });
-                    } else {
-                        // expression
-                        scope.$watch(function() {
-                            with(scope.context) {
-                                try {
-                                    var newValue =  eval(expression);
-                                } catch (e) {
-                                    var newValue = null;
-                                }
-                            };
-                            return newValue;
-                        }, function(newValue, oldValue) {
-                            if (typeof (newValue) !== "undefined" && !(isNaN(newValue) && typeof newValue === "number")) {
-                                scope.dataset = newValue;
-                                scope.message = null;
-                            } else {
-                                var invalidValue = "At least one of the dependent term has invalid value: " + newValue;
-                                scope.dataset = null;
-                                scope.message = buildErrorMessage(invalidValue);
-                            }
-                        });
-                    }
+                    }, true);
+                }
+            }
+
+            var tag, propNgReadonly, propNgRequired, propNgModel, propNgClick, buttonText;
+            propNgReadonly = '!overrideReadOnly && (isReadOnly() || readOnly || ' + readOnly + ')';
+            propNgRequired = 'isRequired() && show==\'true\'';
+            propNgModel = 'dataset';
+
+            var htmlTemplate;
+            if (currentTermType === "boolean") {
+                tag = "input";
+                // No ng-required on a boolean because angular considers "false" as failing the required test. Should we have a 3-state (true, false, null) checkbox?
+                htmlTemplate = '<input ng-model="dataset" type="checkbox" ng-disabled="' + propNgReadonly + '"';
+            } else if (currentTermType === "numeric") {
+                tag = "input";
+                htmlTemplate = '<input ng-model="dataset" type="number" ng-disabled="' + propNgReadonly + '" ng-required="' + propNgRequired + '" class="form-control"';
+            } else if (currentTermType === "text") {
+                if (currentTerm.properties && currentTerm.properties["ui-vertical-lines"] > 1) {
+                    tag = "textarea";
+                    htmlTemplate = '<textarea rows="' + currentTerm.properties["ui-vertical-lines"] + '" ng-disabled="' + propNgReadonly + '" ng-required="' + propNgRequired + '" class="form-control"';
+                } else {
+                    tag = "input";
+                    htmlTemplate = '<input type="text" ng-disabled="' + propNgReadonly + '" ng-required="' + propNgRequired + '" class="form-control"';
+                }
+                if (currentTerm.properties && currentTerm.properties.length) {
+                    htmlTemplate += ' maxLength="' + currentTerm.properties.length + '"'
+                }
+            } else if (currentTermType === "textarea") {
+                tag = "textarea";
+                htmlTemplate = '<textarea ng-disabled="' + propNgReadonly + '" ng-required="' + propNgRequired + '" class="form-control"';
+            } else if (currentTermType === "date") {
+                tag = "cris-date-picker";
+                htmlTemplate = '<cris-date-picker type="date" is-read-only="{{' + propNgReadonly + '}}" ng-required="' + propNgRequired + '"'
+            } else if (currentTermType === "time") {
+                tag = 'cris-time-picker';
+                htmlTemplate = '<cris-time-picker is-read-only="{{' + propNgReadonly + '}}" ng-required="' + propNgRequired + '"'
+            } else if (currentTermType === "date-time") {
+                tag = "cris-date-picker";
+                htmlTemplate = '<cris-date-picker type="datetime-local" is-read-only="{{' + propNgReadonly + '}}" ng-required="' + propNgRequired + '"'
+            } else if (currentTermType === "list") {
+                scope.listItems = [];
+                if (typeof currentTerm.properties !== "undefined" && currentTerm.properties && currentTerm.properties.items) {
+                    scope.listItems =  currentTerm.properties.items;
                 }
 
-                var context = {ngModel: 'dataset', required: '{{isRequired()}}', show: '{{show}}', readOnly: '{{isReadOnly()}}', context: 'context', constraints: "{places: \"0,20\", pattern: \"#0.####################\"}"};
-                var tag, propType, propDataDojoWidget, propDataDojoProps, propDataDojoStore, propNgModel, propNgBind;
-                propDataDojoProps = "required: {required}";
-                if (readOnly || scope.readOnly) {
-                    propDataDojoProps += ", disabled: true";
+                if (currentTerm.properties && currentTerm.properties.isMultiSelect) {
+                    tag = 'cris-multi-select';
+                    htmlTemplate = '<cris-multi-select items="listItems" is-read-only="{{' + propNgReadonly + '}}" ng-required="' + propNgRequired + '"';
                 } else {
-                    propDataDojoProps += ", disabled: {readOnly}";
+                    tag = 'cris-dropdown';
+                    htmlTemplate = '<cris-dropdown items="{{listItems}}" is-read-only="{{' + propNgReadonly + '}}" ng-required="' + propNgRequired + '"';
                 }
-                propDataDojoStore = "";
-                propNgModel = "{ngModel}";
-                propNgBind = "";
-                propNgClick = "";
-                if (currentTermType === "boolean") {
-                    tag = "input";
-                    propType = "boolean";
-                    propDataDojoWidget = "dijit/form/CheckBox";
-                } else if (currentTermType === "numeric") {
-                    tag = "input";
-                    propType = "numeric";
-                    propDataDojoWidget = "dijit/form/NumberTextBox";
-                    propDataDojoProps += ", constraints: {constraints}";
-                } else if (currentTermType === "text") {
-                    tag = "input";
-                    propType = "text";
-                    if (currentTerm.properties && currentTerm.properties["ui-vertical-lines"] > 1) {
-                        propDataDojoWidget = "dijit/form/SimpleTextarea";
-                        propDataDojoProps += ", rows: " + currentTerm.properties["ui-vertical-lines"];
-                    } else {
-                        propDataDojoWidget = "dijit/form/ValidationTextBox";
-                    }
-                    if (currentTerm.properties && currentTerm.properties.length) {
-                        propDataDojoProps += ", maxLength: " + currentTerm.properties.length;
-                    }
-                } else if (currentTermType === "textarea") {
-                    tag = "input";
-                    propType = "textarea";
-                    propDataDojoWidget = "dijit/form/TextBox";
-                } else if (currentTermType === "date") {
-                    tag = "input";
-                    propType = "date";
-                    propDataDojoWidget = "dijit/form/DateTextBox";
-                } else if (currentTermType === "time") {
-                    tag = "input";
-                    propType = "time";
-                    propDataDojoWidget = "dijit/form/TimeTextBox";
-                } else if (currentTermType === "date-time") {
-                    tag = "input";
-                    propType = "date-time";
-                    propDataDojoWidget = "dijit/form/DateTextBox";
-                } else if (currentTermType === "list") {
-                    tag = "select";
-                    propType = "text";
-                    if (currentTerm.properties && currentTerm.properties.isMultiSelect) {
-                        propDataDojoWidget = "dojox/form/CheckedMultiSelect";
-                        propDataDojoProps += ", placeHolder: \"Choose value(s)...\"" + ", " + "multiple: " + "\"" + true + "\"";
-                    } else {
-                        propDataDojoWidget = "dijit/form/FilteringSelect";
-                        propDataDojoProps += ", placeHolder: \"Choose a value...\"";
-                    }
-                    propDataDojoStore = "store";
-                } else if (currentTermType === "file") {
-                    context.path = scope.path;
+            } else if (currentTermType === "file") {
+                var globus = false;
+                if (currentTerm.properties && currentTerm.properties.globus === "true") {
+                    globus = true;
+                } else {
+                    globus = false;
+                }
+
+                if (globus) {
+                    scope.fileList = [];
+                    scope.browseFile = function(path, multiple, storageFile, fileList) {
+                        doGlobusDialog(path, multiple, storageFile, fileList, scope);
+                    };
+                    tag = "button";
+                    buttonText = '<span class="glyphicon glyphicon-folder-open"></span>&nbsp; Browse Globus Files...';
+                    propNgClick = 'browseFile(path, multiple, null, fileList)'
+                    htmlTemplate = '<button type="button" class="btn btn-primary" ng-hide="' + propNgReadonly + '"';
+                } else {
+                    tag = 'cris-file-uploader'
                     if (currentTerm.properties && currentTerm.properties.multiple === "true") {
                         scope.multiple = true;
-                        context.multiple = "true";
                     } else {
                         scope.multiple = false;
-                        context.multiple = "false";
                     }
-                    var globus = false;
-                    if (currentTerm.properties && currentTerm.properties.globus === "true") {
-                        globus = true;
-                    } else {
-                        globus = false;
-                    }
-                    if (globus) {
-                        scope.browseFile = function(termAlias, multiple, storageFile) {
-                            doGlobusDialog(termAlias, multiple, storageFile);
-                        };
-                        tag = "input";
-                        propType = "button";
-                        propDataDojoWidget = "dijit/form/Button";
-                        propDataDojoProps += ", label: \"Browse Globus Files...\"";
-                        propNgClick = "browseFile(path, multiple)";
-                    } else {
-                        tag = "input";
-                        propType = "file";
-                        propDataDojoWidget = "dojox/form/Uploader";
-                        var label;
-                        if (!scope.multiple) {
-                            label = "Browse...";
+                    htmlTemplate = '<cris-file-uploader is-multiple="multiple" path="{{path}}" is-required="' + propNgRequired + '" ng-hide="' + propNgReadonly + '"';
+                }
+            } else if (currentTermType === "attachTo") {
+                var idField = currentTerm["id-field"];
+                var nameField = currentTerm["name-field"];
+                var uuid = currentTerm.uuid;
+                var url = cris.baseUrl + "rest/objectus/" + uuid;
+                var query = currentTerm.query;
+                scope.query = query;
+
+                scope.$watch(function() {
+                    with (scope.context) {
+                        var newValue;
+                        if (query) {
+                            newValue = dojo.toJson(eval("(" + query + ")"));
                         } else {
-                            label = "Browse to Add...";
+                            newValue = null;
                         }
-                        propDataDojoProps += ", label: \"" + label + "\", name: \"{path}\", multiple: {multiple}";
-                    }
-                    propNgModel = "";
-                    propNgBind = "{ngModel}";
-                } else if (currentTermType === "attachTo") {
-                    context.nameField = currentTerm["name-field"];
-                    tag = "select";
-                    var idFieldValidation = currentTerm["id-field-validation"];
-                    propType = idFieldValidation ? idFieldValidation.type : 'text';
-                    propDataDojoWidget = "dijit/form/FilteringSelect";
-                    propDataDojoProps += ", searchAttr: \"{nameField}\", labelAttr: \"{nameField}\"";
-                    propDataDojoProps += ", placeHolder: \"Choose a value...\"";
-                    
-                    if (scope.term["name-field-validation"].type === 'numeric') {
-                        propDataDojoProps += ", queryExpr: \"{queryExpr}\"";
-                        context.queryExpr = "${0}";
-                    }
-                    propDataDojoStore = "store";
-                } else {
-                    // everything else is treated like text
-                    tag = "input";
-                    propType = "text";
-                    propDataDojoWidget = "dijit/form/ValidationTextBox";
-                }
+                    };
+                    return newValue;
+                }, function(value) {
+                    console.log("**** query: " + value);
+                    scope.query = value;
+                });
 
-                context.tag = tag;
-                context.propType = propType;
-                context.propDataDojoWidget = propDataDojoWidget;
-                context.propDataDojoProps = propDataDojoProps;
-                context.propDataDojoStore = propDataDojoStore;
-                context.propNgModel = propNgModel;
-                context.propNgBind = propNgBind;
-                context.propNgClick = propNgClick;
-                var htmlTemplate;
-                if (tag === "input") {
-                    // input
-                    htmlTemplate = "<input";
-                } else {
-                    // select
-                    htmlTemplate = "<select";
-                }
+                tag = 'cris-url-dropdown';
+                htmlTemplate = '<cris-url-dropdown url="' + url + '" id-field="' + idField + '" name-field="' + nameField + '" query="{{query}}" use-mongo-query="{{true}}" items="listItems" is-read-only="{{' + propNgReadonly + '}}" ng-required="' + propNgRequired + '"';
+            } else {
+                // everything else is treated like text
+                tag = "input";
+                htmlTemplate = '<input type="text" class="form-control" ng-disabled="' + propNgReadonly + '" ng-required="' + propNgRequired + '" ';
+            }
 
-                htmlTemplate += " type='{propType}' data-dojo-widget='{propDataDojoWidget}' data-dojo-props='" + propDataDojoProps + "'" + " show='{show}'";
-                if (propDataDojoStore) {
-                    htmlTemplate += " data-dojo-store='store'";
-                }
-                if (propNgBind) {
-                    htmlTemplate += " ng-bind='{ngModel}'";
-                } else {
-                    htmlTemplate += " ng-model='{ngModel}'";
-                }
+            if (propNgModel) {
+                htmlTemplate += ' ng-model="' + propNgModel + '"';
+            }
+            if (propNgClick) {
+                htmlTemplate += ' ng-click="' + propNgClick + '"';
+            }
 
-                if (context.propNgClick) {
-                    // globus
-                    htmlTemplate += " ng-click='{propNgClick}'";
-                }
-
-                if (tag === "input") {
-                    // input
-                    htmlTemplate += "/>";
+            if (tag === "input") {
+                // input
+                htmlTemplate += "/>";
+            } else {
+                // select and etc.
+                if (tag === "button" && buttonText) {
+                    htmlTemplate += ">" + buttonText + "</" + tag + ">";
                 } else {
-                    // select and etc.
                     htmlTemplate += "></" + tag + ">";
                 }
-                if (context.propNgClick) {
-                    // globus
-                    var fileLinks = buildGlobusDownloadLinks(scope.dataset);
-                    htmlTemplate += "<span>&nbsp;(Existing File(s): " + (fileLinks === null ? "None" : fileLinks) + ")</span>";
-                }
-                var html = "<span>" + dojo.replace(htmlTemplate, context) + "</span>";
-                element.append(html);
+            }
 
-                if (currentTerm.unit) {
-                    element.append("<span>&nbsp;" + currentTerm.unit + "</span>");
-                }
+            if (currentTerm.unit && !scope.isGridContent) {
+                htmlTemplate = "<div class='input-group'>" + htmlTemplate + "<div class='input-group-addon'>{{term.unit}}</div></div>";
+            }
 
-                // error message
-                element.append("<span class='error' ng-show=\"message[''].valid === false\" ng-bind-template=\"&nbsp;* {{message[''].errorList[0].errorMessage}}\"></span>"); 
+            element.append(htmlTemplate);
 
-                if (!scope.readOnly) {
-                    // TODO: all nodes: need validation and communicate error messages
-                    //element.append("<-- validation and message -->");
+            // error message
+            if (!scope.isGridContent) { // Grid content uses tooltips for error msgs. Therefore this is not necessary in grid cells.
+                element.append("<span class='error' style='white-space:normal;' ng-show=\"message[''].valid === false\" ng-bind-template=\"&nbsp;* {{message[''].errorList[0].errorMessage}}\"></span>");
+            }
+
+            var globus = false;
+            if (currentTermType === "file") {
+                if (globus) {
+                    // list existing file(s)
+                    if (!scope.multiple) {
+                        element.append("<div><cris-globus-file path=\"path\" file='dataset' removable='removable'></cris-globus-file></div>");
+                    } else {
+                        element.append("<div><cris-globus-files path=\"path\" files='dataset' removable='removable'></cris-globus-files></div>");
+                    }
+
+                    // render a list of files for globus file selection
+                    element.append("<div data-ng-show='fileList.length !== 0'>to be replaced by:");
+                    element.append("<ul><li data-ng-repeat='item in fileList'>{{item}}</li></ul>");
+                    element.append("</div>");
                 } else {
-                    // read only: not much to do
-                }
-
-                if (currentTermType === "file") {
                     // list existing file(s)
                     if (!scope.multiple) {
                         // element.append("Existing File: ");
-                        element.append("<cris-storage-file item='dataset' removable='removable'></cris-storage-file>");
+                        element.append("<div><cris-storage-file item='dataset' removable='removable' get-storage-file-name='getStorageFileName(storageFile)'></cris-storage-file></div>");
                     } else {
                         //element.append("Existing File(s):<br/>");
-                        element.append("<cris-storage-files items='dataset' removable='removable'></cris-storage-files>");
+                        element.append("<div><cris-storage-files items='dataset' removable='removable' get-storage-file-names='getStorageFileNames(storageFiles)' read-only='" + propNgReadonly + "'></cris-storage-files></div>");
                     }
                 }
+            }
 
-                $compile(element.contents())(scope);
+            $compile(element.contents())(scope);
 
-                scope.$on("$destroy", function() {
-                    // cleanup
-                });
+            scope.$on("$destroy", function() {
+                // cleanup
+            });
 
-                element.on("$destroy", function() {
-                    // cleanup
-                });
+            element.on("$destroy", function() {
+                // cleanup
             });
         },
         controller: ["$scope", "datasetService", function($scope, datasetService) {
@@ -1822,6 +1403,20 @@ angular.module("dataset").directive("node", function($compile) {
             };
             $scope.isReadOnly = datasetService.isReadOnly.bind($scope);
             $scope.isRequired = datasetService.isRequired.bind($scope);
+            $scope.getStorageFileName = function (storageFile) {
+                if (storageFile) {
+                    return datasetService.fetchStorageFileName(storageFile);
+                } else {
+                    return storageFile;
+                }
+            };
+            $scope.getStorageFileNames = function (storageFiles) {
+                if (storageFiles) {
+                    return datasetService.fetchStorageFileNames(storageFiles);
+                } else {
+                    return storageFiles;
+                }
+            };
         }]
     };
 });
@@ -1872,8 +1467,6 @@ function getAttribute(term, field) {
     case "id-field":
     case "name-field":
     case "use-alias":
-    case "required-expression":
-    case "read-only-expression":
         // from attributes: string
         value = term.getAttribute(field);
         break;
@@ -1889,6 +1482,8 @@ function getAttribute(term, field) {
     case "length":
     case "value":
     case "show-expression":
+    case "required-expression":
+    case "read-only-expression":
     case "query":
         // from string elements: only a single value is expected
         var nodes = dojo.query("> " + field, term);
@@ -2201,35 +1796,31 @@ function processTerm(term, defaultValue, path, nestLevel) {
 /***********************************************************************
  * Globus
  ***********************************************************************/
-function doGlobusDialog(termAlias, multiple, storageFile) {
-    // termAlias and multiple: needed to put file(s) into cris
+function doGlobusDialog(path, multiple, storageFile, fileList, scope) {
+    // path and multiple: needed to put file(s) into cris
     // storageFile: needed to get a file from cris
+    var templateUuid;
+    var alias;
+    if (path) {
+        var parts = path.split(".");
+        if (parts.length) {
+            templateUuid = parts.shift();
+            alias = parts.join(".");
+        }
+    }
 
     var url = cris.baseUrl + "globus/browseFile";
-    if (cris && cris.job && cris.job.task && cris.job.task.app && cris.job.task.app.jobId) {
-        url += "?jobId=" + cris.job.task.app.jobId;
-        url += "&alias=" + termAlias;
-    } else {
-        url += "?alias=" + termAlias;
-    }
-    if (multiple === false) {
-        url += "&multiple=false";
-    } else {
-        url += "&multiple=true";
-    }
-    if (storageFile) {
-        url += "&storageFile=" + storageFile;
-    }
+    url += "?key=" +  (templateUuid ? templateUuid : "");
+    url += "&alias=" + (alias ? alias : "");
+    url += "&multiple=" + (multiple === false ? "false" : "true");
+    url += "&storageFile=" + (storageFile ? storageFile : "");;
 
-    var xhrArgs = {
+    dojo.xhrGet({
         url: url,
-        headers : {Accept: "application/json"},
+        headers : {Accept: "text/plain"},
         handleAs: "text"
-    };
-
-    var deferred = dojo.xhrGet(xhrArgs);
-    deferred.then(
-        function(data) {
+    }).then(
+        function(data, ioargs) {
             dojo.require("dijit/layout/BorderContainer");
             dojo.require("dijit/layout/ContentPane");
 
@@ -2244,9 +1835,30 @@ function doGlobusDialog(termAlias, multiple, storageFile) {
                 style: "width: 1000px; height: 600px;"
             });
 
+            dojo.connect(dialog, "onCancel", function(evt) {
+                console.dir(evt);
+                dojo.xhrGet({
+                    url: cris.baseUrl + "globus/getStorageFiles?key=" + templateUuid + "&alias=" + alias,
+                    handleAs: "json"
+                }).then(
+                    function(data, ioargs) {
+                        console.dir(data);
+                        if (fileList) {
+                            fileList.splice(0, fileList.length);
+                            for (var index in data) {
+                                fileList.push(data[index]);
+                            }
+                        }
+                        scope.$apply();
+                    },
+                    function (error, ioargs) {
+                    }
+                );
+            });
+
             dialog.show();
         },
-        function (error) {
+        function (error, ioargs) {
             showMessage("An unexpected error occurred: " + error);
         }
     );

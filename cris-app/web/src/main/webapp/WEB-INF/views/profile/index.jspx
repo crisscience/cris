@@ -24,7 +24,7 @@
     <div>
         <div id="tabContainer" data-dojo-type="dijit.layout.TabContainer" data-dojo-props='doLayout: false, useMenu: false, useSlider: false'>
             <div id="tabIdentity" data-dojo-type="dijit.layout.ContentPane" data-dojo-props='title: "Identify", selected: "true"'>
-                <div style="filter:alpha(opacity=90); padding: 10px; background-color: #FFFFFF; width:45%; float: left">
+                <div style="filter:alpha(opacity=90); padding: 10px;" class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
                     <h2>Change your Identity</h2>
                     <div class="instruction">
                         Your Name
@@ -75,14 +75,10 @@
                         </div>
                     </div>
                 </div>
-
-                <div style="float: right; width: 50%">
-                    <br/>
-                </div>
             </div>
 
             <div id="tabPreference" data-dojo-type="dijit.layout.ContentPane" data-dojo-props='title: "Preference"' style="border: 0px; padding: 0px">
-                <div style="padding: 10px">
+                <div style="padding: 10px" class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
                     <h2>Preference</h2>
                     To be implemented
                 </div>

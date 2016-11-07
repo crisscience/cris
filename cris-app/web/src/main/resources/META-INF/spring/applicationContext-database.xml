@@ -32,5 +32,5 @@
 
     <tx:annotation-driven mode="aspectj" transaction-manager="transactionManager"/>
 
-    <jpa:repositories base-package="edu.purdue.cybercenter.dm.repository"/>
+    <jpa:repositories base-package="edu.purdue.cybercenter.dm.repository" factory-class="edu.purdue.cybercenter.dm.repository.CrisRepositoryFactoryBean"/>
 </beans>

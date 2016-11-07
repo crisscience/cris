@@ -5,7 +5,9 @@
 package edu.purdue.cybercenter.dm.web.util;
 
 import edu.purdue.cybercenter.dm.domain.Experiment;
+import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.Job;
+import edu.purdue.cybercenter.dm.domain.MetaField;
 import edu.purdue.cybercenter.dm.domain.Project;
 import edu.purdue.cybercenter.dm.domain.StorageFile;
 import edu.purdue.cybercenter.dm.domain.User;
@@ -35,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -72,15 +76,13 @@ import org.activiti.bpmn.model.UserTask;
 import org.activiti.engine.ProcessEngine;
 import org.activiti.engine.ProcessEngines;
 import org.activiti.engine.RepositoryService;
-import org.activiti.engine.RuntimeService;
 import org.activiti.engine.repository.ProcessDefinition;
 import org.activiti.engine.repository.ProcessDefinitionQuery;
-import org.activiti.engine.runtime.Execution;
-import org.activiti.engine.runtime.ProcessInstance;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
@@ -130,22 +132,16 @@ public class WebHelper {
         WebHelper.datasetService = datasetService;
     }
 
-    private static RuntimeService runtimeService;
-    @Autowired
-    public void setRuntimeService(RuntimeService runtimeService){
-        WebHelper.runtimeService = runtimeService;
-    }
-
     private static StorageFileManager storageFileManager;
     @Autowired
     public void setStorageService(StorageService storageService) throws IOException {
         storageFileManager = storageService.getStorageFileManager(AccessMethodType.FILE);
     }
 
-    private static StorageFileManager storageGlobusFileManager;
+    private static StorageFileManager globusStorageFileManager;
     @Autowired
     public void setGlobusStorageService(StorageService storageService) throws IOException {
-        storageGlobusFileManager = storageService.getStorageFileManager(AccessMethodType.GLOBUS);
+        globusStorageFileManager = storageService.getStorageFileManager(AccessMethodType.GLOBUS);
     }
 
     public static File generateNewKeyForImportedWorkflow(MultipartFile mpFile, String filePath) throws ParserConfigurationException, TransformerConfigurationException, TransformerException, SAXException, IOException {
@@ -1829,23 +1825,13 @@ public class WebHelper {
         return Helper.serialize(map);
     }
 
-    public static String getOriginalHtmlInputFieldName(String name) {
-        // FF uses name[]
-        // IE uses name
-        // (*): be aware conventions used by other browsers
-        if (name != null && name.endsWith("s[]")) {
-            name = name.substring(0, name.length() - 3);
-        }
-
-        return name;
-    }
-
     public static Map<String, Object> buildContext(HttpServletRequest request) {
         User user = (User) request.getAttribute("user");
 
         Integer jobId = null;
-        if (request.getParameter("id") != null && !request.getParameter("id").isEmpty()) {
-            jobId = Integer.parseInt(request.getParameter("id"));
+        String sJobId = request.getParameter("jobId");
+        if (sJobId != null && !sJobId.isEmpty()) {
+            jobId = Integer.parseInt(sJobId);
         }
 
         String taskId = request.getParameter("taskId");
@@ -1858,6 +1844,22 @@ public class WebHelper {
             if (job != null) {
                 projectId = job.getProjectId().getId();
                 experimentId = job.getExperimentId().getId();
+            }
+        }
+
+        if (projectId == null) {
+            String sId = request.getParameter("projectId");
+            try {
+                projectId = Integer.parseInt(sId);
+            } catch (Exception ex) {
+            }
+        }
+
+        if (experimentId == null) {
+            String sId = request.getParameter("experimentId");
+            try {
+                experimentId = Integer.parseInt(sId);
+            } catch (Exception ex) {
             }
         }
 
@@ -1898,10 +1900,38 @@ public class WebHelper {
         }
 
         // 2. file upload
+        Integer groupId = edu.purdue.cybercenter.dm.threadlocal.GroupId.get();
+        Integer userId = edu.purdue.cybercenter.dm.threadlocal.UserId.get();
+        Group group = Group.findGroup(groupId);
+        Boolean isGroupOwner = group == null ? null : group.getIsGroupOwner();
+        Integer ownerId;
+        if (isGroupOwner != null && isGroupOwner) {
+            ownerId = groupId;
+        } else {
+            ownerId = userId;
+        }
+        Map<String, Object> value = new HashMap<>();
+        value.put(MetaField.Id, null);
+        value.put(MetaField.IsGroupOwner, isGroupOwner);
+        value.put(MetaField.OwnerId, ownerId);
+
+        Map<String, Object> context = buildContext(request);
+        value.put(MetaField.ProjectId, context.get("project_id"));
+        value.put(MetaField.ExperimentId, context.get("experiment_id"));
+        value.put(MetaField.JobId, context.get("job_id"));
+
+        collectFiles(request, objectuses, value);
+
+        return objectuses;
+    }
+
+    @PreAuthorize(DatasetService.PRE_AUTHORIZE_SAVE)
+    private static void collectFiles(MultipartHttpServletRequest request, Map<String, Object> objectuses, Map<String, Object> value) {
         MultiValueMap<String, MultipartFile> fileMultiValueMap = request.getMultiFileMap();
+
+        // 1. regular files
         for (String key : fileMultiValueMap.keySet()) {
-            String name = getOriginalHtmlInputFieldName((String) key); // single or list
-            TermName termName = new TermName(name);
+            TermName termName = new TermName(key);
             if (termName.getUuid() != null) {
                 List<MultipartFile> files = fileMultiValueMap.get(key);
                 List<String> storageFiles = new ArrayList<>();
@@ -1910,6 +1940,11 @@ public class WebHelper {
                         try {
                             List<StorageFile> sfs = storageFileManager.putFile(file.getOriginalFilename(), file.getInputStream(), null, true);
                             for (StorageFile storageFile : sfs) {
+                                storageFile.setProjectId((Integer) value.get(MetaField.ProjectId));
+                                storageFile.setExperimentId((Integer) value.get(MetaField.ExperimentId));
+                                storageFile.setJobId((Integer) value.get(MetaField.JobId));
+                                storageFile.merge();
+
                                 storageFiles.add("StorageFile:" + storageFile.getId());
                             }
                         } catch (Exception ex) {
@@ -1921,47 +1956,38 @@ public class WebHelper {
                 // if no file is selected. keep the current files
                 // so only update when there is at least one file.
                 if (!storageFiles.isEmpty()) {
-                    datasetService.mergeValueToObjectus(objectuses, name, storageFiles.toArray(), true);
+                    datasetService.mergeValueToObjectus(objectuses, key, storageFiles.toArray(), true);
                 }
             }
         }
 
-        // 3. Globus Upload
-        String jobId = request.getParameter("jobId");
-        System.out.println(jobId);
-        if (jobId != null && !jobId.isEmpty()) {
-            ProcessInstance processInstance = runtimeService.createProcessInstanceQuery().processInstanceBusinessKey(jobId).singleResult();
-            if (processInstance != null){
-                Execution execution = runtimeService.createExecutionQuery().processInstanceId(processInstance.getId()).singleResult();
-                List<String> mapNames = (List<String>) runtimeService.getVariable(execution.getId(), "mapNames");
+        // 2. Globus Upload
+        for (Map.Entry<String, Object> entry : objectuses.entrySet()) {
+            String key = entry.getKey();
+            if (key.length() >= 36) {
+                String globusFileKey = key.substring(0, 36);
+                Map<String, Object> globusFiles = (Map) request.getSession().getAttribute(globusFileKey);
 
-                if(runtimeService.hasVariableLocal(execution.getId(), "mapNames")){
-                    for(String mapName : mapNames){
-                        Map transferObj = (Map) runtimeService.getVariable(execution.getId(), mapName);
-                        if (transferObj != null){
-                            if( transferObj.containsKey("accessToken") && transferObj.containsKey("sourceEndpoint") && transferObj.containsKey("filePaths")){
-                                try{
-                                    String name = (String) transferObj.get("alias");
-                                    List<String> storageFiles = new ArrayList<>();
-                                    List<StorageFile> sfs = storageGlobusFileManager.putFile(Helper.deepSerialize(transferObj), null, false);
-                                    for (StorageFile storageFile : sfs) {
-                                        storageFiles.add("StorageFile:" + storageFile.getId());
-                                    }
-                                    if (!storageFiles.isEmpty()) {
-                                        datasetService.mergeValueToObjectus(objectuses, name, storageFiles.toArray());
-                                    }
-                                } catch (Exception ex) {
-                                    throw new RuntimeException("Unable to put file in storage: " , ex);
-                                }
+                if (globusFiles != null) {
+                    globusFiles.entrySet().stream().forEach((globusFile) -> {
+                        String alias = globusFile.getKey();
+                        Map<String, Object> inputObj = (Map) globusFile.getValue();
 
-                            }
+                        // initiate a trnsfer
+                        List<StorageFile> storageFiles;
+                        try {
+                            storageFiles = globusStorageFileManager.putFile(Helper.deepSerialize(inputObj), null, false);
+                            datasetService.mergeValueToObjectus(objectuses, globusFileKey + "." + alias, storageFilesToStorageFileIds(storageFiles));
+                        } catch (IOException ex) {
+                            Logger.getLogger(WebHelper.class.getName()).log(Level.SEVERE, null, ex);
                         }
-                    }
+                    });
+
+                    // no longer needed
+                    request.getSession().removeAttribute(globusFileKey);
                 }
             }
         }
-
-        return objectuses;
     }
 
     public static String buildIframeResponse(String response) {
@@ -2039,4 +2065,17 @@ public class WebHelper {
 
         return sb.toString();
     }
+
+    private static String storageFileToStorgaeFileId(StorageFile storageFile) {
+        return storageFile != null ? "StorageFile:" + storageFile.getId() : null;
+    }
+
+    private static List<String> storageFilesToStorageFileIds(List<StorageFile> storageFiles) {
+        List<String> storageFileIds = new ArrayList<>();
+        for (StorageFile storageFile : storageFiles) {
+            storageFileIds.add(storageFileToStorgaeFileId(storageFile));
+        }
+        return storageFileIds;
+    }
+
 }

@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -25,12 +26,12 @@ import org.springframework.security.acls.model.AccessControlEntry;
 import org.springframework.security.acls.model.MutableAcl;
 import org.springframework.security.acls.model.NotFoundException;
 import org.springframework.security.acls.model.ObjectIdentity;
+import org.springframework.security.acls.model.Permission;
 import org.springframework.security.acls.model.Sid;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -44,37 +45,61 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @Controller
 public class PermissionController {
 
+    private static final String EDU_PURDUE_CYBERCENTER_DM_DOMAIN = "edu.purdue.cybercenter.dm.domain.";
+
+    private static final String CREATE = "create";
+    private static final String READ = "read";
+    private static final String UPDATE = "update";
+    private static final String DELETE = "delete";
+    private static final String EXECUTE = "execute";
+    private static final String OWNER = "owner";
+
+    private static final String S_ID = "sId";
+    private static final String IS_GROUP = "group";
+    private static final String USER_ID = "userId";
+    private static final String GROUP_ID = "groupId";
+    private static final String OBJECT_CLASS = "objectClass";
+    private static final String OBJECT_ID = "objectId";
+    private static final String OBJECT_IDS = "objectIds";
+
+    private static final String ID = "id";
+    private static final String NAME = "name";
+    private static final String FIRST_NAME = "firstName";
+    private static final String LAST_NAME = "lastName";
+    private static final String USER = "user";
+    private static final String GROUP = "group";
+    private static final String PERMISSION = "permission";
+    private static final String INHERIT_FROM_GROUP = "inheritFromGroup";
+
     @Autowired
     private JdbcMutableAclService aclService;
 
     @RequestMapping(value = "/index", method = RequestMethod.GET, produces = MediaType.TEXT_HTML_VALUE)
-    public String index(Model model, HttpServletRequest request, HttpServletResponse response) {
-        User user = User.findUser((Integer) request.getSession().getAttribute("userId"));
-        model.addAttribute("isAdmin", user.isAdmin());
+    public String index(HttpServletRequest request, HttpServletResponse response) {
         return "permissions/index";
     }
 
     @Transactional
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String getPermissions(HttpServletRequest request, HttpServletResponse response) {
-        String sObjectClass = request.getParameter("objectClass");
-        String sOids = request.getParameter("objectIds");
-        String sSid = request.getParameter("sId");
-        String sGroup = request.getParameter("group");
-        String sFormat = request.getParameter("format");
+        String sSid = request.getParameter(S_ID);
+        String sGroup = request.getParameter(IS_GROUP);
+        String sObjectClass = request.getParameter(OBJECT_CLASS);
+        String sOids = request.getParameter(OBJECT_IDS);
 
         // if sSid is missing, use the current user
         if (StringUtils.isEmpty(sSid)) {
-            sSid = ((Integer) request.getSession().getAttribute("userId")).toString();
+            sSid = ((Integer) request.getSession().getAttribute(USER_ID)).toString();
+            sGroup = Boolean.FALSE.toString();
         }
 
-        // if group is missing, assume "no"
+        // if group is missing, assume "false"
         if (StringUtils.isEmpty(sGroup)) {
-            sGroup = "no";
+            sGroup = Boolean.FALSE.toString();
         }
 
-        String objectClass = "edu.purdue.cybercenter.dm.domain." + sObjectClass;
+        String objectClass = EDU_PURDUE_CYBERCENTER_DM_DOMAIN + sObjectClass;
 
         StringTokenizer st = new StringTokenizer(sOids, ",");
         List<Long> oids = new ArrayList<>();
@@ -85,8 +110,10 @@ public class PermissionController {
         Sid sid;
         boolean isAdmin;
         List<Sid> sids = new ArrayList<>();
-        if (sGroup.equals("no")) {
+        PrincipalSid userSid = null;
+        if (sGroup.equals(Boolean.FALSE.toString())) {
             sid = new PrincipalSid(sSid);
+            userSid = (PrincipalSid) sid;
             User user = User.findUser(Integer.valueOf(sSid));
             isAdmin = user.isAdmin();
             sids.add(sid);
@@ -105,30 +132,48 @@ public class PermissionController {
         }
 
         Map<Object, Map> objectPermissions = new HashMap<>();
-        for (int i = 0; i < oids.size(); i++) {
+        for (Long objectId : oids) {
+
             // There are 4 cases
             // 1. admin: permit all
             // 2. the object exists and a permission entry for the particular user exists: use permission from the security table.
             // 3. the object exists but a permission entry for the particular user does not exist: use default, .i.e deny all
             // 4. the object does not exist:  use default, .i.e deny all
-            boolean read, update, delete, create, execute;
-            Long objectId = oids.get(i);
+            Boolean read, update, delete, create, execute, owner;
+            boolean inheritFromGroup = true;
             if (isAdmin) {
-                read = true; update = true; delete = true; create = true; execute = true;
+                read = true; update = true; delete = true; create = true; execute = true; owner = true;
             } else {
-                read = false; update = false; delete = false; create = false; execute = false;
+                read = null; update = null; delete = null; create = null; execute = null; owner = null;
                 try {
                     ObjectIdentity oId = new ObjectIdentityImpl(objectClass, objectId);
                     MutableAcl acl = (MutableAcl) aclService.readAclById(oId, sids);
                     List<AccessControlEntry> aces = acl.getEntries();
                     for (AccessControlEntry ace : aces) {
+                        if (ace.getSid().equals(userSid)) {
+                            // if user permission explicitly assigned then use it
+                            Integer permissionMask = ace.getPermission().getMask();
+                            read = (permissionMask & CustomPermission.READ.getMask()) != 0;
+                            update = (permissionMask & CustomPermission.WRITE.getMask()) != 0;
+                            create = (permissionMask & CustomPermission.CREATE.getMask()) != 0;
+                            delete = (permissionMask & CustomPermission.DELETE.getMask()) != 0;
+                            execute = (permissionMask & CustomPermission.EXECUTE.getMask()) != 0;
+                            owner = (permissionMask & CustomPermission.OWNER.getMask()) != 0;
+                            inheritFromGroup = false;
+                            break;
+                        }
                         if (sids.contains(ace.getSid())) {
+                            // otherwise it will be the sum of all its groups
+                            if (read == null) {
+                                read = false; update = false; delete = false; create = false; execute = false; owner = false;
+                            }
                             Integer permissionMask = ace.getPermission().getMask();
                             read = read | (permissionMask & CustomPermission.READ.getMask()) != 0;
                             update = update | (permissionMask & CustomPermission.WRITE.getMask()) != 0;
                             create = create | (permissionMask & CustomPermission.CREATE.getMask()) != 0;
                             delete = delete | (permissionMask & CustomPermission.DELETE.getMask()) != 0;
                             execute = execute | (permissionMask & CustomPermission.EXECUTE.getMask()) != 0;
+                            owner = owner | (permissionMask & CustomPermission.OWNER.getMask()) != 0;
                         }
                     }
                 } catch (NotFoundException nfe) {
@@ -137,25 +182,133 @@ public class PermissionController {
             }
 
             Map<String, Object> objectPermission = new HashMap<>();
-            objectPermission.put("read", read);
-            objectPermission.put("update", update);
-            objectPermission.put("create", create);
-            objectPermission.put("delete", delete);
-            objectPermission.put("execute", execute);
+            objectPermission.put(READ, read);
+            objectPermission.put(UPDATE, update);
+            objectPermission.put(CREATE, create);
+            objectPermission.put(DELETE, delete);
+            objectPermission.put(EXECUTE, execute);
+            objectPermission.put(OWNER, owner);
+            objectPermission.put(INHERIT_FROM_GROUP, inheritFromGroup);
 
+            String sFormat = request.getParameter("format");
             if ("old".equals(sFormat)) {
                 objectPermission.put("id", objectId);
-                objectPermissions.put("" + i, objectPermission);
-            } else {
-                objectPermissions.put(objectId, objectPermission);
             }
+            objectPermissions.put(objectId, objectPermission);
         }
 
         return Helper.serialize(objectPermissions);
     }
 
     @Transactional
-    @RequestMapping(method = {RequestMethod.POST, RequestMethod.PUT}, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value="/users", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public String getUserPermissions(HttpServletRequest request, HttpServletResponse response) {
+        String sGroupId = request.getParameter(GROUP_ID);
+        String sObjectClass = request.getParameter(OBJECT_CLASS);
+        String sOid = request.getParameter(OBJECT_ID);
+
+        Group group = Group.findGroup(Integer.parseInt(sGroupId));
+        Set<User> users = group.getUsers();
+        List<Sid> sids = new ArrayList<>();
+        users.stream().map((user) -> new PrincipalSid(user.getId().toString())).forEach((sid) -> {
+            sids.add(sid);
+        });
+
+        ObjectIdentity oId = new ObjectIdentityImpl(EDU_PURDUE_CYBERCENTER_DM_DOMAIN + sObjectClass, Integer.parseInt(sOid));
+
+        List<Map<String, Object>> userPermissions = new ArrayList<>();
+        List<Integer> usersWithPermission = new ArrayList<>();
+        if (!sids.isEmpty()) {
+            try {
+                MutableAcl acl = (MutableAcl) aclService.readAclById(oId, sids);
+                List<AccessControlEntry> aces = acl.getEntries();
+                aces.stream().forEach((ace) -> {
+                    if (sids.contains(ace.getSid())) {
+                        Integer userId = Integer.parseInt(((PrincipalSid) ace.getSid()).getPrincipal());
+                        usersWithPermission.add(userId);
+                        User user = User.findUser(userId);
+                        Map<String, Object> userMap = new HashMap<>();
+                        userMap.put(ID, userId);
+                        userMap.put(FIRST_NAME, user.getFirstName());
+                        userMap.put(LAST_NAME, user.getLastName());
+                        Map<String, Object> userPermission = new HashMap<>();
+                        userPermission.put(USER, userMap);
+                        userPermission.put(PERMISSION, toPermissionMap(ace.getPermission()));
+                        userPermission.put(INHERIT_FROM_GROUP, false);
+                        userPermissions.add(userPermission);
+                    }
+                });
+            } catch (NotFoundException ex) {
+                // ok without acl
+                System.out.println(ex.getMessage());
+            }
+        }
+
+        users.stream().forEach((user) -> {
+            Integer userId = user.getId();
+            if (!usersWithPermission.contains(userId)) {
+                Map<String, Object> userMap = new HashMap<>();
+                userMap.put(ID, userId);
+                userMap.put(FIRST_NAME, user.getFirstName());
+                userMap.put(LAST_NAME, user.getLastName());
+                Map<String, Object> userPermission = new HashMap<>();
+                userPermission.put(USER, userMap);
+                userPermission.put(PERMISSION, toPermissionMap(null));
+                userPermission.put(INHERIT_FROM_GROUP, true);
+                userPermissions.add(userPermission);
+            }
+        });
+
+        return Helper.serialize(userPermissions);
+    }
+
+    @Transactional
+    @RequestMapping(value="groups", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public String getGroupPermissions(HttpServletRequest request, HttpServletResponse response) {
+        String sUserId = request.getParameter(USER_ID);
+        String sObjectClass = request.getParameter(OBJECT_CLASS);
+        String sOid = request.getParameter(OBJECT_ID);
+
+        User user = User.findUser(Integer.parseInt(sUserId));
+        List<Group> groups = user.getMemberGroups();
+        List<Sid> sids = new ArrayList<>();
+        groups.stream().map((group) -> new GrantedAuthoritySid(group.getId().toString())).forEach((sid) -> {
+            sids.add(sid);
+        });
+
+        ObjectIdentity oId = new ObjectIdentityImpl(EDU_PURDUE_CYBERCENTER_DM_DOMAIN + sObjectClass, Integer.parseInt(sOid));
+
+        List<Map<String, Map>> groupPermissions = new ArrayList<>();
+        if (!sids.isEmpty()) {
+            try {
+                MutableAcl acl = (MutableAcl) aclService.readAclById(oId, sids);
+                List<AccessControlEntry> aces = acl.getEntries();
+                aces.stream().forEach((ace) -> {
+                    if (sids.contains(ace.getSid())) {
+                        Integer groupId = Integer.parseInt(((GrantedAuthoritySid) ace.getSid()).getGrantedAuthority());
+                        Group group = Group.findGroup(groupId);
+                        Map<String, Object> groupMap = new HashMap<>();
+                        groupMap.put(ID, groupId);
+                        groupMap.put(NAME, group.getName());
+                        Map<String, Map> groupPermission = new HashMap<>();
+                        groupPermission.put(GROUP, groupMap);
+                        groupPermission.put(PERMISSION, toPermissionMap(ace.getPermission()));
+                        groupPermissions.add(groupPermission);
+                    }
+                });
+            } catch (NotFoundException ex) {
+                // ok without acl
+                System.out.println(ex.getMessage());
+            }
+        }
+
+        return Helper.serialize(groupPermissions);
+    }
+
+    @Transactional
+    @RequestMapping(method = {RequestMethod.POST, RequestMethod.PUT}, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object savePermissions(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) throws ClassNotFoundException {
         String username = ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getUsername();
@@ -164,36 +317,8 @@ public class PermissionController {
 
         Map<String, Object> object = Helper.deserialize(json, Map.class);
 
-        String sObjectClass = (String) object.get("objectClass");
-        Long oid = ((Integer) object.get("objectId")).longValue();
-        String sSid = object.get("sId") != null ? object.get("sId").toString() : "";
-        boolean isGroup = (boolean) object.get("group");
-
-        CumulativePermission cPermission = new CumulativePermission();
-        cPermission.clear();
-        boolean bit = (boolean) object.get("read");
-        if (bit) {
-            cPermission.set(CustomPermission.READ);
-        }
-        bit = (boolean) object.get("update");
-        if (bit) {
-            cPermission.set(CustomPermission.WRITE);
-        }
-        bit = (boolean) object.get("create");
-        if (bit) {
-            cPermission.set(CustomPermission.CREATE);
-        }
-        bit = (boolean) object.get("delete");
-        if (bit) {
-            cPermission.set(CustomPermission.DELETE);
-        }
-        bit = (boolean) object.get("execute");
-        if (bit) {
-            cPermission.set(CustomPermission.EXECUTE);
-        }
-
-        String objectClass = "edu.purdue.cybercenter.dm.domain." + sObjectClass;
-
+        String sSid = object.get(S_ID) != null ? object.get(S_ID).toString() : "";
+        Boolean isGroup = (Boolean) object.get(IS_GROUP);
         Sid sid;
         if (!isGroup) {
             sid = new PrincipalSid(sSid);
@@ -211,11 +336,46 @@ public class PermissionController {
         List<Sid> sids = new ArrayList<>();
         sids.add(sid);
 
-        if (oid == 0 && !currentUserIsAdmin) {
+        String objectClass = EDU_PURDUE_CYBERCENTER_DM_DOMAIN + (String) object.get(OBJECT_CLASS);
+        Long objectId = ((Integer) object.get(OBJECT_ID)).longValue();
+
+        if (objectId == 0 && !currentUserIsAdmin) {
             return new ResponseEntity<>("{\"message\": \"Permission Not Created\"}", HttpStatus.FORBIDDEN);
         }
 
-        ObjectIdentity objectIdentity = new ObjectIdentityImpl(objectClass, oid);
+        CumulativePermission cPermission = new CumulativePermission();
+        cPermission.clear();
+        boolean bit = (boolean) object.get(READ);
+        if (bit) {
+            cPermission.set(CustomPermission.READ);
+        }
+        bit = (boolean) object.get(UPDATE);
+        if (bit) {
+            cPermission.set(CustomPermission.WRITE);
+        }
+        bit = (boolean) object.get(CREATE);
+        if (bit) {
+            cPermission.set(CustomPermission.CREATE);
+        }
+        bit = (boolean) object.get(DELETE);
+        if (bit) {
+            cPermission.set(CustomPermission.DELETE);
+        }
+        if (objectId != 0) {
+            bit = (boolean) object.get(EXECUTE);
+            if (bit) {
+                cPermission.set(CustomPermission.EXECUTE);
+            }
+            bit = (boolean) object.get(OWNER);
+            if (bit) {
+                cPermission.set(CustomPermission.OWNER);
+            }
+        } else {
+            cPermission.clear(CustomPermission.EXECUTE);
+            cPermission.clear(CustomPermission.OWNER);
+        }
+
+        ObjectIdentity objectIdentity = new ObjectIdentityImpl(objectClass, objectId);
         try {
             MutableAcl acl = (MutableAcl) aclService.readAclById(objectIdentity, sids);
             List<AccessControlEntry> aces = acl.getEntries();
@@ -227,6 +387,7 @@ public class PermissionController {
                         acl.updateAce(i, cPermission);
                         aclService.updateAcl(acl);
                         updated = true;
+                        break;
                     }
                 }
             }
@@ -246,4 +407,76 @@ public class PermissionController {
         return new ResponseEntity<>("{\"message\": \"Permission Successfully Created\"}", HttpStatus.OK);
     }
 
+    @Transactional
+    @RequestMapping(method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
+    @ResponseBody
+    public Object deletePermissions(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) throws ClassNotFoundException {
+        String username = ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getUsername();
+        User currentUser = User.findByUsername(username);
+        boolean currentUserIsAdmin = currentUser.isAdmin();
+
+        Map<String, Object> object = Helper.deserialize(json, Map.class);
+
+        String sSid = object.get(S_ID).toString();
+        Boolean isGroup = (Boolean) object.get(IS_GROUP);
+        Sid sid;
+        if (!isGroup) {
+            sid = new PrincipalSid(sSid);
+            User user = User.findUser(Integer.valueOf(sSid));
+            if (user.isAdmin()) {
+                return new ResponseEntity<>("{\"message\": \"The User is an Admin and cannot be assigned Permissions\"}", HttpStatus.PRECONDITION_FAILED);
+            }
+        } else {
+            sid = new GrantedAuthoritySid(sSid);
+            Group group = Group.findGroup(Integer.valueOf(sSid));
+            if (group.isAdmin()) {
+                return new ResponseEntity<>("{\"message\": \"The Group is an Admin Group and cannot be assigned Permissions\"}", HttpStatus.PRECONDITION_FAILED);
+            }
+        }
+        List<Sid> sids = new ArrayList<>();
+        sids.add(sid);
+
+        String objectClass = EDU_PURDUE_CYBERCENTER_DM_DOMAIN + (String) object.get(OBJECT_CLASS);
+        Long objectId = ((Integer) object.get(OBJECT_ID)).longValue();
+        ObjectIdentity objectIdentity = new ObjectIdentityImpl(objectClass, objectId);
+        try {
+            MutableAcl acl = (MutableAcl) aclService.readAclById(objectIdentity, sids);
+            List<AccessControlEntry> aces = acl.getEntries();
+            for (int i = 0; i < aces.size(); i++) {
+                AccessControlEntry ace = acl.getEntries().get(i);
+                if (ace.getSid().equals(sid)) {
+                    acl.deleteAce(i);
+                    aclService.updateAcl(acl);
+                    break;
+                }
+            }
+        } catch (NotFoundException nfe) {
+            // object does not exist
+        }
+
+        return new ResponseEntity<>("{\"message\": \"Permission Successfully deleted\"}", HttpStatus.NO_CONTENT);
+    }
+
+    private Map<String, Boolean> toPermissionMap(Permission permission) {
+        Map<String, Boolean> permissionMap = new HashMap<>();
+
+        if (permission != null) {
+            Integer permissionMask = permission.getMask();
+            permissionMap.put(READ, (permissionMask & CustomPermission.READ.getMask()) != 0);
+            permissionMap.put(UPDATE, (permissionMask & CustomPermission.WRITE.getMask()) != 0);
+            permissionMap.put(CREATE, (permissionMask & CustomPermission.CREATE.getMask()) != 0);
+            permissionMap.put(DELETE, (permissionMask & CustomPermission.DELETE.getMask()) != 0);
+            permissionMap.put(EXECUTE, (permissionMask & CustomPermission.EXECUTE.getMask()) != 0);
+            permissionMap.put(OWNER, (permissionMask & CustomPermission.OWNER.getMask()) != 0);
+        } else {
+            permissionMap.put(READ, null);
+            permissionMap.put(UPDATE, null);
+            permissionMap.put(CREATE, null);
+            permissionMap.put(DELETE, null);
+            permissionMap.put(EXECUTE, null);
+            permissionMap.put(OWNER, null);
+        }
+
+        return permissionMap;
+    }
 }

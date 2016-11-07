@@ -3,88 +3,141 @@
 
     <jsp:output omit-xml-declaration="yes"/>
 
-    <script type="text/javascript">
-        cris.require([
-            "dijit/form/SimpleTextarea"
-        ]);
-    </script>
+    <c:set value="yyyy-MM-dd HH:mm:ss" var="dateFormat"/>
 
-    <h2>Job Details</h2>
+    <c:set value="${jsRoot}/dm/dataset.js" var="url" />
+    <script src="${url}" type="text/javascript"><!-- required for FF3 and Opera --></script>
 
-    <div style="width: 49%">
-        <table style="width: 100%">
-            <tr >
-                <td style="width: 25%">Project:</td>
-                <td style="width: 75%">${job.projectId.name}</td>
-            </tr>
-            <tr>
-                <td>Experiment:</td>
-                <td>${job.experimentId.name}</td>
-            </tr>
-            <!--
-            <tr>
-                <td>Resource:</td>
-                <td>${job.resourceId.name}</td>
-            </tr>
-            -->
-            <tr>
-                <td>Workflow:</td>
-                <td>${job.workflowId.name}</td>
-            </tr>
-            <c:set value="yyyy-MM-dd HH:mm:ss" var="dateFormat"/>
-            <tr>
-                <td>Time Created:</td>
-                <td>
-                    <fmt:formatDate pattern="${dateFormat}" value="${job.timeCreated}"/>
-                </td>
-            </tr>
-            <tr>
-                <td>Last updated:</td>
-                <td>
-                    <fmt:formatDate pattern="${dateFormat}" value="${job.timeUpdated}"/>
-                </td>
-            </tr>
-            <tr>
-                <td>Job ID:</td>
-                <td>${job.id}</td>
-            </tr>
-            <tr>
-                <td>Job Name</td>
-                <td>${job.name}</td>
-            </tr>
-            <tr>
-                <td>Job Status:</td>
-                <td>
-                    <c:choose>
-                        <c:when test="${job.statusId == 1}">
-                            Created
-                        </c:when>
-                        <c:when test="${job.statusId == 2}">
-                            Submitted
-                        </c:when>
-                        <c:when test="${job.statusId == 3}">
-                            Started
-                        </c:when>
-                        <c:when test="${job.statusId == 4}">
-                            Finished
-                        </c:when>
-                        <c:when test="${job.statusId == 5}">
-                            Canceled
-                        </c:when>
-                        <c:when test="${job.statusId == 6}">
-                            Closed
-                        </c:when>
-                        <c:otherwise>
-                            Unknown
-                        </c:otherwise>
-                    </c:choose>
-                </td>
-            </tr>
-            <tr>
-                <td>Job Description:</td>
-                <td>${job.description}</td>
-            </tr>
-        </table>
+    <div id="idJobShow">
+        <h2>
+            Job ${job.id}: ${job.name}
+            <span class="badge">
+                <c:choose>
+                    <c:when test="${job.statusId == 1}">
+                        Created
+                    </c:when>
+                    <c:when test="${job.statusId == 2}">
+                        Submitted
+                    </c:when>
+                    <c:when test="${job.statusId == 3}">
+                        Started
+                    </c:when>
+                    <c:when test="${job.statusId == 4}">
+                        Finished
+                    </c:when>
+                    <c:when test="${job.statusId == 5}">
+                        Canceled
+                    </c:when>
+                    <c:when test="${job.statusId == 6}">
+                        Closed
+                    </c:when>
+                    <c:otherwise>
+                        Unknown
+                    </c:otherwise>
+                </c:choose>
+            </span>
+        </h2>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <span class="label label-info">Project:</span> ${job.projectId.name},
+                <span class="label label-info">Experiment:</span> ${job.experimentId.name},
+                <span class="label label-info">Workflow:</span> ${job.workflowId.name},
+                <span class="label label-info">Time Created:</span>&amp;nbsp;<fmt:formatDate pattern="${dateFormat}" value="${job.timeCreated}"/>,
+                <span class="label label-info">Last Updated:</span>&amp;nbsp;<fmt:formatDate pattern="${dateFormat}" value="${job.timeUpdated}"/>
+            </div>
+            <div class="panel-body">
+                ${job.description}
+            </div>
+            <div class="panel-footer">
+                <div data-ng-controller="jobShowController">
+                    <div data-ng-switch="templateUuids.length">
+                        <div data-ng-switch-when="0">
+                            <div class='alert alert-info'>There's no dataset associated with this job.</div>
+                        </div>
+                        <div data-ng-switch-default="">
+                            <div class="dropdown" uib-dropdown="" on-toggle="toggled(open)">
+                                <button type="button" class="btn btn-primary dropdown-toggle" id="idTemplateSelector" uib-dropdown-toggle="">Dataset <span class="caret"><!-- --></span></button>
+                                <ul class="dropdown-menu" uib-dropdown-menu="" aria-labelledby="idTemplateSelector">
+                                    <li data-ng-repeat="item in templateUuids" data-ng-click="onSelect(item)"><a href="#">{{item.name}}</a></li>
+                                </ul>
+                            </div>
+                            <br/>
+                            <cris-dataset term="term" dataset="data" context="context" message="message" read-only="true"><!----></cris-dataset>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <script type="text/javascript">
+        // <![CDATA[
+        cris.require("dojox/xml/parser");
+
+        angular.module("crisJobShow", ["angular-dojo", "ui.bootstrap", "dataset"]);
+
+        angular.module("crisJobShow").service("jobShowService", ["$http", function($http) {
+            this.getTemplate = function(uuid) {
+                return $http({
+                    method: 'GET',
+                    url: cris.baseUrl + "templates/metadata/" + uuid
+                });
+            };
+        }]);
+
+        angular.module("crisJobShow").controller("jobShowController", ["$scope", "$http", "jobShowService", function ($scope, $http, jobShowService) {
+            $scope.term = {};
+            $scope.data = {};
+            $scope.readOnly = true;
+
+            var templateUuids = "${job.templateUuids}";
+            var uuids = [];
+            if (templateUuids && templateUuids.length >= 38) {
+                var parts = templateUuids.split(",");
+                for (var i = 0; i < parts.length; i++) {
+                    var part = parts[i].trim();
+                    if (i === 0 || i === parts.length - 1) {
+                        if (i === 0) {
+                            uuids.push(part.substring(1));
+                        }
+                        if (i === parts.length - 1) {
+                            uuids.push(part.substring(0, part.length - 1));
+                        }
+                    } else {
+                        uuids.push(part);
+                    }
+                }
+            }
+
+            $scope.templateUuids = [];
+            angular.forEach(uuids, function(uuid) {
+                jobShowService.getTemplate(uuid).then(function (response) {
+                    $scope.templateUuids.push(response.data);
+                    console.dir(response);
+                }, function (response) {
+                    console.dir(response);
+                });
+            });
+
+            $scope.onSelect = function(term) {
+                //TODO: initialize dataset directive
+                $scope.term = convertXmlToJson(term.content);
+                console.dir($scope.term);
+                $scope.term.list = true;
+                $scope.term.grid = false;
+
+                var url = cris.baseUrl + "rest/objectus/" + $scope.term.uuid +"?query={_job_id:" + ${job.id} +"}";
+                $http.get(url).then(function(dataResponse) {
+                    $scope.data = dataResponse.data;
+                }, function(errorResponse) {
+                });
+            };
+        }]);
+
+        cris.bootstrapAngular("idJobShow", "crisJobShow");
+        // ]]>
+    </script>
 
 </div>

@@ -3,27 +3,31 @@ package edu.purdue.cybercenter.dm.domain;
 import edu.purdue.cybercenter.dm.domain.listener.CrisEntityListener;
 import edu.purdue.cybercenter.dm.util.JsonRestRef;
 import flexjson.ObjectFactory;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EntityListeners;
 import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.PostLoad;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.Filters;
 import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 import org.springframework.beans.factory.annotation.Configurable;
 
 @Filters({
-    @Filter(name = "enabledFilter"),
     @Filter(name = "userInGroupFilter"),
     @Filter(name = "userNotInGroupFilter"),
     @Filter(name = "tenantFilter")
@@ -89,25 +93,46 @@ public class User extends AbstractCrisEntity {
     private SmallObject imageId;
 
     @OneToMany(mappedBy = "ownerId")
-    private Set<Group> groups;
+    private Set<Group> ownedGroups;
 
-    @OneToMany(mappedBy = "userId", cascade = CascadeType.REMOVE)
-    private Set<GroupUser> groupUsers;
+    @ManyToMany
+    @JoinTable(name="group_user", joinColumns = @JoinColumn(name="user_id", referencedColumnName = "id"), inverseJoinColumns = @JoinColumn(name="group_id", referencedColumnName = "id"))
+    @NotAudited
+    private List<Group> memberGroups;
 
-    public Set<Group> getGroups() {
-        return groups;
+    @Transient
+    private String fullName;
+
+    @PostLoad
+    void onPostLoad() {
+        fullName = "";
+        if (!StringUtils.isEmpty(this.firstName)) {
+            fullName = StringUtils.capitalize(this.firstName.toLowerCase());
+        }
+        if (!StringUtils.isEmpty(this.middleName)) {
+            if (!fullName.isEmpty()) {
+                fullName += " ";
+            }
+            fullName += StringUtils.capitalize(this.middleName.toLowerCase());
+        }
+        if (!StringUtils.isEmpty(this.lastName)) {
+            if (!fullName.isEmpty()) {
+                fullName += " ";
+            }
+            fullName += StringUtils.capitalize(this.lastName.toLowerCase());
+        }
     }
 
-    public void setGroups(Set<Group> groups) {
-        this.groups = groups;
+    public String getFullName() {
+        return this.fullName;
     }
 
-    public Set<GroupUser> getGroupUsers() {
-        return groupUsers;
+    public Set<Group> getOwnedGroups() {
+        return ownedGroups;
     }
 
-    public void setGroupUsers(Set<GroupUser> groupUsers) {
-        this.groupUsers = groupUsers;
+    public void setOwnedGroups(Set<Group> groups) {
+        this.ownedGroups = groups;
     }
 
     public SmallObject getImageId() {
@@ -240,16 +265,18 @@ public class User extends AbstractCrisEntity {
     }
 
     public List<Group> getMemberGroups() {
-        List<Group> memberGroups = new ArrayList<>();
-
-        Set<GroupUser> groupUsers = this.getGroupUsers();
-        if (groupUsers != null) {
-            for (GroupUser groupUser : groupUsers) {
-                memberGroups.add(groupUser.getGroupId());
-            }
-        }
-
         return memberGroups;
+    }
+
+    public void setMemberGroups(List<Group> memberGroups) {
+        this.memberGroups = memberGroups;
+    }
+
+    public void addMemberGroups(Group memberGroup) {
+        if (this.memberGroups == null) {
+            this.memberGroups = new ArrayList<>();
+        }
+        this.memberGroups.add(memberGroup);
     }
 
     /*********************************************************

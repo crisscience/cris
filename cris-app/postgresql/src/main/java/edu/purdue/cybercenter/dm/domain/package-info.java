@@ -1,6 +1,5 @@
 @FilterDefs({
     // General
-    @FilterDef(name="enabledFilter", parameters={@ParamDef(name="enabled", type="java.lang.Boolean")}, defaultCondition="enabled = :enabled"),
     @FilterDef(name="timeBeforeFilter", parameters={@ParamDef(name="time", type="java.util.Date")}, defaultCondition="time_updated < :time"),
     @FilterDef(name="timeBetweenFilter", parameters={@ParamDef(name="beginTime", type="java.util.Date"), @ParamDef(name="endTime", type="java.util.Date")}, defaultCondition="time_updated >= :beginTime and time_updated < :endTime"),
     @FilterDef(name="timeAfterFilter", parameters={@ParamDef(name="time", type="java.util.Date")}, defaultCondition="time_updated >= :time"),

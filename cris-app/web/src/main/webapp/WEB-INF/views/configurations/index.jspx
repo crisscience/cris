@@ -4,143 +4,168 @@
     <jsp:output omit-xml-declaration="yes"/>
 
     <spring:url value="/configurations" var="url"/>
+    
+    <!-- Scripts for the TinyMCE Rich Text Editor -->
+    <script src="${jsRoot}/tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
+    <script src="${jsRoot}/tinymce/angular-ui-tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
 
     <script type="text/javascript">
     // <![CDATA[
-        cris.require('dijit/form/Form');
-        cris.require("dijit/form/Button");
-        cris.require("dijit/form/SimpleTextarea");
-        cris.require("dojox/data/JsonRestStore");
-        cris.require("dojox/grid/EnhancedGrid");
-        cris.require("dojox/grid/enhanced/plugins/Pagination");
-        cris.require("dojox/grid/enhanced/plugins/Selector");
-        cris.require("dojox/grid/enhanced/plugins/Filter");
-
-        function updateDetail(item) {
-            dojo.byId("configId").innerHTML = item.id || "";
-            dojo.byId("name").innerHTML = item.name || "";
-            dijit.byId("value").setValue(item.valueText || "");
-            dojo.byId("description").innerHTML = item.description || "";
-            dojo.byId("timeCreated").innerHTML = item.timeCreated ? dateIsoToLocale(item.timeCreated.$date) : "";
-            dojo.byId("lastUpdated").innerHTML = item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
-        }
-
-        function updateStore(item) {
-            store.setValue(item, "valueText", dijit.byId("value").getValue());
-        }
-
-        cris.ready(function() {
-            store = createJsonRestStore("${url}");
-
-            var layout= [{cells: [
-                        { field: 'id', name: 'ID', datatype: "number", width: '50px' },
-                        { field: 'name', name: 'Name', width: 'auto' },
-                        { field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '120px', get: function(row, item){
-                            if (!item) {
-                                return "Loading...";
-                            }
-                            return item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
-                        }}
-                    ]}];
-
-            var asc = true;
-            var args = {
-                sortFields: [{attribute: "name", descending: !asc}]
+        angular.module('crisConfiguration', ["angular-dojo"]).controller('ConfigurationController', ['$scope', '$http', '$uibModal', function ($scope, $http, $uibModal){
+            $scope.url = "${url}/?sort(+name)";
+            $scope.gridColumnDefs = [
+                {field: 'id', name: 'id', displayName: 'ID', width: 60},
+                {field: 'name', name: 'name', displayName: 'Name', minWidth: 160},
+                {field: 'timeUpdated', name: 'timeUpdated', displayName: 'Last Updated', enableFiltering: false, width: 115, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity,isDate:true}) CUSTOM_FILTERS}}</div>'}
+            ];
+            
+            // Settings for the TinyMCE text editor
+            $scope.tinymceOptions = {
+                menubar: false,
+                statusbar: false,
+                height:180
+            }
+            $scope.record = {};
+            $scope.currentAction = "No configuration selected";
+            
+            $scope.formatDisplayValue = function (value, rowData, isDate) {
+                if (isDate) {
+                    return value ? dateIsoToLocale(value.$date) : "";
+                }
             };
-            grid = createGrid(store, layout, "configurations", args);
-            grid.setSortIndex(1, asc);
-
-            dojo.connect(grid, "onSelected", function(index){
-                var item = grid.getItem(index);
-                updateDetail(item);
-            });
-
-            var buttonSave = dijit.byId("buttonSave");
-            dojo.connect(buttonSave, "onClick", function(evt){
-                if (grid.selection.getSelectedCount("row") >= 1) {
-                    var modified = false;
-                    var item = grid.selection.getSelected("row")[0];
-
-                    var value = dijit.byId("value");
-                    if (item.valueText !== value.getValue()) {
-                        modified = true;
-                    }
-
-                    if (modified) {
-                        updateStore(item);
-                        var pd = createProgressDialog();
-                        store.save({
-                            onComplete: function(response) {
-                                grid.updateRow(grid.selection.selectedIndex);
-                                var data = response[0].content;
-                                updateDetail(data);
-                                pd.hide();
-                            },
-                            onError: function(error) {
-                                pd.setContent("Failed to save changes. " + error);
-                            }
-                        });
-                    } else {
-                        showMessage("No change is made");
+            
+            $scope.save = function () {
+                if ($scope.selectedRecord) {
+                    if ($scope.record.valueText === $scope.selectedRecord.valueText) {
+                        showMessageModal({uibModal: $uibModal, message: "No change is made"});
                         return;
                     }
+                    var data = $scope.selectedRecord;
+                    data.valueText = $scope.record.valueText;
+                    
+                    $http({
+                        url: "${url}/" + data.id,
+                        method: "PUT",
+                        data: data
+                    }).then(function successCallback(result) {
+                        refreshGrid(true);
+                    }, function errorCallback(error) {
+                        showMessageModal({uibModal: $uibModal, message: "Failed to save changes. " + error.data.message});
+                    });
                 } else {
-                    showMessage("Please select a configuration");
+                    showMessageModal({uibModal: $uibModal, message: "Please select a configuration"});
+                    return;
                 }
-            });
-
-            var buttonReset = dijit.byId("buttonReset");
-            dojo.connect(buttonReset, "onClick", function(evt){
-                if (grid.selection.getSelectedCount("row") >= 1) {
-                    var item = grid.selection.getSelected("row")[0];
-                    updateDetail(item);
+            };
+        
+            $scope.rowSelectCallback = function (rowData) {
+                $scope.record = angular.copy(rowData);
+                $scope.selectedRecord = rowData;
+                $scope.toggleDetailsView(true);
+                $scope.currentAction = "Edit selected configuration";
+            };
+            
+            $scope.getTimeCreated = function (record) {
+                return record && record.timeCreated && record.timeCreated.$date ? dateIsoToLocale(record.timeCreated.$date) : "";
+            };
+            
+            $scope.getLastUpdated = function (record) {
+                return record && record.timeUpdated && record.timeUpdated.$date ? dateIsoToLocale(record.timeUpdated.$date) : "";
+            };
+            
+            $scope.reset = function () {
+                if ($scope.selectedRecord) {
+                    $scope.record = angular.copy($scope.selectedRecord);
                 } else {
-                    updateDetail({});
+                    $scope.record = {};
                 }
-            });
-        });
+            };
+            
+            // On smaller screens toggle between tools view and details view
+            $scope.toggleDetailsView = function (doShow, clearSelection) {
+                if (doShow) {
+                    $('#detailsView').removeClass('hidden-xs hidden-sm');
+                    $('#configurationView').addClass('hidden-xs hidden-sm');
+                } else {
+                    $('#detailsView').addClass('hidden-xs hidden-sm');
+                    $('#configurationView').removeClass('hidden-xs hidden-sm');
+                    if (clearSelection) {
+                        clearSelected();
+                    }
+                }
+            }
+            
+            function clearSelected () {
+                if ($scope.gridRef) {
+                    $scope.gridRef.clearSelection();
+                }
+                $scope.selectedRecord = null;
+                $scope.currentAction = "No configuration selected";
+            }
+            
+            function refreshGrid (restoreSelection) {
+                if ($scope.gridRef) {
+                    if (restoreSelection && $scope.selectedRecord) {
+                        $scope.gridRef.refreshGrid(function () {
+                            $scope.gridRef.selectRow($scope.selectedRecord.id, "id");
+                        });
+                    } else {
+                        $scope.gridRef.refreshGrid();
+                    }
+                }
+            }
+        }]);
+        cris.bootstrapAngular("idConfiguration", "crisConfiguration");
 
     // ]]>
     </script>
-
-    <div class="halfMinus floatLeft">
-        <h2>Configurations</h2>
-        <div id="configurations"><!-- fix ff problem --></div>
-    </div>
-
-    <div class="half floatRight">
-        <h2>Details</h2>
-        <form id="form" data-dojo-type="dijit.form.Form">
-            <div>
-                <table class="form" style="width: 100%;">
-                    <tr>
-                        <td style="width: 30%">ID:</td><td id="configId" style="width: 70%"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td>Name:</td><td id="name"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td>Description:</td><td id="description"><!-- --></td>
-                    </tr>
-                    <tr>
-                        <td>Value:</td><td class="tdTextArea"><textarea id="value" rows="8" height="8" dojoType="dijit.form.SimpleTextarea"><!-- --></textarea></td>
-                    </tr>
-                    <tr>
-                        <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
-                    </tr>
-                </table>
+    
+    <div id="idConfiguration" data-ng-controller="ConfigurationController">
+        <div class="row">
+            <div id="configurationView" class="col-xs-12 col-sm-10 col-md-5 col-sm-offset-1">
+                <h2>Configurations</h2>
+                <br />
+                <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>
             </div>
-            <p/>
-            <div style="float: right">
-                <input id="buttonSave" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Save"'/>
-                <input id="buttonReset" type="button" data-dojo-type="dijit.form.Button" data-dojo-props='label: "Reset"'/>
+            <div id="detailsView" class="col-xs-12 col-sm-10 col-md-5 hidden-xs hidden-sm">
+                <div class="hidden-md hidden-lg">
+                    <button type="button" class="btn btn-default" ng-click="toggleDetailsView(null, true)"><span class="glyphicon glyphicon-chevron-left"></span>&amp;nbsp;Back to Configurations List</button>
+                </div>
+                <h2>Details</h2>
+                <div class="text-center">{{currentAction}}</div>
+                <div ng-show="selectedRecord">
+                    <table class="table table-striped">
+                        <tr>
+                            <td style="width: 20%">ID:</td>
+                            <td>{{record.id}}</td>
+                        </tr>
+                        <tr>
+                            <td>Name:</td>
+                            <td>{{record.name}}</td>
+                        </tr>
+                        <tr>
+                            <td>Description:</td>
+                            <td>{{record.description}}</td>
+                        </tr>
+                        <tr>
+                            <td>Value:</td>
+                            <td><textarea rows="10" class="form-control" ng-model="record.valueText"><!----></textarea></td>
+                        </tr>
+                        <tr>
+                            <td>Time Created:</td><td>{{getTimeCreated(record)}}</td>
+                        </tr>
+                        <tr>
+                            <td>Last Updated:</td><td>{{getLastUpdated(record)}}</td>
+                        </tr>
+                    </table>
+                    <div class="pull-right">
+                        <button type="button" class="btn btn-primary" ng-click="save()">Save</button>
+                        &amp;nbsp;
+                        <button type="button" class="btn btn-primary" ng-click="reset()">Reset</button>
+                    </div>
+                </div>
             </div>
-        </form>
+        </div>
     </div>
-
-    <p style="clear: both"/>
 
 </jsp:root>

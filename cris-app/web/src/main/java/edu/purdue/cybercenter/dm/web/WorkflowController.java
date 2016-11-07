@@ -35,7 +35,6 @@ import org.activiti.engine.repository.DeploymentQuery;
 import org.activiti.engine.repository.ProcessDefinition;
 import org.activiti.engine.repository.ProcessDefinitionQuery;
 import org.apache.commons.io.IOUtils;
-import org.hibernate.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -302,7 +301,7 @@ public class WorkflowController {
         return WebHelper.buildIframeResponse(body);
     }
 
-    @RequestMapping(value = "/load/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/load/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object loadWorkflow(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         Workflow workflow = domainObjectService.findById(id, Workflow.class);
@@ -345,7 +344,7 @@ public class WorkflowController {
         return json;
     }
 
-    @RequestMapping(value = "/versions/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/versions/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object getVersions(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -388,44 +387,21 @@ public class WorkflowController {
         return Helper.serialize(result);
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.show(id, request, response, Workflow.class);
     }
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
-        if (request.getParameter("resourceId") != null) {
-            Session session = DomainObjectHelper.getHbmSession();
-            Integer resourceId = Integer.parseInt(request.getParameter("resourceId"));
-            if (!request.getParameter("resourceId").startsWith("-")) {
-                session.enableFilter("workflowInResourceFilter").setParameter("resourceId", resourceId);
-            } else {
-                session.enableFilter("workflowNotInResourceFilter").setParameter("resourceId", -resourceId);
-            }
-        }
         return WebJsonHelper.list(request, response, Workflow.class);
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object updateFromJson(@PathVariable("id") Integer id, @RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
-        Object result;
-        try {
-            result = WebJsonHelper.update(json, request, response, Workflow.class);
-        } catch (Exception ex) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", ex.getMessage());
-            error.put("status", "Unable to update the experiment");
-
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("error", error);
-
-            result = errorResult;
-        }
-
-        return result;
+        return WebJsonHelper.update(json, request, response, Workflow.class);
     }
 }

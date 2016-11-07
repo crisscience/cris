@@ -31,9 +31,6 @@ public class WorkflowDataOnDemand {
     private GroupDataOnDemand groupDataOnDemand;
 
 	@Autowired
-    private ResourceDataOnDemand resourceDataOnDemand;
-
-	@Autowired
     private TenantDataOnDemand tenantDataOnDemand;
 
 	@Autowired
@@ -51,7 +48,6 @@ public class WorkflowDataOnDemand {
         setVersionNumber(obj, index);
         setName(obj, index);
         setOwnerId(obj, index);
-        setResourceId(obj, index);
         setStatusId(obj, index);
         setTenantId(obj, index);
         setTimeCreated(obj, index);
@@ -88,7 +84,7 @@ public class WorkflowDataOnDemand {
     }
 
 	public void setImageId(Workflow obj, int index) {
-        SmallObject imageId = smallObjectDataOnDemand.getRandomSmallObject();
+        Integer imageId = smallObjectDataOnDemand.getRandomSmallObject().getId();
         obj.setImageId(imageId);
     }
 
@@ -114,13 +110,8 @@ public class WorkflowDataOnDemand {
     }
 
 	public void setOwnerId(Workflow obj, int index) {
-        Group ownerId = groupDataOnDemand.getRandomGroup();
+        Integer ownerId = groupDataOnDemand.getRandomGroup().getId();
         obj.setOwnerId(ownerId);
-    }
-
-	public void setResourceId(Workflow obj, int index) {
-        Resource resourceId = resourceDataOnDemand.getRandomResource();
-        obj.setResourceId(resourceId);
     }
 
 	public void setStatusId(Workflow obj, int index) {

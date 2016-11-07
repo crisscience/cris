@@ -4,307 +4,289 @@
     <jsp:output omit-xml-declaration="yes"/>
 
     <spring:url value="/projects" var="urlStore"/>
+    
+    <!-- Scripts for the TinyMCE Rich Text Editor -->
+    <script src="${jsRoot}/tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
+    <script src="${jsRoot}/tinymce/angular-ui-tinymce/tinymce.min.js" type="text/javascript"><!-- --></script>
 
     <div style="display: none;">
         <h4>TODO: Users can put general, project specific, experiment specific, job specific, dataset specific, subject specific, equipment specific comments/notes/discussion. These information can be either private (to the user) or public (to the project) </h4>
         <h4>TODO: Each project/experiment has a wiki-like page where all the facts/discoveries are posted, and interesting links/articles are referenced</h4>
         <hr/>
     </div>
-
-    <div class="floatLeft halfMinus">
-        <h2>Projects</h2>
-
-        <span>
-            <input id="buttonNew" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'New'"/>
-            <input id="buttonDeprecate" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Deprecate'"/>
-        </span>
-        <span class="floatRightToButton">
-            Show:
-            <input id="idShowOperational" type="radio" name="showStatus" value="1" checked="checked" data-dojo-type="dijit/form/RadioButton"/><span>Operational</span>
-            &amp;nbsp
-            <input id="idShowDeprecated" type="radio" name="showStatus" value="0" data-dojo-type="dijit/form/RadioButton"/><span>Deprecated</span>
-            &amp;nbsp
-            <input id="idShowAll" type="radio" name="showStatus" value="" data-dojo-type="dijit/form/RadioButton"/><span>All</span>
-            &amp;nbsp
-        </span>
-        <br/>
-        <div id="idGrid"><!-- fix ff problem --></div>
-    </div>
-
-    <div class="floatRight half">
-        <h2>Details</h2>
-        <div id="detailPrompt" style="text-align: center">No project selected</div>
-        <form id="form" data-dojo-type="dijit/form/Form">
-            <div>
-                <table class="form" style="width: 100%">
-                    <tr>
-                        <td style="width: 30%">ID:</td><td id="configId" style="width: 70%"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td>Name:</td><td class="tdTextBox"><input id="name" data-dojo-type="dijit/form/TextBox"/></td>
-                    </tr>
-                    <tr>
-                        <td>Status:</td><td id="status"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td>Time Created:</td><td id="timeCreated"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td>Last Updated:</td><td id="lastUpdated"><!-- fix ff problem --></td>
-                    </tr>
-                    <tr>
-                        <td style="text-align: center" colspan="2">Description</td>
-                    </tr>
-                    <tr>
-                        <td class="tdTextArea" colspan="2"><div id="description"><!-- --></div></td>
-                    </tr>
-                </table>
+    
+    <div id="idProject" data-ng-controller="projectController">
+        <div class="row">
+            <div id="projectsView" class="col-xs-12 col-sm-10 col-md-5 col-sm-offset-1">
+                <h2>Projects</h2>
+                <div class="row">
+                    <div class="col-md-5">
+                        <div>
+                            <button type="button" class="btn btn-primary" ng-click="createNewProject()">New</button>
+                            &amp;nbsp;&amp;nbsp;
+                            <button type="button" class="btn btn-warning" ng-click="toggleDeprecate()" ng-disabled="!selectedRecord">{{record.statusId === 0 ? "Restore" : "Deprecate"}}</button>
+                        </div>
+                    </div>
+                    <div class="col-md-7 text-right">
+                        <br class="hidden-xs hidden-sm"/>
+                        Show:&amp;nbsp;
+                        <span style="display: inline-block;"><cris-radio-button-group name="projectsStatus" orientation="horizontal" items="{Operational: '1', Deprecated: '0', All: ''}" data-ng-model="status"><!-- --></cris-radio-button-group></span>
+                    </div>
+                </div>
+                <br />
+                <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>
             </div>
-            <div class="floatRight">
-                <input id="buttonSave" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Save'"/>
-                <input id="buttonReset" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Reset'"/>
+            <div id="detailsView" class="col-xs-12 col-sm-10 col-md-5 hidden-xs hidden-sm">
+                <div class="hidden-md hidden-lg">
+                    <button type="button" class="btn btn-default" ng-click="toggleDetailsView(null, true)"><span class="glyphicon glyphicon-chevron-left"></span>&amp;nbsp;Back to Projects List</button>
+                </div>
+                <h2>Details</h2>
+                <div class="text-center">{{currentAction}}</div>
+                <div ng-show="selectedRecord || isNewProject">
+                    <table class="table table-striped">
+                        <tr>
+                            <td style="width: 30%">ID:</td>
+                            <td style="width: 70%">{{record.id}}</td>
+                        </tr>
+                        <tr>
+                            <td>Name:</td>
+                            <td><input type="text" ng-model="record.name" class="form-control" /></td>
+                        </tr>
+                        <tr>
+                            <td>Is Public:</td>
+                            <td>
+                                <cris-radio-button-group name="projectPublicStatus" orientation="horizontal" items="{'Public': true, 'Non Public': null}" data-ng-model="record.isPublic"><!-- --></cris-radio-button-group>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Status:</td>
+                            <td>{{statusIdToName(record.statusId)}}</td>
+                        </tr>
+                        <tr>
+                            <td>Time Created:</td>
+                            <td>{{getTimeCreated(record)}}</td>
+                        </tr>
+                        <tr>
+                            <td>Last Updated:</td>
+                            <td>{{getLastUpdated(record)}}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <div style="width:100%;" class="text-center">Description</div>
+                                <span ui-tinymce="tinymceOptions" ng-model="record.description"><!----></span>
+                            </td>
+                        </tr>
+                    </table>
+                    <div class="pull-right">
+                        <button type="button" class="btn btn-primary" ng-click="save()">Save</button>
+                        &amp;nbsp;
+                        <button type="button" class="btn btn-primary" ng-click="reset()">Reset</button>
+                    </div>
+                </div>
             </div>
-        </form>
+        </div>
     </div>
-
+    <br />
+    
     <script type="text/javascript">
     // <![CDATA[
-        cris.require([
-            "dijit/Editor",
-            "dijit/form/Form",
-            "dijit/form/Button",
-            "dijit/form/TextBox",
-            "dijit/form/SimpleTextarea",
-            "dojox/data/JsonRestStore",
-            "dojo/behavior"
-        ]);
+        angular.module('crisProject', ["angular-dojo","ui.tinymce"]).controller('projectController', ['$scope', '$http', '$uibModal', function ($scope, $http, $uibModal){
+            $scope.status = 1; // Operational projects
+            $scope.url = "${urlStore}" + '/?' + 'showAllStatus=true&filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":1,"isCol":false}]}&sort(+name)';
 
-        cris.project = {};
-        cris.project.app = {
-            store: null,
-            grid: null,
-            creatingNew: false,
-            defaultQuery: {showAllStatus: true},
-            setGridFilter: function(status) {
-                if (status === 0 || status === 1) {
-                    this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: status}]);
-                } else {
-                    this.grid.setFilter();
-                }
-            },
-            updateHtml: function(item) {
-                if (item) {
-                    dojo.byId("configId").innerHTML = item.id || "";
-                    dijit.byId("name").set("value", item.name || "");
-                    dijit.byId("description").set("value", item.description || "");
-                    dojo.byId("status").innerHTML = convertAssetStatusIdToName(item.statusId);
-                    dojo.byId("timeCreated").innerHTML = item.timeCreated && item.timeCreated.$date ? dateIsoToLocale(item.timeCreated.$date) : "";
-                    dojo.byId("lastUpdated").innerHTML = item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
-                    if (item.statusId === 1) {
-                        dijit.byId("buttonDeprecate").set("label", "Deprecate");
-                    } else if (item.statusId === 0) {
-                        dijit.byId("buttonDeprecate").set("label", "Restore");
-                    } else {
-                        dijit.byId("buttonDeprecate").set("label", "Deprecate");
-                    }
-                }
-            },
-            updateStore: function(item) {
-                this.store.setValue(item, "name", dijit.byId("name").getValue());
-                this.store.setValue(item, "description", dijit.byId("description").getValue());
-            },
-            isModified: function(item) {
-                var modified = false;
-
-                var name = dijit.byId("name");
-                if (item.name !== name.getValue()) {
-                    modified = true;
-                }
-
-                var description = dijit.byId("description");
-                if (item.description !== description.getValue()) {
-                    modified = true;
-                }
-
-                return modified;
-            },
-            saveStore: function() {
-                var pd = createProgressDialog();
-                this.store.save({
-                    onComplete: function(data) {
-                        var response = JSON.parse(data[0].deferred.ioArgs.xhr.response);
-                        if (response.hasError) {
-                            pd.setContent("Failed to save changes. " + response.message + " " + response.status);
-                            cris.project.app.updateHtml({});
-                            cris.project.app.grid.setQuery({showAllStatus: true});
-                        } else {
-                            var selectedItem = cris.project.app.grid.selection.getSelected("row")[0];
-                            var selectedIndex = cris.project.app.grid.selection.selectedIndex;
-                            if (selectedItem) {
-                                cris.project.app.grid.updateRow(selectedIndex);
-                                cris.project.app.updateHtml(selectedItem);
-                            } else {
-                                cris.project.app.updateHtml({});
-                            }
-                            cris.project.app.grid.setQuery({showAllStatus: true});
-                            pd.hide();
-                        }
-                    },
-                    onError: function(error) {
-                        pd.setContent("Failed to save changes. " + error);
-                    }
-                });
-            },
-            behavior: {
-                "#idGrid": {
-                    onclick: function(evt) {
-                        dojo.publish("cris/project/newSelection", []);
-                    }
-                },
-                "#idShowOperational": {
-                    onclick: function(evt) {
-                        cris.project.app.setGridFilter(1);
-                    }
-                },
-                "#idShowDeprecated": {
-                    onclick: function(evt) {
-                        cris.project.app.setGridFilter(0);
-                    }
-                },
-                "#idShowAll": {
-                    onclick: function(evt) {
-                        cris.project.app.setGridFilter(null);
-                    }
-                },
-                "#buttonNew": {
-                    onclick: function(evt) {
-                        dojo.byId("detailPrompt").innerHTML = "Create a new project";
-                        cris.project.app.creatingNew = true;
-                        cris.project.app.grid.selection.deselectAll();
-                        cris.project.app.updateHtml({});
-                    }
-                },
-                "#buttonDeprecate": {
-                    onclick: function(evt) {
-                        var item = cris.project.app.grid.selection.getSelected("row")[0];
-                        if (!item) {
-                            showMessage("Please select a project");
-                            return;
-                        }
-
-                        var status;
-                        if (item.statusId === 1) {
-                            status = 0;
-                        } else {
-                            status = 1;
-                        }
-                        cris.project.app.store.setValue(item, "statusId", status ? 1 : 0);
-                        cris.project.app.saveStore();
-                    }
-                },
-                "#buttonSave": {
-                    onclick: function(evt) {
-                        var formManager = dijit.byId("form");
-                        formManager.validate();
-
-                        if (!formManager.isValid()) {
-                            return;
-                        }
-
-                        var item;
-                        if (cris.project.app.creatingNew) {
-                            var name = dojo.byId("name").value;
-                            if (!name) {
-                                showMessage("You must specify a name for the project");
-                                return;
-                            }
-
-                            item = cris.project.app.store.newItem();
-                        } else {
-                            if (cris.project.app.grid.selection.getSelectedCount("row") >= 1) {
-                                var item = cris.project.app.grid.selection.getSelected("row")[0];
-                                if (!cris.project.app.isModified(item)) {
-                                    showMessage("No change is made");
-                                    return;
-                                }
-                            } else {
-                                showMessage("Please select a project");
-                                return;
-                            }
-                        }
-
-                        cris.project.app.creatingNew = false;
-                        cris.project.app.updateStore(item);
-                        cris.project.app.saveStore(item);
-                    }
-                },
-                "#buttonReset": {
-                    onclick: function(evt) {
-                        if (cris.project.app.grid.selection.getSelectedCount("row") >= 1) {
-                            var item = cris.project.app.grid.selection.getSelected("row")[0];
-                            cris.project.app.updateHtml(item);
-                        } else {
-                            cris.project.app.updateHtml({});
-                        }
-                    }
-                }
-            },
-            init: function() {
-                this.creatingNew = false;
-
-                this.store = createJsonRestStore("${urlStore}");
-
-                var layout = [{cells: [
-                            {field: 'statusId', name: 'Status ID', hidden: true},
-                            {field: 'id', name: 'ID', width: '50px'},
-                            {field: 'name', name: 'Name', width: 'auto'},
-                            {field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px',
-                                dataTypeArgs: {
-                                    datePattern: "yyyy-M-d"
-                                },
-                                get: function(row, item) {
-                                    if (!item) {
-                                        return "Loading...";
-                                    }
-                                    return item.timeUpdated ? dateIsoToLocale(item.timeUpdated.$date) : "";
-                                }}
-                        ]}];
-
-                var asc = true;
-                var args = {
-                    query: this.defaultQuery,
-                    sortFields: [{attribute: "name", descending: !asc}],
-                    rowsPerPage: 15,
-                    pageSizes: []
-                };
-                this.grid = createGrid(this.store, layout, "idGrid", args);
-                this.grid.setSortIndex(2, asc);
-                this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: 1}]);
-
-                var editor = new dijit.Editor({}, "description");
-                editor.startup();
-
-                dojo.style("buttonDeprecate", "width", "70px");
-
-                this.updateHtml({});
-
-                dojo.behavior.add(this.behavior);
-                dojo.behavior.apply();
-
-                dojo.subscribe("cris/project/newSelection", this, function(evt) {
-                    if (this.grid.selection.getSelectedCount("row") >= 1) {
-                        dojo.byId("detailPrompt").innerHTML = "Edit an existing project";
-                        this.creatingNew = false;
-                        var item = this.grid.selection.getSelected("row")[0];
-                        this.updateHtml(item);
-                    }
-                });
+            $scope.gridColumnDefs = [
+                {field: 'statusId', name: 'statusId', displayName: 'Status ID', visible: false, width: 80},
+                {field: 'id', name: 'id', displayName: 'ID', width: 60},
+                {field: 'name', name: 'name', displayName: 'Name', minWidth: 160},
+                {field: 'timeUpdated', name: 'timeUpdated', displayName: 'Last Updated', enableFiltering: false, width: 115, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity,isDate:true}) CUSTOM_FILTERS}}</div>'}
+            ];
+            
+            // Settings for the TinyMCE text editor
+            $scope.tinymceOptions = {
+                menubar: false,
+                statusbar: false,
+                height:200
             }
-        };
+            clearDetails();
+                    
+            $scope.formatDisplayValue = function (value, rowData, isDate) {
+                if (isDate) {
+                    return value ? dateIsoToLocale(value.$date) : "";
+                }
+            };
+            
+            $scope.$watch('status', function (newValue, oldValue) {
+                if (newValue !== oldValue) {
+                    if (newValue === "") { // all
+                        $scope.url = "${urlStore}" + '/?showAllStatus=true&sort(+name)';
+                    } else { // Operational or Deprecated
+                        $scope.url = "${urlStore}" + '/?' + 'showAllStatus=true&filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":' + newValue + ',"isCol":false}]}&sort(+name)';
+                    }
+                    clearDetails();
+                    refreshGrid();
+                }
+            });
+            
+            // Clear reference to selected record during pagination
+            $scope.$watch('gridRef.grid.selection.selectedCount', function (newValue, oldValue) {
+                if (newValue !== oldValue && newValue === 0) {
+                    $scope.selectedRecord = null;
+                }
+            });
+            
+            $scope.rowSelectCallback = function (rowData) {
+                $scope.currentAction = "Edit an existing project";
+                $scope.isNewProject = false;
+                
+                $scope.record = angular.copy(rowData);
+                $scope.selectedRecord = rowData;
+                $scope.toggleDetailsView(true);
+            };
+            
+            $scope.statusIdToName = function (statusId) {
+                return (typeof statusId !== 'undefined') ? convertAssetStatusIdToName(statusId) : "";
+            };
+            
+            $scope.getTimeCreated = function (record) {
+                return record && record.timeCreated && record.timeCreated.$date ? dateIsoToLocale(record.timeCreated.$date) : "";
+            };
+            
+            $scope.getLastUpdated = function (record) {
+                return record && record.timeUpdated && record.timeUpdated.$date ? dateIsoToLocale(record.timeUpdated.$date) : "";
+            };
+            
+            $scope.createNewProject = function () {
+                $scope.currentAction = "Create a new project";
+                $scope.isNewProject = true;
+                clearSelected();
+                $scope.record = {name: null, description: null, isPublic: null};
+                $scope.toggleDetailsView(true);
+            };
+            
+            $scope.toggleDeprecate = function () {
+                if ($scope.selectedRecord) {
+                    var status;
+                    if ($scope.selectedRecord.statusId === 1) {
+                        status = 0;
+                    } else {
+                        status = 1;
+                    }
 
-        cris.ready(function() {
-            cris.project.app.init();
-        });
+                    $scope.selectedRecord.statusId = status;
+                    $http({
+                        url: "${urlStore}" + "/" + $scope.selectedRecord.id,
+                        method: 'PUT',
+                        data: $scope.selectedRecord
+                    }).then(function successCallback(result) {
+                        refreshGrid();
+                        clearDetails();
+                    }, function errorCallback(error) {
+
+                    });
+                }
+            };
+            
+            $scope.save = function () {
+                var data;
+                var method;
+                if ($scope.isNewProject) {
+                    if (!$scope.record.name) {
+                        showMessageModal({uibModal: $uibModal, message: "You must specify a name for the project"});
+                        return;
+                    }
+                    data = $scope.record;
+                    method = "POST";
+                } else {
+                    if ($scope.selectedRecord) {
+                        if (!isModified()) {
+                            showMessageModal({uibModal: $uibModal, message: "No change is made"});
+                            return;
+                        }
+                        data = $scope.selectedRecord;
+                        data.name = $scope.record.name;
+                        data.isPublic = $scope.record.isPublic;
+                        data.description = $scope.record.description;
+                        method = "PUT";
+                    } else {
+                        showMessageModal({uibModal: $uibModal, message: "Please select a project"});
+                        return;
+                    }
+                }
+                $scope.isNewProject = false;
+                
+                $http({
+                    url: "${urlStore}" + (method === "PUT" ? "/" + data.id : ""),
+                    method: method,
+                    data: data
+                }).then(function successCallback(result) {
+                    refreshGrid(true);
+                }, function errorCallback(error) {
+                    
+                });
+            };
+            
+            $scope.reset = function () {
+                if ($scope.selectedRecord) {
+                    $scope.record = angular.copy($scope.selectedRecord);
+                } else {
+                    $scope.record = {};
+                }
+            };
+            
+            // On smaller screens toggle between projects view and details view
+            $scope.toggleDetailsView = function (doShow, clearSelection) {
+                if (doShow) {
+                    $('#detailsView').removeClass('hidden-xs hidden-sm');
+                    $('#projectsView').addClass('hidden-xs hidden-sm');
+                } else {
+                    $('#detailsView').addClass('hidden-xs hidden-sm');
+                    $('#projectsView').removeClass('hidden-xs hidden-sm');
+                    if (clearSelection) {
+                        clearSelected();
+                    }
+                }
+            }
+            
+            function refreshGrid (restoreSelection) {
+                if ($scope.gridRef) {
+                    if (restoreSelection && $scope.selectedRecord) {
+                        var selectedId = $scope.selectedRecord.id;
+                        $scope.gridRef.refreshGrid(function () {
+                            $scope.gridRef.selectRow(selectedId, "id");
+                        });
+                    } else {
+                        $scope.gridRef.refreshGrid();
+                    }
+                }
+            }
+            
+            function clearSelected () {
+                if ($scope.gridRef) {
+                    $scope.gridRef.clearSelection();
+                }
+                $scope.selectedRecord = null;
+            }
+            
+            function clearDetails () {
+                $scope.record = {isPublic: null};
+                $scope.currentAction = "No project selected";
+            }
+            
+            function isModified () {
+                var modified = false;
+                if ($scope.record.name !== $scope.selectedRecord.name) {
+                    modified = true;
+                }
+                if ($scope.record.isPublic !== $scope.selectedRecord.isPublic) {
+                    modified = true;
+                }
+                if ($scope.record.description !== $scope.selectedRecord.description) {
+                    modified = true;
+                }
+                return modified;
+            }   
+        }]);
+        cris.bootstrapAngular("idProject", "crisProject");
 // ]]>
     </script>
 

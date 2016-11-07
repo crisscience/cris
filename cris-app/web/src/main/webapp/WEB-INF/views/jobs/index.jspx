@@ -18,19 +18,22 @@
 
     <script type="text/javascript">
     // <![CDATA[
-    angular.module("crisJob", ["angular-dojo"]);
+    angular.module("crisJob", ["angular-dojo"]).controller("jobController", ["$scope", "$http", function($scope, $http) {
+        
+        // ui-grid column definitions
+        $scope.gridColumnDefs = [
+            {field: 'id', name: 'Job ID', displayName: 'Job ID', enableSorting: true, width: 60},
+            {field: 'name', name: 'Name', displayName: 'Name', enableSorting: true, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" ng-bind-html="grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity})"></div>'},
+            {field: 'workflowId.name', name: 'Workflow', displayName: 'Workflow', enableSorting: true, minWidth: 200},
+            {field: 'timeUpdated', name: 'Last Updated', displayName: 'Last Updated', enableSorting: true, width: 110, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity,isDate:true}) CUSTOM_FILTERS}}</div>'},
+            {field: 'statusId.name', name: 'Status', displayName: 'Status', enableSorting: false, width: 85},
+            {field: 'actionNeeded', name: 'Next Task', displayName: 'Next Task', enableSorting: false, enableFiltering: false, minWidth: 200, cellTemplate: '<div class="ui-grid-cell-contents" ng-bind-html="grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity})"></div>'},
+        ];
 
-    angular.module("crisJob").controller("jobController", ["$scope", function($scope) {
-        cris.require([
-            "dojo/request/xhr",
-            "dijit/form/Button",
-            "dijit/form/RadioButton"
-        ]);
-
-        cris.ready(function() {
-            var store = createJsonRestStore("${urlJobs}");
-
-            var formatHref = function(value, rowIndex) {
+        $scope.formatDisplayValue = function (value, rowData, isDate) {
+            if (isDate) {
+                return stringDate(value); 
+            } else {
                 var newValue;
                 if (value) {
                     newValue = value.replace(/&lt;/g, "<");
@@ -38,123 +41,81 @@
                     newValue = "";
                 }
                 return newValue;
-            };
+            }
+        };
+        
+        var status;
+        if ("${status}") {
+            status = "${status}";
+        } else {
+            status = "true,true,true";
+        }
+        $scope.url = cris.baseUrl + 'jobs/json/list/?status=' + (status ? status : "true,true,true");
+        
+        var dateFilter = '${param["dateFilter"]}';
+        if (dateFilter) {
+            $scope.url = $scope.url + '&' + dateFilter;
+        }
 
-            var layout = [
-                {
-                    cells: [
-                        { field: 'id', name: 'Job ID', datatype: "number", width: '50px' },
-                        { field: 'name', name: 'Name', width: 'auto', formatter: formatHref },
-                        { field: 'workflowId.name', name: 'Workflow', width: 'auto' },
-                        { field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px', get: function(index, item) {
-                            if (!item) {
-                                return;
-                            }
-                            return stringDate(item.timeUpdated);
-                        } },
-                        { field: 'statusId.name', name: 'Status', width: '75px' },
-                        { field: 'actionNeeded', name: 'Next Task', filterable: false, width: 'auto', formatter: formatHref, canSort: false}
-                    ]
-                }
-            ];
+        $scope.sortField = "timeUpdated";
+        $scope.sortDirection = 'desc';
 
-            var args = {};
-
-            var status;
-            if ("${status}") {
-                status = "${status}";
+        $scope.deprecateButtonDisabled = true;
+        
+        $scope.rowSelectCallback = function (rowData) {
+            $scope.selectedRow = rowData;
+            // ui-grid doesn't support dots in field name. The function formatUnsupportedFieldName is accessible in row Object
+            var status = rowData[rowData.formatUnsupportedFieldName("statusId.name")];
+            if (status === "CANCELED") {
+                $scope.deprecateButtonDisabled = true;
             } else {
-                status = "true,true,true";
+                $scope.deprecateButtonDisabled = false;
             }
-
-            var query = {status: status};
-            //TODO: there may be better ways
-            var dateFilter = '${param["dateFilter"]}';
-            if (dateFilter) {
-                //dateFilter = dojo.fromJson(dateFilter);
-                query.dateFilter = dateFilter;
-            }
-            args.query = query;
-
-            var asc = false;
-            args.sortFields = [{attribute: "timeUpdated", descending: !asc}];
-            args.pageSizes = ["10", "25", "50", "100"];
-
-            var grid = createGrid(store, layout, "idGrid", args);
-            grid.setSortIndex(3, asc);
-
-            grid.canSort = function(col) {
-                if (Math.abs(col) === 6 || Math.abs(col) === 5) {
-                    return false;
-                } else {
-                    return true;
-                }
-            };
-
-            var buttonDelete = dijit.byId("idDelete");
-            dojo.connect(grid, "onSelected", function(index) {
-                if (grid.selection.getSelectedCount("row") >= 1) {
-                    var item = grid.getItem(index);
-                    var status = item["statusId.name"];
-                    if (status === "CANCELED") {
-                        buttonDelete.set("disabled", true);
+        };
+        
+        $scope.onDelete = function() {
+            if ($scope.selectedRow) {
+                // ui-grid doesn't support dots in field name. The function formatUnsupportedFieldName is accessible in row Object
+                var status = $scope.selectedRow[$scope.selectedRow.formatUnsupportedFieldName("statusId.name")];
+                if (status !== "CANCELLED") {
+                    var index = $scope.selectedRow.name.indexOf(">");
+                    var name;
+                    if (index !== -1) {
+                        name = $scope.selectedRow.name.substring(index + 1);
                     } else {
-                        buttonDelete.set("disabled", false);
+                        name = $scope.selectedRow.name;
                     }
-                } else {
-                    buttonDelete.set("disabled", false);
-                }
-            });
+                    index = name.lastIndexOf("<");
+                    if (index !== -1) {
+                        name = name.substring(0, index);
+                    }
+                    var yes = confirm("Are you sure to delete job: " + $scope.selectedRow.id + ": " + name);
+                    if (yes) {
+                        $http({
+                            url: "${urlJobsCancel}" + $scope.selectedRow.id,
+                            method: 'DELETE'
+                        }).then(function (successCallback) {
+                            $scope.deprecateButtonDisabled = true;
+                            refreshGrid();
+                        }, function (errorCallback) {
 
-            $scope.onDelete = function() {
-                if (grid.selection.getSelectedCount("row") >= 1) {
-                    var item = grid.selection.getSelected()[0];
-                    var status = item["statusId.name"];
-                    if (status !== "CANCELLED") {
-                        var index = item.name.indexOf(">");
-                        var name;
-                        if (index !== -1) {
-                            name = item.name.substring(index + 1);
-                        } else {
-                            name = item.name;
-                        }
-                        index = name.lastIndexOf("<");
-                        if (index !== -1) {
-                            name = name.substring(0, index);
-                        }
-                        var yes = confirm("Are you sure to delete job: " + item.id + ": " + name);
-                        if (yes) {
-                            var xhrArgs = {
-                                url: "${urlJobsCancel}" + item.id,
-                                handleAs: "json",
-
-                                load: function(data) {
-                                    grid.setQuery(query);
-                                    buttonDelete.set("disabled", true);
-                                    grid.selection.setSelected(grid.selection.selectedIndex, false);
-                                },
-
-                                error: function(error) {
-                                }
-                            };
-
-                            dojo.xhrDelete(xhrArgs);
-                        }
+                        });
                     }
                 }
-            };
+            }
+        }
+        
+        $scope.errorMessage = "";
+        $scope.status = [];
+        var arrayStatus = dojo.fromJson("[" + status + "]");
+        angular.forEach(arrayStatus, function(v, i) {
+            if (v === true) {
+                $scope.status.push(i);
+            }
+        });
 
-            $scope.errorMessage = "";
-            $scope.status = [];
-            var arrayStatus = dojo.fromJson("[" + status + "]");
-            angular.forEach(arrayStatus, function(v, i) {
-                if (v === true) {
-                    $scope.status.push(i);
-                }
-            });
-            $scope.$apply();
-
-            $scope.$watch("status", function(value) {
+        $scope.$watchCollection("status", function(newValue, oldValue) {
+            if (!angular.equals(newValue,oldValue)) {
                 console.dir($scope.status);
                 var running = false;
                 var finished = false;
@@ -168,10 +129,17 @@
                         cancelled = true;
                     }
                 });
-                query.status = running +  "," + finished + "," + cancelled;
-                grid.setQuery(query);
-            }, true);
-        });
+                $scope.url = cris.baseUrl + 'jobs/json/list/?status=' + running +  "," + finished + "," + cancelled;
+                refreshGrid();
+            }
+        }, true);
+        
+        function refreshGrid () {
+            if ($scope.gridRef) {
+                $scope.gridRef.refreshGrid();
+            }
+            $scope.deprecateButtonDisabled = true;
+        }
     }]);
 
 
@@ -180,21 +148,31 @@
     </script>
 
     <div id="idJob" data-ng-controller="jobController">
-        <h1 class="center">Jobs</h1>
+        <h1 class="text-center">Jobs</h1>
 
-        <div>
-            <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props='label: "Create a New Job"' onClick="window.location.href='${urlJobsForm}'"/>
-            <span data-ng-show="${fn:length(views) > 1}">
-                <input id="idDelete" type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Deprecate", disabled: true' data-ng-click="onDelete()"/>
-            </span>
-            &amp;nbsp;&amp;nbsp;&amp;nbsp;{{errorMessage}}
-
-            <div class="floatRightToButton">
-                <cris-check-box name="status" orientation="horizontal" items="{Running: 0, Finished: 1, Cancelled: 2}" data-ng-model="status"><!-- --></cris-check-box>
+        <div class="row">
+            <div class="col-sm-4 col-lg-3 col-lg-offset-1">
+                <button type="button" class="btn btn-primary" onclick="window.location.href='${urlJobsForm}'"> Create a New Job</button>
+                <span data-ng-show="${user.isAdmin()}">
+                    &amp;nbsp;&amp;nbsp;
+                    <button type="button" class="btn btn-warning" ng-disabled="deprecateButtonDisabled" data-ng-click="onDelete()">Deprecate</button>
+                </span>
+            </div>
+            <div class="col-sm-4 col-lg-4 text-center">
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;{{errorMessage}}
+            </div>
+            <div class="col-sm-4 col-lg-3 text-right">
+                <div class="floatRightToButton">
+                    <cris-check-box name="status" orientation="horizontal" items="{Running: 0, Finished: 1, Cancelled: 2}" data-ng-model="status"><!-- --></cris-check-box>
+                </div>
             </div>
         </div>
-
-        <div id="idGrid"><!-- --></div>
+        <br />
+        <div class="row">
+            <div class="col-lg-10 col-lg-offset-1">
+                <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" sort-field="sortField" sort-direction="{{sortDirection}}" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>
+            </div>
+        </div>
     </div>
 
 </jsp:root>

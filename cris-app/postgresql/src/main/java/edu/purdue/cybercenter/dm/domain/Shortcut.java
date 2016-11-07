@@ -22,7 +22,6 @@ import org.hibernate.envers.Audited;
 import org.springframework.beans.factory.annotation.Configurable;
 
 @Filters({
-//    @Filter(name = "myShortcutsFilter"),
     @Filter(name = "timeBetweenFilter"),
     @Filter(name = "tenantFilter")
 })

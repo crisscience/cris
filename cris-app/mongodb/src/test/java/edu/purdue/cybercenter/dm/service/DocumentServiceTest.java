@@ -114,7 +114,7 @@ public class DocumentServiceTest {
         Map<String, Object> map = new HashMap<>();
 
         Map document = save(map);
-        Assert.assertEquals("number of fields", 8, document.size());
+        Assert.assertEquals("number of fields", 12, document.size());
     }
 
     @Test
@@ -176,12 +176,17 @@ public class DocumentServiceTest {
         save(map);
         save(map);
 
-        List<Map<String, Object>> documents = documentService.find(uuid1, version1, null);
+        Map<String, Object> aggregators = new HashMap<>();
+        aggregators.put(DocumentService.IS_ADMIN, true);
+
+        long count = documentService.count(uuid1, version1, aggregators);
+        Assert.assertEquals("document size:", 3, count);
+
+        List<Map<String, Object>> documents = documentService.find(uuid1, version1, aggregators);
         Assert.assertEquals("document size:", 3, documents.size());
 
         Map<String, Object> document = documents.get(1);
 
-        Map<String, Object> aggregators = new HashMap<>();
         aggregators.put(DocumentService.AGGREGATOR_MATCH, document);
 
         List<Map<String, Object>> documentsSelected = documentService.find(uuid1, version1, aggregators);
@@ -191,7 +196,8 @@ public class DocumentServiceTest {
         documentsSelected = documentService.find(uuid1, version1, aggregators);
         Assert.assertEquals("selected document size after deletion:", 0, documentsSelected.size());
 
-        documents = documentService.find(uuid1, version1, null);
+        aggregators.remove(DocumentService.AGGREGATOR_MATCH);
+        documents = documentService.find(uuid1, version1, aggregators);
         Assert.assertEquals("document size after deletion:", 2, documents.size());
     }
 
@@ -203,6 +209,7 @@ public class DocumentServiceTest {
         Map<String, Object> query = new HashMap<>();
         query.put("hplc_id", "a1");
         Map<String, Object> aggregators = new HashMap<>();
+        aggregators.put(DocumentService.IS_ADMIN, true);
         aggregators.put(DocumentService.AGGREGATOR_MATCH, query);
         List<Map<String, Object>> documents = documentService.find(uuid2, null, aggregators);
         Assert.assertEquals("documents size", 2, documents.size());
@@ -214,6 +221,7 @@ public class DocumentServiceTest {
         project.put("hplc_id", true);
         project.put("hplc_name", true);
         aggregators.clear();
+        aggregators.put(DocumentService.IS_ADMIN, true);
         aggregators.put(DocumentService.AGGREGATOR_DISTINCT, project);
         documents = documentService.find(uuid2, null, aggregators);
         int less = documents.size();
@@ -248,6 +256,7 @@ public class DocumentServiceTest {
         query.put("hplc_id", "a1");
         Map<String, Object> aggregators = new HashMap<>();
         aggregators.put(DocumentService.AGGREGATOR_MATCH, query);
+        aggregators.put(DocumentService.IS_ADMIN, true);
         List<Map<String, Object>> documents = documentService.find(uuid2, null, aggregators, file);
         Assert.assertEquals("documents size", 0, documents.size());
 

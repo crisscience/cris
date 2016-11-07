@@ -6,16 +6,24 @@ import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.GroupUser;
 import edu.purdue.cybercenter.dm.domain.Tenant;
 import edu.purdue.cybercenter.dm.domain.User;
+import edu.purdue.cybercenter.dm.repository.ConfigurationRepository;
+import edu.purdue.cybercenter.dm.repository.GroupRepository;
+import edu.purdue.cybercenter.dm.repository.GroupUserRepository;
+import edu.purdue.cybercenter.dm.repository.TenantRepository;
+import edu.purdue.cybercenter.dm.repository.UserRepository;
 import edu.purdue.cybercenter.dm.util.DomainObjectHelper;
 import edu.purdue.cybercenter.dm.util.SecurityHelper;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.persistence.Query;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.encoding.ShaPasswordEncoder;
 import org.springframework.stereotype.Controller;
@@ -27,9 +35,20 @@ import org.springframework.web.bind.annotation.RequestMethod;
 @Controller
 public class TenantController {
 
-    static final private String PublicPassword = "d41d62b0-3cbc-11e2-a25f-0800200c9a66";
-    static final private int MinPasswordLength = 8;
-    static final private int MaxNameLength = 80;
+    static final private String PUBLIC_PASSWORD = "d41d62b0-3cbc-11e2-a25f-0800200c9a66";
+    static final private int MIN_PASSWORD_LENGTH = 8;
+    static final private int MAX_PASSWORD_LENGTH = 80;
+
+    @Autowired
+    private TenantRepository tenantRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private GroupRepository groupRepository;
+    @Autowired
+    private GroupUserRepository groupUserRepository;
+    @Autowired
+    private ConfigurationRepository configurationRepository;
 
     @RequestMapping(value = "/createForm", method = RequestMethod.GET, produces = MediaType.TEXT_HTML_VALUE)
     public String createForm() {
@@ -49,14 +68,14 @@ public class TenantController {
             errors.put("password", "password is missing");
         } else if (!password1.equals(password2)) {
             errors.put("password", "passwords do not macth");
-        } else if (password1.length() < MinPasswordLength) {
-            errors.put("password", "password too short: must be at least " + MinPasswordLength + " characters long");
+        } else if (password1.length() < MIN_PASSWORD_LENGTH) {
+            errors.put("password", "password too short: must be at least " + MIN_PASSWORD_LENGTH + " characters long");
         }
 
         if (name == null || name.isEmpty()) {
             errors.put("name", "no name specified");
-        } else if (name.length() > MaxNameLength) {
-            errors.put("name", "name too long: " + MaxNameLength + " characters maximum");
+        } else if (name.length() > MAX_PASSWORD_LENGTH) {
+            errors.put("name", "name too long: " + MAX_PASSWORD_LENGTH + " characters maximum");
         }
 
         if (urlIdentifier == null || urlIdentifier.isEmpty()) {
@@ -90,7 +109,7 @@ public class TenantController {
             tenant.setName(name);
             tenant.setUrlIdentifier(urlIdentifier);
             tenant.setEnabled(true);
-            tenant.persist();
+            tenant = tenantRepository.save(tenant);
 
             // impersonate the tenant and current user (null)
             edu.purdue.cybercenter.dm.threadlocal.TenantId.set(tenant.getId());
@@ -114,7 +133,7 @@ public class TenantController {
             adminUser.setCredentialsNonExpired(true);
             adminUser.setEnabled(true);
 
-            adminUser.persist();
+            adminUser = userRepository.save(adminUser);
 
             /*
              * admin group
@@ -122,7 +141,7 @@ public class TenantController {
             Group adminGroup = new Group();
             adminGroup.setName(Constant.AdminGroupName);
             adminGroup.setEnabled(true);
-            adminGroup.persist();
+            groupRepository.save(adminGroup);
 
             /*
              * add the user to admin group
@@ -130,7 +149,7 @@ public class TenantController {
             GroupUser groupUser = new GroupUser();
             groupUser.setGroupId(adminGroup);
             groupUser.setUserId(adminUser);
-            groupUser.persist();
+            groupUserRepository.save(groupUser);
 
             /*
              * and public user for the workspace
@@ -143,102 +162,117 @@ public class TenantController {
             publicUser.setLastName("User");
             publicUser.setUsername(Constant.PublicUsername);
             publicUser.setSalt(salt);
-            publicUser.setPassword(encoder.encodePassword(PublicPassword, salt));
+            publicUser.setPassword(encoder.encodePassword(PUBLIC_PASSWORD, salt));
 
             publicUser.setAccountNonExpired(true);
             publicUser.setAccountNonLocked(true);
             publicUser.setCredentialsNonExpired(true);
             publicUser.setEnabled(true);
 
-            publicUser.persist();
+            userRepository.save(publicUser);
 
             /*
              * Configuration
              */
+            List<Configuration> configurations = new ArrayList<>();
             Configuration configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("externalSource");
             configuration.setValueText("Purdue University");
-            configuration.persist();
+            configurations.add(configuration);
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy");
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("CopyrightYear");
             configuration.setValueText(dateFormat.format(new Date()));
-            configuration.persist();
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsFavicon");
             configuration.setValueText("favicon.ico");
-            configuration.persist();
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsBannerImage");
             configuration.setValueText("header.jpg");
-            configuration.persist();
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsAuthBackgroundImage");
             configuration.setValueText("");
-            configuration.persist();
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsName");
             configuration.setValueText(name);
-            configuration.persist();
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsDescription");
             configuration.setValueText("");
-            configuration.persist();
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsSigninInstruction");
-            configuration.setValueText("");
-            configuration.persist();
+            configuration.setValueText("If you are a Purdue user, please use your Purdue Career Account.");
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsSignupInstruction");
-            configuration.setValueText("");
-            configuration.persist();
+            configuration.setValueText("If you are a Purdue user, please use your Purdue Career Account. If outside of Purdue, create a new account here.");
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsAuthProblem");
-            configuration.setValueText("");
-            configuration.persist();
+            configuration.setValueText("Please provide the email that you used as username. Password reset instruction will be sent to this email.");
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsAuthReset");
-            configuration.setValueText("");
-            configuration.persist();
+            configuration.setValueText("Please copy/paste the token in the email that has been sent to your, then enter a new password.");
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsEmailGeneral");
-            configuration.setValueText("");
-            configuration.persist();
+            configuration.setValueText("cyber@purdue.edu");
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsEmailAccountProblem");
-            configuration.setValueText("");
-            configuration.persist();
+            configuration.setValueText("cyber@purdue.edu");
+            configurations.add(configuration);
 
             configuration = new Configuration();
             configuration.setType("text");
             configuration.setName("wsHomeUri");
             configuration.setValueText("/home");
-            configuration.persist();
+            configurations.add(configuration);
+
+            configuration = new Configuration();
+            configuration.setType("text");
+            configuration.setName("wsAuthFailedGeneral");
+            configuration.setValueText("");
+            configurations.add(configuration);
+
+            configuration = new Configuration();
+            configuration.setType("text");
+            configuration.setName("wsAuthFailedDisabled");
+            configuration.setValueText("");
+            configurations.add(configuration);
+
+            configurationRepository.save(configurations);
 
             // reset tenant id to null
             edu.purdue.cybercenter.dm.threadlocal.TenantId.set(null);

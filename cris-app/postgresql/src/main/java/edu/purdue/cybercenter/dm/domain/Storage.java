@@ -13,14 +13,9 @@ import javax.persistence.EntityListeners;
 import javax.persistence.PrePersist;
 import javax.persistence.Table;
 import javax.validation.constraints.NotNull;
-import org.hibernate.annotations.Filter;
-import org.hibernate.annotations.Filters;
 import org.hibernate.envers.Audited;
 import org.springframework.beans.factory.annotation.Configurable;
 
-@Filters({
-    @Filter(name = "tenantFilter")
-})
 @Entity
 @Table(schema = "public", name = "storage")
 @Audited

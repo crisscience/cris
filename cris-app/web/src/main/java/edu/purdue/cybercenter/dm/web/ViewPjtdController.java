@@ -47,7 +47,7 @@ public class ViewPjtdController {
     /*********************************************************
      * tree
      *********************************************************/
-    @RequestMapping(value={"/root"}, method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value={"/root"}, method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String getProjectsRoot(HttpServletRequest request, HttpServletResponse response) {
         StringBuilder sb = new StringBuilder();
@@ -61,7 +61,7 @@ public class ViewPjtdController {
         return sb.toString();
     }
 
-    @RequestMapping(value={"/project/root"}, method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value={"/project/root"}, method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String getProjects(HttpServletRequest request, HttpServletResponse response) {
         //Query query = Helper.createNamedQuery("Project.findAll");
@@ -86,7 +86,7 @@ public class ViewPjtdController {
         return sb.toString();
     }
 
-    @RequestMapping(value="/project/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value="/project/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String getExperiments(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         Project project = domainObjectService.findById(id, Project.class);
@@ -112,7 +112,7 @@ public class ViewPjtdController {
         return sb.toString();
     }
 
-    @RequestMapping(value="/experiment/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value="/experiment/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String getJobs(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         Session session = DomainObjectHelper.getHbmSession();
@@ -144,7 +144,7 @@ public class ViewPjtdController {
         return sb.toString();
     }
 
-    @RequestMapping(value="/job/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value="/job/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String getTasks(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         Job job = Job.findJob(id);
@@ -160,13 +160,13 @@ public class ViewPjtdController {
         return sb.toString();
     }
 
-    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object showJson(@PathVariable("id") Integer id, HttpServletRequest request, HttpServletResponse response) {
         return WebJsonHelper.show(id, request, response, ViewPjtd.class);
     }
 
-    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listJson(HttpServletRequest request, HttpServletResponse response) {
         Integer[] ia = WebHelper.getDojoGridPaginationInfo(request);

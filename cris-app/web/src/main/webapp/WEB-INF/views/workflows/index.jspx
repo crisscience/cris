@@ -10,7 +10,7 @@
     
     <spring:url value="/images/famfamfam_silk_icons_v013/icons/add.png" var="srcAddImg"/>
     <spring:url value="/images/famfamfam_silk_icons_v013/icons/delete.png" var="srcDeleteImg"/>
-
+    
     <!-- jsPlumb -->
     <c:set value="${jsRoot}/jquery-ui.js" var="url" />
     <script src="${url}" type="text/javascript"><!-- required for Diagram editor using jsPlumb --></script>
@@ -42,198 +42,138 @@
     <spring:url value="/workflows/save" var="urlSaveWorkflow"/>
     <spring:url value="/workflows/load/" var="urlLoadWorkflow"/>
     <spring:url value="/workflows/versions" var="urlVersions"/>
-    <spring:url value="/templates" var="urlTemplates"/>
-    <spring:url value="/reports" var="urlReports"/>
+    <spring:url value="/templates/?sort(+name)" var="urlTemplates"/>
+    <spring:url value="/reports/?sort(+name)" var="urlReports"/>
 
     <script type="text/javascript">
         // <![CDATA[
-        cris.require([
-            "dojo/behavior",
-            "dijit/form/Form",
-            "dijit/form/ValidationTextBox",
-            "dijit/form/Button",
-            "dijit/form/RadioButton",
-            "dijit/form/SimpleTextarea",
-            "dijit/form/FilteringSelect",
-            "dijit/layout/TabContainer",
-            "dijit/layout/ContentPane",
-            "dijit/MenuItem",
-            "dijit/Dialog",
-            "dijit/DropDownMenu",
-            "dojox/xml/parser"
-        ]);
-
         cris.workflow = {};
         cris.workflow.app = {
-            grid: null,
-            store: null,
-
-            defaultQuery: {showAllStatus: true},
-
-            setGridFilter: function(status) {
-                if (status === 0 || status === 1) {
-                    this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: status}]);
-                } else {
-                    this.grid.setFilter();
-                }
-            },
-
-            updateHtml: function(item) {
-                dojo.byId("detailVersionNumber").innerHTML = item["versionNumber"];
-                dojo.byId("detailKey").innerHTML = item["key"] ? item["key"] : "";
-                dojo.byId("detailName").innerHTML = item["name"] ? item["name"] : "";
-                dojo.byId("detailFileName").innerHTML = item["content"] ? item["content"] : "";
-                dojo.byId("status").innerHTML = convertAssetStatusIdToName(item.statusId);
-                dojo.byId("detailTimeCreated").innerHTML = item.timeCreated && item.timeCreated.$date ? dateIsoToLocale(item.timeCreated.$date) : "";
-                dojo.byId("detailTimeUpdated").innerHTML = item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
-                dojo.byId("detailExportUrl").href = (item ? "${urlExport}/" + this.workflowId : "") + "?version=" + item.version + "&showAllStatus=true";
-                dojo.byId("detailExportUrl").innerHTML = (item && item.content) ? item.content : "";
-                if (item.statusId === 1) {
-                    dijit.byId("buttonDeprecate").set("label", "Deprecate");
-                } else if (item.statusId === 0) {
-                    dijit.byId("buttonDeprecate").set("label", "Restore");
-                } else {
-                    dijit.byId("buttonDeprecate").set("label", "Deprecate");
-                }
-            },
-
-            saveStore: function() {
-                var pd = createProgressDialog();
-                this.store.save({
-                    onComplete: function(data) {
-                        var selectedItem = cris.workflow.app.grid.selection.getSelected("row")[0];
-                        var selectedIndex = cris.workflow.app.grid.selection.selectedIndex;
-                        if (selectedItem) {
-                            cris.workflow.app.grid.updateRow(selectedIndex);
-                            cris.workflow.app.updateHtml(selectedItem);
-                        } else {
-                            cris.workflow.app.updateHtml({});
-                        }
-                        cris.workflow.app.grid.setQuery({showAllStatus: true});
-                        pd.hide();
-                    },
-                    onError: function(error) {
-                        pd.setContent("Failed to save changes. " + error);
-                    }
-                });
-            },
-
-            behavior: {
-                "#idShowOperational": {
-                    onclick: function(evt) {
-                        cris.workflow.app.setGridFilter(1);
-                    }
-                },
-                "#idShowDeprecated": {
-                    onclick: function(evt) {
-                        cris.workflow.app.setGridFilter(0);
-                    }
-                },
-                "#idShowAll": {
-                    onclick: function(evt) {
-                        cris.workflow.app.setGridFilter(null);
-                    }
-                },
-                "#buttonDeprecate": {
-                    onclick: function(evt) {
-                        var item = cris.workflow.app.grid.selection.getSelected("row")[0];
-                        if (!item) {
-                            showMessage("Please select a workflow");
-                            return;
-                        }
-
-                        var status;
-                        if (item.statusId === 1) {
-                            status = 0;
-                        } else {
-                            status = 1;
-                        }
-                        cris.workflow.app.store.setValue(item, "statusId", status);
-                        cris.workflow.app.saveStore();
-                    }
-                },
-                "#idGrid": {
-                    onclick: function(evt) {
-                        dojo.publish("cris/workflow/newSelection", []);
-                    }
-                }
-            },
-
-            init: function() {
-                console.log("++++++++ manager init called");
-                this.store = createJsonRestStore("${url}");
-                var layout = [{cells: [
-                            {field: 'statusId', name: 'Status ID', hidden: true},
-                            {field: 'id', name: 'ID', datatype: "number", width: '50px'},
-                            {field: 'name', name: 'Name', width: 'auto'},
-                            {field: 'timeUpdated', name: 'Last Updated', datatype: "date", width: '100px', get: function(row, item) {
-                                    if (!item) {
-                                        return "Loading...";
-                                    }
-                                    return item.timeUpdated && item.timeUpdated.$date ? dateIsoToLocale(item.timeUpdated.$date) : "";
-                                }}
-                        ]}];
-                var asc = true;
-                var args = {
-                    query: this.defaultQuery,
-                    sortFields: [{attribute: "name", descending: !asc}],
-                    rowsPerPage: 10,
-                    pageSizes: []
-                };
-                this.grid = createGrid(this.store, layout, "idGrid", args);
-                this.grid.setSortIndex(2, asc);
-                this.grid.setFilter([{type: 'number', column: 0, condition: 'equalto', value: 1}]);
-
-                this.updateHtml({});
-                dojo.behavior.add(this.behavior);
-                dojo.behavior.apply();
-
-                var _this = this;
-                dojo.connect(dijit.byId("detailVersionNumber"), "onChange", function(evt) {
-                    var index = dijit.byId("detailVersionNumber").getValue();
-                    var workflow = _this.workflows[index];
-                    _this.updateHtml(workflow);
-                });
-
-                dojo.subscribe("cris/workflow/newSelection", this, function(evt) {
-                    if (this.grid.selection.getSelectedCount("row") >= 1) {
-                        var item = this.grid.selection.getSelected("row")[0];
-                        _this.workflowId = item.id;
-                        // fetch all versions of the workflow
-                        var xhrArgs = {
-                            url: "${urlVersions}/" + item.id,
-                            content: _this.defaultQuery,
-                            handleAs: "json",
-                            load: function(data) {
-                                _this.workflows = data;
-                                // display: version number, value: index to array
-                                var versionIndex = [];
-                                for (var i = 0; i < data.length; i++) {
-                                    versionIndex.push({name: "" + data[i].version, id: "" + i});
-                                }
-                                var storeVersionIndex = new dojo.store.Memory({data: versionIndex});
-                                var widgetVersionNumber = dijit.byId("detailVersionNumber");
-                                widgetVersionNumber.store = storeVersionIndex;
-                                if (data.length > 0) {
-                                    widgetVersionNumber.set("value", "" + 0);
-                                    widgetVersionNumber.onChange();
-                                }
-                            },
-                            error: function(error) {
-                                console.log(error);
-                            }
-                        };
-                        // Call the asynchronous xhrGet
-                        dojo.xhrGet(xhrArgs);
-                    }
-                });
-            }
         };
+        
+        angular.module('crisWorkflow').controller('WorkflowEditorController2', function ($scope, $compile, $http) {
+            $scope.status = 1; // Operational workflows
+            $scope.workflowsUrl = "${url}" + '/?' + 'showAllStatus=true&sort(+name)';
+            $scope.urlFilter = '{"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":' + $scope.status + ',"isCol":false}]}';
+            
+            $scope.gridColumnDefs = [
+                {field: 'statusId', name: 'statusId', displayName: 'Status ID', visible: false, width: 80},
+                {field: 'id', name: 'id', displayName: 'ID', width: 60},
+                {field: 'name', name: 'name', displayName: 'Name', minWidth: 160},
+                {field: 'timeUpdated', name: 'timeUpdated', displayName: 'Last Updated', enableFiltering: false, width: 115, cellTemplate: '<div class="ui-grid-cell-contents" title="TOOLTIP">{{grid.appScope.formatDisplayValue({value:COL_FIELD,rowData:row.entity,isDate:true}) CUSTOM_FILTERS}}</div>'}
+            ];
+            
+            $scope.formatDisplayValue = function (value, rowData, isDate) {
+                if (isDate) {
+                    return value ? dateIsoToLocale(value.$date) : "";
+                }
+            };
+            
+            $scope.$watch('status', function (newValue, oldValue) {
+                if (newValue !== oldValue) {
+                    if (newValue === "") { // all
+                        $scope.urlFilter = '';
+                    } else { // Operational or Deprecated
+                        $scope.urlFilter = '{"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":' + $scope.status + ',"isCol":false}]}';
+                    }
+                    clearDetails();
+                    refreshGrid();
+                }
+            });
+            
+            $scope.$watch('gridRef.grid.selection.selectedCount', function (newValue, oldValue) {
+                if (newValue !== oldValue && newValue === 0) {
+                    $scope.selectedRecord = null;
+                }
+            });
+            
+            $scope.rowSelectCallback = function (rowData) {
+                $scope.record = angular.copy(rowData);
+                $scope.selectedRecord = rowData;
+                $scope.versionsUrl = '${urlVersions}/' + $scope.record.id + '?showAllStatus=true&filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":' + $scope.record.statusId + ',"isCol":false}]}';
+                $scope.toggleDetailsView(true);
+            };
+            
+            $scope.toggleDeprecate = function () {
+                if ($scope.selectedRecord) {
+                    var status;
+                    if ($scope.selectedRecord.statusId === 1) {
+                        status = 0;
+                    } else {
+                        status = 1;
+                    }
+
+                    $scope.selectedRecord.statusId = status;
+                    $http({
+                        url: "${url}" + "/" + $scope.selectedRecord.id,
+                        method: 'PUT',
+                        data: $scope.selectedRecord
+                    }).then(function successCallback(result) {
+                        refreshGrid();
+                        clearDetails();
+                    }, function errorCallback(error) {
+
+                    });
+                }
+            };
+            
+            // On smaller screens toggle between workflows view and details view
+            $scope.toggleDetailsView = function (doShow, clearSelection) {
+                if (doShow) {
+                    $('#detailsView').removeClass('hidden-xs hidden-sm');
+                    $('#workflowsView').addClass('hidden-xs hidden-sm');
+                } else {
+                    $('#detailsView').addClass('hidden-xs hidden-sm');
+                    $('#workflowsView').removeClass('hidden-xs hidden-sm');
+                    if (clearSelection) {
+                        clearSelected();
+                    }
+                }
+            };
+            
+            $scope.getStatusName = function (statusId) {
+               return convertAssetStatusIdToName(statusId); 
+            };
+            
+            $scope.getTimeCreated = function (record) {
+                return record && record.timeCreated && record.timeCreated.$date ? dateIsoToLocale(record.timeCreated.$date) : "";
+            };
+            
+            $scope.getLastUpdated = function (record) {
+                return record && record.timeUpdated && record.timeUpdated.$date ? dateIsoToLocale(record.timeUpdated.$date) : "";
+            };
+            
+            // Initializes and places grid in its tab location. For some reason placing the directive directly in the tab was a causing an error preventing grid creation.
+            $scope.loadGrid = function () {
+                var gridNode = $compile('<cris-ui-grid column-defs="gridColumnDefs" url="workflowsUrl" url-filter="urlFilter" grid-ref="gridRef" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>')($scope);
+                angular.element('#gridContainer').html(gridNode);
+            };
+            
+            function refreshGrid () {
+                console.log('----SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS');
+                console.dir($scope.gridRef)
+                console.dir($scope)
+                if ($scope.gridRef) {
+                    $scope.gridRef.refreshGrid();
+                }
+            }
+            
+            function clearSelected () {
+                if ($scope.gridRef) {
+                    $scope.gridRef.clearSelection();
+                }
+                $scope.selectedRecord = null;
+            }
+            
+            function clearDetails () {
+                $scope.record = {};
+            }
+        });
 
         cris.bootstrapAngular("idWorkflow", "crisWorkflow");
 
         cris.ready(function() {
-            cris.workflow.app.init();
+
         });
         // ]]>
     </script>
@@ -262,757 +202,659 @@
     </div>
     </script>
     
-    <div id='idWorkflow' style="width: 100%; height: 1000px" data-ng-controller="WorkflowEditorController as weCtrl"  data-ng-keydown="weCtrl.keyDown($event)" tabindex="0">
-        <div id="idWorkflowEditorController" data-dojo-type="dijit/layout/TabContainer" style="width: 100%; height: 100%;">
-
-            <div data-dojo-type="dijit/layout/ContentPane" title="Editor" data-dojo-props='selected: "true"' style="overflow: hidden">
-
-                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "New..."' data-ng-click="weCtrl.newWorkflow()"/>
-                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Open..."' data-ng-click="weCtrl.openWorkflow()"/>
-                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Import..."' data-ng-click="weCtrl.importWorkflow()"/>
-
-                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
-
-                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Save As...", disabled: {{weCtrl.workflow === null}}' data-ng-click="weCtrl.saveAsWorkflow()"/>
-                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Save", disabled: {{weCtrl.workflow === null}}' data-ng-click="weCtrl.saveWorkflow()"/>
-
-                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
-
-                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Edit Metadata...", disabled: {{weCtrl.workflow === null}}' data-ng-click="weCtrl.editWorkflowMetadata()"/>
-
-                <div class='floatRight'>
-                    <div id="newTask" data-dojo-widget="dijit/form/DropDownButton" data-dojo-props='disabled: {{weCtrl.workflow === null}}'>
-                        <span>New Task...</span>
-                        <div data-dojo-widget="dijit/DropDownMenu">
-                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newUserTask()">User Task</div>
-                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newServiceTask()">Service Task</div>
-                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newReportTask()">Report Task</div>
-                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newConditionBranch()">Condition Branch</div>
-                            <div data-dojo-widget="dijit/MenuItem" data-ng-click="weCtrl.newMultiConditionBranch()">Multi-condition Branch</div>
-                        </div>
-                    </div>
+    <div id='idWorkflow' style="width: 100%; height: 1400px" data-ng-controller="WorkflowEditorController as weCtrl"  data-ng-keydown="weCtrl.keyDown($event)" tabindex="0">
+        <uib-tabset style="height:100%;position:relative;">
+            <uib-tab heading="Editor" select="weCtrl.repaintWorkflow()">
+                <button class="btn btn-default" data-ng-click="weCtrl.newWorkflow()">New</button>&amp;nbsp;
+                <button class="btn btn-default" data-ng-click="weCtrl.openWorkflow()">Open</button>&amp;nbsp;
+                <button class="btn btn-default" data-ng-click="weCtrl.importWorkflow()">Import...</button>
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+                <button class="btn btn-primary" data-ng-click="weCtrl.saveAsWorkflow()" ng-disabled="weCtrl.workflow === null">Save As...</button>&amp;nbsp;
+                <button class="btn btn-primary" data-ng-click="weCtrl.saveWorkflow()" ng-disabled="weCtrl.workflow === null">Save</button>&amp;nbsp;
+                &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+                <button class="btn btn-default" data-ng-click="weCtrl.editWorkflowMetadata()" ng-disabled="weCtrl.workflow === null">Edit Metadata...</button>&amp;nbsp;
+                
+                <div class="btn-group pull-right" uib-dropdown="uib-dropdown" keyboard-nav="keyboard-nav" style="width:180px;">
+                    <button type="button" class="btn btn-default" uib-dropdown-toggle="uib-dropdown-toggle" ng-disabled="weCtrl.workflow === null" style="width:100%;">
+                        <span>New Task...</span>&amp;nbsp;<span class="glyphicon glyphicon-menu-down pull-right"/>
+                    </button>
+                    <ul class="dropdown-menu" uib-dropdown-menu="uib-dropdown-menu" role="menu" aria-labelledby="simple-btn-keyboard-nav">
+                        <li role="menuitem"><a href="" style="text-decoration:none;" data-ng-click="weCtrl.newUserTask()">User Task</a></li>
+                        <li role="menuitem"><a href="" style="text-decoration:none;" data-ng-click="weCtrl.newServiceTask()">Service Task</a></li>
+                        <li role="menuitem"><a href="" style="text-decoration:none;" data-ng-click="weCtrl.newReportTask()">Report Task</a></li>
+                        <li role="menuitem"><a href="" style="text-decoration:none;" data-ng-click="weCtrl.newConditionBranch()">Condition Branch</a></li>
+                        <li role="menuitem"><a href="" style="text-decoration:none;" data-ng-click="weCtrl.newMultiConditionBranch()">Multi-condition Branch</a></li>
+                    </ul>
                 </div>
+                
+                <br class="clearfix" />
+                
+                <h3 class="text-center">{{weCtrl.workflow ? (weCtrl.workflow.name ? weCtrl.workflow.name : "(Please use \"Edit Metadata\" to enter workflow info)") : "(No workflow)"}}</h3>
 
-                <br class="clearBoth"/>
-
-                <h3 style="text-align: center;">{{weCtrl.workflow ? (weCtrl.workflow.name ? weCtrl.workflow.name : "(Please use \"Edit Metadata\" to enter workflow info)") : "(No workflow)"}}</h3>
-
-                <span class="errors">{{weCtrl.errorMessage}}&amp;nbsp;</span>
-
-                <div id="container" style="display: block; overflow-y: scroll; position: relative; width: 100%; height: 89%;">
+                <span class="text-danger">{{weCtrl.errorMessage}}&amp;nbsp;</span>
+                
+                <div style="width:100%;white-space:nowrap;padding-right:10px;font-size:1.7em;" class="text-right">
+                    <a href="" ng-click="weCtrl.zoomOut()"><span class="glyphicon glyphicon-zoom-out"></span></a>&amp;nbsp;
+                    <a href="" ng-click="weCtrl.zoomIn()"><span class="glyphicon glyphicon-zoom-in"></span></a>
+                </div>
+                <div id="container" style="overflow-y: auto; position: relative; height: 89%;">
                     <!-- workflow diagram area-->
                 </div>
-
-                <div data-dojo-type="dijit/Dialog" data-dojo-id="openWorkflowDialog" title="Open Workflow">
-                    <div>
-                        Workflow: <input data-dojo-widget="dijit/form/FilteringSelect" data-dojo-props='placeholder: "select a workflow...", fetchProperties: {sort: [{attribute:"name",ascending: true}]}' data-dojo-store="weCtrl.storeWorkflows" data-ng-model="weCtrl.workflowIdToOpen"/>
+                
+                <script type="text/ng-template" id="view_open_workflow_modal">
+                    <div class="modal-body">
+                        <table>
+                            <tr>
+                                <td>WorkFlow:&amp;nbsp;</td>
+                                <td><cris-url-dropdown url="${url}/?name=*&amp;sort(+name)" ng-model="weCtrl.workflowIdToOpen"></cris-url-dropdown></td>
+                            </tr>
+                        </table>
                     </div>
-
-                    <br/>
-
-                    <div class="floatRight">
-                        <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Open'" data-ng-click="weCtrl.fetchAndInitWorkflow(weCtrl.workflowIdToOpen)"/>
-                        <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Cancel', onClick:function(){openWorkflowDialog.hide();}"/>
+                    <div class="modal-footer">
+                        <span class="pull-left"><input type="button" value="Open" class="btn btn-primary" ng-click="weCtrl.fetchAndInitWorkflow(weCtrl.workflowIdToOpen);cancel();" /></span>
+                        <span class="pull-right"><input type="button" value="Cancel" class="btn btn-warning" ng-click="cancel()" /></span>
                     </div>
-
-                    <br class="clearBoth"/>
-                </div>
-
-                <div data-dojo-type="dijit/Dialog" data-dojo-id="importWorkflowDialog" title="Import Workflow" style="width: 33%;">
-                    <div>
-                        <form id="idFormImportWorkflow" method="POST" enctype="multipart/form-data" data-dojo-type="dijit/form/Form">
-                            <input id="idFile" name="file" data-dojo-type="dojox/form/Uploader" data-dojo-props='multiple : false, label : "Browse..."' style="width: 75px;"/>
-                            <div id="idFileList" data-dojo-type="dojox/form/uploader/FileList" data-dojo-props='uploaderId: "idFile"'><!-- --></div>
-                        </form>
+                </script>
+                
+                <script type="text/ng-template" id="view_import_workflow_modal">
+                    <div class="modal-body">
+                        <cris-file-uploader ng-model="dummyFile" path="workflowToUpload" isMultiple="false"></cris-file-uploader>
                     </div>
-
-                    <br/>
-
-                    <div class='floatRight'>
-                        <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label : "Upload"' data-ng-click='weCtrl.saveWorkflowArchive()'/>
-                        <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Cancel', onClick:function(){importWorkflowDialog.hide();}"/>
+                    <div class="modal-footer">
+                        <span class="pull-left"><input type="button" value="Upload" class="btn btn-primary" ng-click="weCtrl.saveWorkflowArchive();cancel();" /></span>
+                        <span class="pull-right"><input type="button" value="Cancel" class="btn btn-warning" ng-click="cancel()" /></span>
                     </div>
-
-                    <br class="clearBoth"/>
-                </div>
-
-                <div data-dojo-type="dijit/Dialog" data-dojo-id="saveAsWorkflowDialog" title="Save as Workflow" style="width: 50%;">
-                    <h3>Please provide a name and description for the new workflow</h3>
-
-                    <br/>
-
-                    <table class="form" style="width: 100%;">
+                </script>
+                
+                <script type="text/ng-template" id="view_save-as_modal">
+                    <div class="modal-body">
+                        <h3>Please provide a name and description for the new workflow</h3><br />
+                        <table class="table plain">
+                            <tr>
+                                <td>Name:</td>
+                                <td><input type="text" ng-model="weCtrl.name" class="form-control" /></td>
+                            </tr>
+                            <tr>
+                                <td>Description:</td>
+                                <td><input type="text" ng-model="weCtrl.description" class="form-control" /></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <span class="pull-left"><input type="button" value="Save" class="btn btn-primary" ng-click="weCtrl.renameAndSaveWorkflow(weCtrl.name, weCtrl.description);cancel();" /></span>
+                        <span class="pull-right"><input type="button" value="Cancel" class="btn btn-warning" ng-click="cancel()" /></span>
+                    </div>
+                </script>
+                
+                <script type="text/ng-template" id="view_edit_metadata_modal">
+                    <div class="modal-header text-center">
+                        <b>Workflow Metadata</b>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-striped">
+                            <tr>
+                                <td style="width:30%;">ID:</td>
+                                <td>{{weCtrl.workflow.id}}</td>
+                            </tr>
+                            <tr>
+                                <td>UUID:</td>
+                                <td>{{weCtrl.workflow.uuid}}</td>
+                            </tr>
+                            <tr>
+                                <td>Name:</td>
+                                <td><input type="text" ng-model="weCtrl.workflow.name" class="form-control" /></td>
+                            </tr>
+                            <tr>
+                                <td>Description:</td>
+                                <td><input type="textarea" rows="4" ng-model="weCtrl.workflow.documentation" class="form-control" /></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2">
+                                    Default Dataset State when a Job is Running:
+                                    <div style="padding-left:25%;">
+                                        <cris-radio-button-group name="initialDatasetState" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3}" data-ng-model="weCtrl.workflow.initialDatasetState"><!-- --></cris-radio-button-group>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2">
+                                    Final Dataset State(s) Available for User to Choose:
+                                    <div style="padding-left:25%;">
+                                        <cris-checkbox-group orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3}" data-ng-model="weCtrl.workflow.finalDatasetStates"><!-- --></cris-checkbox-group>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width:25%;">"the_end.html" in Archive:</td>
+                                <td><cris-checkbox-group orientation="vertical" items="{{weCtrl.workflow.theEndFileInArchive}}" data-ng-model="weCtrl.workflow.theEndFileToInclude"><!-- --></cris-checkbox-group></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    "the_end.html" to Include:<br/>
+                                    (File must be named "the_end.html")
+                                </td>
+                                <td>
+                                    <div id="idTheEndPageFile" ng-init="weCtrl.initEndFileUploader()"><!----></div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <span class="pull-right"><input type="button" value="Ok" class="btn btn-default" ng-click="cancel()" /></span>
+                    </div>
+                </script>
+                
+                <div id="userTaskDetails" class="workflowOverlayDiv">
+                    <table class="table plain">
                         <tr>
-                            <td style="width: 25%">Name:</td>
-                            <td><input id="nameWorkflowSaveAs" type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.name"/></td>
-                        </tr>
-                        <tr>
-                            <td>Description:</td>
                             <td>
-                                <input id="descWorkflowSaveAs" type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.description"/>
+                                <h4 id="userTaskLabel"></h4>
+                            </td>
+                            <td class="text-right">
+                                <button class="btn btn-default" data-ng-click='weCtrl.cancelTaskDetails("userTaskDetails")'>Cancel</button>&amp;nbsp;&amp;nbsp;
+                                <button class="btn btn-default" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditUT)'>Delete</button>&amp;nbsp;&amp;nbsp;
+                                <button class="btn btn-default" data-ng-click='weCtrl.closeUserTaskDetails(weCtrl.currentEditUT)'>OK</button>
                             </td>
                         </tr>
                     </table>
-
-                    <br/>
-
-                    <div class="floatRight" id ="saveAsWorkflowActionBar">
-                        <input id="createSaveAsWorkflow" type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Save'" data-ng-click='weCtrl.renameAndSaveWorkflow(weCtrl.name, weCtrl.description)'/>
-                        <input id="cancelsaveAsWorkflow" type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Cancel', onClick:function(){saveAsWorkflowDialog.hide();}"/>
-                    </div>
-
-                    <br class="clearBoth"/>
-                </div>
-
-                <div data-dojo-type="dijit/Dialog" data-dojo-id="OnSaveWorkflowDialog" title="Success!">
-                    <div class="dijitDialogPaneContentArea">
-                        The workflow has been successfully saved!
-                    </div>
-                </div>
-
-                <form id="idFormEditor" method="POST" enctype="multipart/form-data" data-dojo-type="dijit/form/Form">
-                    <div id="idUploaderFiles" style="display: none;"><!-- --></div>
-
-                    <div data-dojo-type="dijit/Dialog" data-dojo-id="workflowMetadataDialog" title="Workflow Metadata" style="width: 50%;">
-                        <!-- new/update workflow metadata -->
-                        <div id="createNewWorkflowDialog">
-                            <table class="form" style="width: 100%;">
+                    <br />
+                    <uib-tabset active="0" style="width: 100%;">
+                        <uib-tab index="0" heading="General">
+                            <table class="table table-striped">
                                 <tr>
-                                    <td style="width: 20%;">ID:</td><td>{{weCtrl.workflow.id}}</td>
-                                </tr>
-                                <tr>
-                                    <td>UUID:</td><td>{{weCtrl.workflow.uuid}}</td>
-                                </tr>
-                                <tr>
-                                    <td>Name:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.workflow.name" style='width: 100%;'/></td>
-                                </tr>
-                                <tr>
-                                    <td>Description:</td><td><input type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props="rows: 4" data-ng-model="weCtrl.workflow.documentation" style='width: 100%;'/></td>
-                                </tr>
-                            </table>
-
-                            <br/>
-
-                            <div>
-                                <table class="form" style="width: 100%">
-                                    <tr>
-                                        <td colspan="2">Default Dataset State when a Job is Running:</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 20%"><!-- --></td>
-                                        <td>
-                                            <cris-radio-button name="initialDatasetState" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3}" data-ng-model="weCtrl.workflow.initialDatasetState"><!-- --></cris-radio-button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2">Final Dataset State(s) Available for User to Choose:</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 20%"><!-- --></td>
-                                        <td>
-                                            <cris-check-box name="initialDatasetState" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3}" data-ng-model="weCtrl.workflow.finalDatasetStates"><!-- --></cris-check-box>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-
-                            <br/>
-
-                            <div>
-                                <table class="form" style="width: 100%">
-                                    <tr>
-                                        <td style="width: 20%">
-                                            "the_end.html" in Archive:
-                                        </td>
-                                        <td>
-                                            <cris-check-box name="endOfJobFile" orientation="vertical" items="{{weCtrl.workflow.theEndFileInArchive}}" data-ng-model="weCtrl.workflow.theEndFileToInclude"><!-- --></cris-check-box>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            "the_end.html" to Include:<br/>
-                                            (File must be named "the_end.html")
-                                        </td>
-                                        <td>
-                                            <div id="idTheEndPageFile"><!-- --></div>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-
-                            <div class='floatRight'>
-                                <input type="button" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Ok', onClick: function() { workflowMetadataDialog.hide(); }" />
-                            </div>
-
-                            <br class='clearBoth'/>
-                        </div>
-                    </div>
-
-                    <div id="userTaskDetails" class="overlayDiv">
-                        <table style="width: 100%;">
-                            <tr>
-                                <td>
-                                    <h4 id="userTaskLabel"></h4>
-                                </td>
-                                <td style="text-align: right;">
-                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Cancel'" data-ng-click='weCtrl.cancelTaskDetails("userTaskDetails")'/>
-                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditUT)'/>
-                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeUserTaskDetails(weCtrl.currentEditUT)'/>
-                                </td>
-                            </tr>
-                        </table>
-                        
-                        <br />
-                        
-                        <div data-dojo-type="dijit/layout/TabContainer" data-dojo-props="doLayout: false, controllerWidget: 'dijit.layout.TabController'" style="width: 100%; height: 100%;">
-                            <div data-dojo-type="dijit/layout/ContentPane" title="General" style="overflow: hidden;">
-                                <table class="form" style="width: 100%">
-                                    <tr>
-                                        <td style="width: 25%">Name:</td><td><input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditUT.name"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Description:</td><td><input type="text" name="description" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEditUT.documentation"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Page from:</td>
-                                        <td colspan="2">
-                                            <cris-radio-button name="pageType" orientation="horizontal" items="{'Template': 'template', 'Custom HTML': 'custom'}" data-ng-model="weCtrl.currentEditUT.pageType"><!-- --></cris-radio-button>
-                                        </td>
-                                    </tr>
-                                    <tr  data-ng-show="weCtrl.currentEditUT.pageType == 'template'">
-                                        <td><!-- --></td>
-                                        <td>
-                                            <div style="width: 20%; float: left;">Template:</div>
-                                            <div style="width: 80%; float: right;">
-                                                <input data-dojo-widget="dijit/form/FilteringSelect" data-dojo-props='placeholder: "select a template...", fetchProperties: {sort: [{attribute:"name",ascending: true}]}' data-dojo-store="weCtrl.storeTemplates" data-ng-model="weCtrl.currentEditUT.templateId"/>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr data-ng-show="weCtrl.currentEditUT.pageType == 'custom'">
-                                        <td><!-- --></td>
-                                        <td>
-                                            <div style="width: 20%; float: left;">HTML File:</div>
-                                            <div style="width: 80%; float: right;">
-                                                <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: true" data-ng-model="weCtrl.currentEditUT.ui_page"/>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr  data-ng-show="weCtrl.currentEditUT.pageType == 'custom'">
-                                        <td><!-- --></td>
-                                        <td>
-                                            <div style="width: 20%; float: left;">Select a new HTML</div>
-                                            <div style="width: 80%; float: right;">
-                                                <div id="idUserTaskCustomHtmlFile"></div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">User(s) Permitted:</td>
-                                        <td>
-                                            <input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditUT.csvUsers"/>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">Group(s) Permitted:</td>
-                                        <td>
-                                            <input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditUT.csvGroups"/>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">Dataset State:</td>
-                                        <td>
-                                            <cris-radio-button name="datasetStateUT" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditUT.datasetState"><!-- --></cris-radio-button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">UI Orientation:</td>
-                                        <td>
-                                            <cris-radio-button name="orientationUT" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditUT.orientation"><!-- --></cris-radio-button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">File(s) in Archive:<br/>
-                                            (To remove a file, uncheck it)
-                                        </td>
-                                        <td>
-                                            <cris-check-box name="filesToIncludeUT" orientation="vertical" items="{{weCtrl.currentEditUT.filesInArchive}}" data-ng-model="weCtrl.currentEditUT.filesToInclude"><!-- --></cris-check-box>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>File(s) to Include:</td>
-                                        <td>
-                                            <div id="idUserTaskFiles"><!-- --></div>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-                            <div data-dojo-type="dijit/layout/ContentPane" title="Json In" style="overflow: hidden;">
-                                <cris-workflow-json-builder task="weCtrl.currentEditUT" type="jsonIn" queries="weCtrl.currentEditUT.jsonInQueries"></cris-workflow-json-builder>
-                            </div>
-                        </div>       
-                    </div>
-                    
-                    <div id="serviceTaskDetails" class="overlayDiv">
-                        <table style="width: 100%;">
-                            <tr>
-                                <td>
-                                    <h4 id="serviceTaskLabel"></h4>
-                                </td>
-                                <td style="text-align: right;">
-                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Cancel'" data-ng-click='weCtrl.cancelTaskDetails("serviceTaskDetails")'/>
-                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditST)'/>
-                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeServiceTaskDetails(weCtrl.currentEditST)'/>
-                                </td>
-                            </tr>
-                        </table>
-                        
-                        <br />
-                        
-                        <div data-dojo-type="dijit/layout/TabContainer" data-dojo-props="doLayout: false, controllerWidget: 'dijit.layout.TabController'" style="width: 100%; height: 100%;">
-                            <div data-dojo-type="dijit/layout/ContentPane" title="General" style="overflow: hidden;">
-                                <table class="form" style="width: 100%">
-                                    <tr>
-                                        <td style="width: 25%">Name:</td><td><input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditST.name"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Description:</td><td><input type="text" name="description" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEditST.documentation"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">File(s) in Archive:<br/>
-                                            (To remove a file, uncheck it)
-                                        </td>
-                                        <td>
-                                            <cris-check-box name="filesToIncludeST" orientation="vertical" items="{{weCtrl.currentEditST.filesInArchive}}" data-ng-model="weCtrl.currentEditST.filesToInclude"><!-- --></cris-check-box>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>File(s) to Include:</td>
-                                        <td>
-                                            <div id="idServiceTaskFiles"><!-- --></div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">Dataset State:</td>
-                                        <td>
-                                            <cris-radio-button name="datasetStateST" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditST.datasetState"><!-- --></cris-radio-button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">UI Orientation:</td>
-                                        <td>
-                                            <cris-radio-button name="orientationST" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditST.orientation"><!-- --></cris-radio-button>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-                            <div data-dojo-type="dijit/layout/ContentPane" title="Service" style="overflow: hidden;">
-                                <table class="form" style="width: 100%">
-                                    <tr>
-                                        <td style="width: 25%">Prefilter:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.prefilter"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Commandline:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.commandline"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Postfilter:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.postfilter"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td style="width: 25%">File(s) to place:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.filesToPlace"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>File(s) to collect:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditST.filesToCollect"/></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Wait for service task to complete:</td><td><input type="checkbox" data-dojo-widget="dijit/form/CheckBox" data-ng-model="weCtrl.currentEditST.syncTask"/></td>
-                                    </tr>
-                                </table>
-                            </div>
-                            <div data-dojo-type="dijit/layout/ContentPane" title="Json In" style="overflow: hidden;">
-                                <cris-workflow-json-builder task="weCtrl.currentEditST" type="jsonIn" queries="weCtrl.currentEditST.jsonInQueries"></cris-workflow-json-builder>
-                            </div>
-                            <div data-dojo-type="dijit/layout/ContentPane" title="Json Out" style="overflow: hidden;">
-                                <cris-workflow-json-builder task="weCtrl.currentEditST" type="jsonOut" queries="weCtrl.currentEditST.jsonOutQueries"></cris-workflow-json-builder>
-                            </div>
-                        </div>
-                        
-                        <br class="clearBoth"/>
-                    </div>
-                    
-                    <div data-dojo-type="dijit/Dialog" data-dojo-id="reportTaskDialog" title=" New Report Task" style="width: 50%;">
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Name:</td><td><input type="text" data-dojo-widget="dijit/form/TextBox" data-ng-model="weCtrl.currentEditRT.name"/></td>
-                            </tr>
-                            <tr>
-                                <td>Description:</td><td><input type="text" name="description" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEditRT.documentation"/></td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Command:</td><td><cris-select items="[{id: 'GetParameters', name: 'GetParameters'}, {id: 'GenerateReport', name: 'GenerateReport'}]" item='weCtrl.currentEditRT.command' value="{{weCtrl.currentEditRT.command}}"/></td>
-                            </tr>
-                            <tr>
-                                <td>Report:</td><td><cris-rest-select url="${urlReports}" value="weCtrl.currentEditRT.reportId"/></td>
-                            </tr>
-                            <tr>
-                                <td>Template:</td><td><cris-rest-select url="${urlTemplates}" value="weCtrl.currentEditRT.templateId"/></td>
-                            </tr>
-                            <tr>
-                                <td>Parameters:</td><td><input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditRT.parameters"/></td>
-                            </tr>
-                            <tr>
-                                <td>Output Type:</td><td><cris-select items="[{id: 'html', name: 'html'}, {id: 'pdf', name: 'pdf'}, {id: 'rtf', name: 'rtf'}, {id: 'xls', name: 'xls'}, {id: 'xlsx', name: 'xlsx'}]" item='weCtrl.currentEditRT.outputType' value="{{weCtrl.currentEditRT.outputType}}"/></td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Dataset State:</td>
-                                <td>
-                                    <cris-radio-button name="datasetStateRT" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditRT.datasetState"><!-- --></cris-radio-button>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">UI Orientation:</td>
-                                <td>
-                                    <cris-radio-button name="orientationRT" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditRT.orientation"><!-- --></cris-radio-button>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <div class="floatRight">
-                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditRT)'/>
-                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeReportTaskDialog(weCtrl.currentEditRT)'/>
-                        </div>
-
-                        <br class="clearBoth"/>
-                    </div>
-
-                    <div data-dojo-type="dijit/Dialog" data-dojo-id="conditionBranchDialog" title=" New Condition Branch" style="width: 50%;">
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Name:</td>
-                                <td>
-                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditCF.name"/>
-                                </td>
-                            </tr>
-                            <!--
-                            <tr>
-                                <td>Description:</td><td><input type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 5' data-ng-model="weCtrl.currentEdit.documentation"/></td>
-                            </tr>
-                            -->
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Condition Expression:</td>
-                                <td>
-                                    <input type="text" name='conditionExpression' data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: false" data-ng-model="weCtrl.currentEditCF.conditionExpression"/>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">UI Orientation:</td>
-                                <td>
-                                    <cris-radio-button name="orientationCF" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditCF.orientation"><!-- --></cris-radio-button>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <div class="floatRight">
-                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditCF)'/>
-                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeConditionBranchDialog(weCtrl.currentEditCF)'/>
-                        </div>
-
-                        <br class="clearBoth"/>
-                    </div>
-                       
-                    <div data-dojo-type="dijit/Dialog" data-dojo-id="multiConditionBranchDialog" title=" New Multi Condition Branch" style="width: 50%;">
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Name:</td>
-                                <td>
-                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="weCtrl.currentEditCF.name"/>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-                        
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Num of Expressions:</td>
-                                <td>
-                                    <cris-select items="[{id: 1, name: 1}, {id: 2, name: 2}, {id: 3, name: 3}, {id: 4, name: 4}, {id: 5, name: 5}, {id: 6, name: 6}]" item="weCtrl.currentEditCF.expressionCount" value='{{weCtrl.currentEditCF.expressionCount}}'></cris-select>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr data-ng-repeat="n in weCtrl.currentEditCF.numExpressions track by $index">
-                                <td style="width: 16%">Expression {{$index + 1}}:</td>
-                                <td>
-                                    <input type="text" name='conditionExpression{{$index + 1}}' data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: false" data-ng-model="weCtrl.currentEditCF.conditionExpressions[$index].expression"/>
-                                </td>
-                                <td style="width: 10%">Label {{$index + 1}}:</td>
-                                <td style="width: 24%">
-                                    <input type="text" name='label{{$index + 1}}' data-dojo-widget="dijit/form/ValidationTextBox" data-dojo-props="disabled: false" data-ng-model="weCtrl.currentEditCF.conditionExpressions[$index].label"/>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-                        
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">UI Orientation:</td>
-                                <td>
-                                    <cris-radio-button name="orientationMCF" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditCF.orientation"><!-- --></cris-radio-button>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <div class="floatRight">
-                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click='weCtrl.deleteMultiConditionTask(weCtrl.currentEditCF)'/>
-                            <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'OK'" data-ng-click='weCtrl.closeMultiConditionBranchDialog(weCtrl.currentEditCF)'/>
-                        </div>
-
-                        <br class="clearBoth"/>
-                    </div>
-                            
-                    <div data-dojo-type="dijit/Dialog" data-dojo-id="caseBranchDialog" title=" New Case Branch">
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Name:</td>
-                                <td>
-                                    <input type="text" name="name" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Description:</td><td><input type="text" name="description" data-dojo-type="dijit/form/SimpleTextarea" data-dojo-props='rows: 5'/></td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">Case Expression:</td>
-                                <td colspan="2">
-                                    <input type="text" name="caseExpression" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td style="width: 15%">Value 1:</td>
-                                <td>
-                                    <input type="text" name="caseValue1" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 2:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 3:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 4:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 5:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 6:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 7:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 8:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 9:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><!-- --></td>
-                                <td>Value 10:</td>
-                                <td>
-                                    <input type="text" name="caseValue2" data-dojo-type="dijit/form/ValidationTextBox"/>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <table class="form" style="width: 100%">
-                            <tr>
-                                <td style="width: 25%">UI Orientation:</td>
-                                <td>
-                                    <input type="radio" data-dojo-type="dijit/form/RadioButton"/> Normal
-                                    <input type="radio" data-dojo-type="dijit/form/RadioButton"/> Flipped
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br/>
-
-                        <div class="floatRight">
-                            <input type="button" data-dojo-type="dijit/form/Button"  data-dojo-props="label: 'OK', onClick:function(){cris.workflow.app.createNewTask();}"/>
-                            <input type="button" data-dojo-type="dijit/form/Button"  data-dojo-props="label: 'Delete', onClick:function(){}"/>
-                            <input type="button" data-dojo-type="dijit/form/Button"  data-dojo-props="label: 'Cancel', onClick:function(){caseBranchDialog.hide();}"/>
-                        </div>
-
-                        <br class="clearBoth"/>
-                    </div>
-                </form>
-            </div>
-
-            <div data-dojo-type="dijit/layout/ContentPane" title="Manager">
-                <div>
-                    <div class="halfMinus floatLeft">
-                        <h2>Workflows</h2>
-                        <span>
-                            <input id="buttonDeprecate" data-dojo-type="dijit/form/Button" data-dojo-props="label: 'Deprecate', style: {width: '100px;'}"/>
-                        </span>
-                        <span class="floatRightToButton">
-                            Show:
-                            <input id="idShowOperational" type="radio" name="showStatus" value="1" checked="checked" data-dojo-type="dijit/form/RadioButton"/><span>Operational</span>
-                            &amp;nbsp
-                            <input id="idShowDeprecated" type="radio" name="showStatus" value="0" data-dojo-type="dijit/form/RadioButton"/><span>Deprecated</span>
-                            &amp;nbsp
-                            <input id="idShowAll" type="radio" name="showStatus" value="" data-dojo-type="dijit/form/RadioButton"/><span>All</span>
-                            &amp;nbsp
-                        </span>
-                        <br/>
-                        <div id="idGrid"><!-- --></div>
-                    </div>
-
-                    <div class="half floatRight">
-                        <h2>Details</h2>
-
-                        <form id="formDetail" method="POST" data-dojo-type="dijit.form.Form">
-                            <table class="form" style="width: 100%">
-                                <tr>
-                                    <td style="width: 40%">Version:</td>
-                                    <td><input id="detailVersionNumber" data-dojo-type="dijit.form.FilteringSelect" data-dojo-props=""/></td>
-                                </tr>
-                                <tr>
-                                    <td>Key:</td>
-                                    <td><span id="detailKey"><!-- --></span></td>
-                                </tr>
-                                <tr>
-                                    <td>Name:</td>
-                                    <td><span id="detailName"><!-- --></span></td>
-                                </tr>
-                                <tr>
-                                    <td>Workflow File Name:</td>
-                                    <td><span id="detailFileName"><!-- --></span></td>
-                                </tr>
-                                <tr>
-                                    <td>Status:</td><td id="status"><!-- fix ff problem --></td>
-                                </tr>
-                                <tr>
-                                    <td>Time Created:</td><td id="detailTimeCreated"><!-- --></td>
-                                </tr>
-                                <tr>
-                                    <td>Time Updated:</td><td id="detailTimeUpdated"><!-- --></td>
-                                </tr>
-                                <tr>
-                                    <td>Export Link:</td>
+                                    <td style="width:20%;">Name:</td>
                                     <td>
-                                        <a id="detailExportUrl" href="uninitialized"></a>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditUT.name" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Description:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="textarea" rows="5" class="form-control" data-ng-model="weCtrl.currentEditUT.documentation" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Page from:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <cris-radio-button-group name="pageType" orientation="horizontal" items="{'Template': 'template', 'Custom HTML': 'custom'}" data-ng-model="weCtrl.currentEditUT.pageType"><!-- --></cris-radio-button-group>
+                                            <div data-ng-show="weCtrl.currentEditUT.pageType==='template'">
+                                                <table class="table plain">
+                                                    <tr>
+                                                        <td style="width: 25%;">Template:</td>
+                                                        <td>
+                                                            <cris-url-dropdown url="${urlTemplates}" ng-model="weCtrl.currentEditUT.templateId"></cris-url-dropdown>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div data-ng-show="weCtrl.currentEditUT.pageType==='custom'">
+                                                <table class="table plain">
+                                                    <tr>
+                                                        <td style="width: 25%;">HTML File:</td>
+                                                        <td>
+                                                            <input type="text" class="form-control" ng-disabled="true" data-ng-model="weCtrl.currentEditUT.ui_page"/>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Select a new HTML</td>
+                                                        <td>
+                                                            <div id="idUserTaskCustomHtmlFile"></div>>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>User(s) Permitted:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditUT.csvUsers"/>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Group(s) Permitted:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditUT.csvGroups"/>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Dataset State:</td>
+                                    <td>
+                                        <cris-radio-button-group name="datasetStateUT" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditUT.datasetState"><!-- --></cris-radio-button-group>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>UI Orientation:</td>
+                                    <td>
+                                        <cris-radio-button-group name="orientationUT" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditUT.orientation"><!-- --></cris-radio-button-group>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>File(s) in Archive:<br/>(To remove a file, uncheck it)</td>
+                                    <td>
+                                        <cris-checkbox-group orientation="vertical" items="{{weCtrl.currentEditUT.filesInArchive}}" data-ng-model="weCtrl.currentEditUT.filesToInclude"><!-- --></cris-checkbox-group>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>File(s) to Include:</td>
+                                    <td>
+                                        <div id="idUserTaskFiles"><!-- --></div>
                                     </td>
                                 </tr>
                             </table>
-                        </form>
+                        </uib-tab>
+                        <uib-tab index="1" heading="Json In" style="overflow: hidden;">
+                            <cris-workflow-json-builder task="weCtrl.currentEditUT" type="jsonIn" queries="weCtrl.currentEditUT.jsonInQueries"></cris-workflow-json-builder>
+                        </uib-tab>
+                    </uib-tabset>
+                </div>
+                                                        
+                <div id="serviceTaskDetails" class="workflowOverlayDiv">
+                    <table class="table plain">
+                        <tr>
+                            <td>
+                                <h4 id="serviceTaskLabel"></h4>
+                            </td>
+                            <td class="text-right">
+                                <button class="btn btn-default" data-ng-click='weCtrl.cancelTaskDetails("serviceTaskDetails")'>Cancel</button>&amp;nbsp;&amp;nbsp;
+                                <button class="btn btn-default" data-ng-click='weCtrl.deleteTask(weCtrl.currentEditST)'>Delete</button>&amp;nbsp;&amp;nbsp;
+                                <button class="btn btn-default" data-ng-click='weCtrl.closeServiceTaskDetails(weCtrl.currentEditST)'>OK</button>
+                            </td>
+                        </tr>
+                    </table>
+                    <br />
+                    <uib-tabset active="0" style="width: 100%;">
+                        <uib-tab index="0" heading="General">
+                            <table class="table table-striped">
+                                <tr>
+                                    <td style="width:20%;">Name:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditST.name" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Description:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="textarea" rows="5" class="form-control" data-ng-model="weCtrl.currentEditST.documentation" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>File(s) in Archive:<br/>(To remove a file, uncheck it)</td>
+                                    <td>
+                                        <cris-checkbox-group orientation="vertical" items="{{weCtrl.currentEditST.filesInArchive}}" data-ng-model="weCtrl.currentEditST.filesToInclude"><!-- --></cris-checkbox-group>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>File(s) to Include:</td>
+                                    <td>
+                                        <div id="idServiceTaskFiles"><!-- --></div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Dataset State:</td>
+                                    <td>
+                                        <cris-radio-button-group name="datasetStateST" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditST.datasetState"><!-- --></cris-radio-button-group>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>UI Orientation:</td>
+                                    <td>
+                                        <cris-radio-button-group name="orientationST" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditST.orientation"><!-- --></cris-radio-button-group>
+                                    </td>
+                                </tr>
+                            </table>
+                        </uib-tab>
+                        <uib-tab index="1" heading="Service">
+                            <table class="table table-striped">
+                                <tr>
+                                    <td style="width:20%;">Prefilter:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditST.prefilter" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Commandline:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditST.commandline" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Postfilter:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditST.postfilter" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!--
+                                <tr>
+                                    <td style="width:20%;">Clear working directory on error:</td>
+                                    <td>
+                                        <input type="checkbox" ng-true-value="true" ng-false-value="false" data-ng-model="weCtrl.currentEditST.clearWorkingDirectory" />
+                                    </td>
+                                </tr>
+                                -->
+                                <tr>
+                                    <td>File(s) to place:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditST.filesToPlace" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>File(s) to collect:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditST.filesToCollect" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Wait for service task to complete:</td>
+                                    <td>
+                                        <div class="col-sm-8 col-md-5 noPadding">
+                                            <input type="text" class="form-control" data-ng-model="weCtrl.currentEditST.syncTask" />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </uib-tab>
+                        <uib-tab index="2" heading="Json In">
+                            <cris-workflow-json-builder task="weCtrl.currentEditST" type="jsonIn" queries="weCtrl.currentEditST.jsonInQueries"></cris-workflow-json-builder>
+                        </uib-tab>
+                        <uib-tab index="3" heading="Json Out">
+                            <cris-workflow-json-builder task="weCtrl.currentEditST" type="jsonOut" queries="weCtrl.currentEditST.jsonOutQueries"></cris-workflow-json-builder>
+                        </uib-tab>
+                    </uib-tabset>
+                </div>
+                                                        
+                <script type="text/ng-template" id="view_report_edit_modal">
+                    <div class="modal-body">
+                        <b>{{modalTitle ? modalTitle : 'New Report Task'}}</b>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-striped">
+                            <tr>
+                                <td style="width:25%;">Name:</td>
+                                <td>
+                                    <input type="text" class="form-control" data-ng-model="weCtrl.currentEditRT.name" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Description:</td>
+                                <td>
+                                    <input name="description" type="textarea" rows="5" class="form-control" data-ng-model="weCtrl.currentEditRT.documentation" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Command:</td>
+                                <td>
+                                    <cris-dropdown items="[{id: 'GetParameters', name: 'GetParameters'}, {id: 'GenerateReport', name: 'GenerateReport'}]" data-ng-model="weCtrl.currentEditRT.command" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Report:</td>
+                                <td>
+                                    <cris-url-dropdown url="${urlReports}" ng-model="weCtrl.currentEditRT.reportId"></cris-url-dropdown>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Template:</td>
+                                <td>
+                                    <cris-url-dropdown url="${urlTemplates}" ng-model="weCtrl.currentEditRT.templateId"></cris-url-dropdown>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Parameters:</td>
+                                <td>
+                                    <input type="text" class="form-control" data-ng-model="weCtrl.currentEditRT.parameters" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Output Type:</td>
+                                <td>
+                                    <cris-dropdown items="[{id: 'html', name: 'html'}, {id: 'pdf', name: 'pdf'}, {id: 'rtf', name: 'rtf'}, {id: 'xls', name: 'xls'}, {id: 'xlsx', name: 'xlsx'}]" data-ng-model="weCtrl.currentEditRT.outputType" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Dataset State:</td>
+                                <td>
+                                    <cris-radio-button-group name="datasetStateRT" orientation="vertical" items="{Sandboxed: 0, Operational: 1, Archived: 2, Deprecated: 3, Temporary: 4}" data-ng-model="weCtrl.currentEditRT.datasetState"><!-- --></cris-radio-button-group>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>UI Orientation:</td>
+                                <td>
+                                    <cris-radio-button-group name="orientationRT" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditRT.orientation"><!-- --></cris-radio-button-group>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <span class="pull-left"><input type="button" value="Delete" class="btn btn-primary" ng-click="weCtrl.deleteTask(weCtrl.currentEditRT);cancel();" /></span>
+                        <span class="pull-right"><input type="button" value="Ok" class="btn btn-warning" ng-click="weCtrl.closeReportTaskDialog(weCtrl.currentEditRT);cancel();" /></span>
+                    </div>
+                </script>
+                
+                <script type="text/ng-template" id="view_condition_branch_modal">
+                    <div class="modal-header">
+                        <b>{{modalTitle ? modalTitle : 'New Condition Branch'}}</b>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-striped">
+                            <tr>
+                                <td style="width:25%;">Name:</td>
+                                <td>
+                                    <input type="text" class="form-control" data-ng-model="weCtrl.currentEditCF.name" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width:25%;">Condition Expression:</td>
+                                <td>
+                                    <input type="text" class="form-control" data-ng-model="weCtrl.currentEditCF.conditionExpression" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>UI Orientation:</td>
+                                <td>
+                                    <cris-radio-button-group name="orientationCF" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditCF.orientation"><!-- --></cris-radio-button-group>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <span class="pull-left"><input type="button" value="Delete" class="btn btn-primary" ng-click="weCtrl.deleteTask(weCtrl.currentEditCF);cancel();" /></span>
+                        <span class="pull-right"><input type="button" value="Ok" class="btn btn-warning" ng-click="weCtrl.closeConditionBranchDialog(weCtrl.currentEditCF);cancel();" /></span>
+                    </div>
+                </script>
+                
+                <script type="text/ng-template" id="view_multi-condition_branch_modal">
+                    <div class="modal-header">
+                        <b>{{modalTitle ? modalTitle : 'New Condition Branch'}}</b>
+                    </div>
+                    <div class="modal-body">
+                        <table class="table table-striped">
+                            <tr>
+                                <td style="width:25%;">Name:</td>
+                                <td>
+                                    <input type="text" class="form-control" data-ng-model="weCtrl.currentEditCF.name" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Num of Expressions:</td>
+                                <td>
+                                    <cris-dropdown items="[{id: 1, name: 1}, {id: 2, name: 2}, {id: 3, name: 3}, {id: 4, name: 4}, {id: 5, name: 5}, {id: 6, name: 6}]" data-ng-model="weCtrl.currentEditCF.expressionCount" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2">
+                                    <table class="table table-striped">
+                                        <tr data-ng-repeat="n in weCtrl.currentEditCF.numExpressions track by $index">
+                                            <td style="width: 18%">Expression {{$index + 1}}:</td>
+                                            <td>
+                                                <input type="text" name='conditionExpression{{$index + 1}}' class="form-control" data-ng-model="weCtrl.currentEditCF.conditionExpressions[$index].expression"/>
+                                            </td>
+                                            <td style="width: 12%">Label {{$index + 1}}:</td>
+                                            <td style="width: 24%">
+                                                <input type="text" name='label{{$index + 1}}' class="form-control" data-ng-model="weCtrl.currentEditCF.conditionExpressions[$index].label"/>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>UI Orientation:</td>
+                                <td>
+                                    <cris-radio-button-group name="orientationMCF" orientation="horizontal" items="{Normal: 'normal', Flipped: 'flipped'}" data-ng-model="weCtrl.currentEditCF.orientation"><!-- --></cris-radio-button-group>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <span class="pull-left"><input type="button" value="Delete" class="btn btn-primary" ng-click="weCtrl.deleteMultiConditionTask(weCtrl.currentEditCF);cancel();" /></span>
+                        <span class="pull-right"><input type="button" value="Ok" class="btn btn-warning" ng-click="weCtrl.closeMultiConditionBranchDialog(weCtrl.currentEditCF);cancel();" /></span>
+                    </div>
+                </script>
+            </uib-tab>
+            <uib-tab heading="Manager">
+                <div class="row" ng-controller="WorkflowEditorController2">
+                    <div id="workflowsView" class="col-xs-12 col-sm-10 col-md-5 col-sm-offset-1">
+                        <h2>Workflows</h2>
+                        <div class="row">
+                            <div class="col-md-5">
+                                <div>
+                                    <button type="button" class="btn btn-warning" ng-click="toggleDeprecate()" ng-disabled="!selectedRecord">{{record.statusId === 0 ? "Restore" : "Deprecate"}}</button>
+                                </div>
+                            </div>
+                            <div class="col-md-7">
+                                <div class="form-horizontal pull-right">
+                                    <br class="hidden-xs hidden-sm"/>
+                                    Show:&amp;nbsp;
+                                    <span style="display: inline-block;"><cris-radio-button-group name="workflowStatus" orientation="horizontal" items="{Operational: '1', Deprecated: '0', All: ''}" data-ng-model="status"><!-- --></cris-radio-button-group></span>
+                                </div>
+                            </div>
+                        </div>
+                        <br />
+                        <!-- for some reason grid couldn't be created when its directive is placed directly in the tab. We now have to create it after the grid container is loaded-->
+                        <div ng-init="loadGrid()" id="gridContainer">
+                            <!--<cris-ui-grid column-defs="gridColumnDefs" url="workflowsUrl" grid-ref="gridRef" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"></cris-ui-grid>-->
+                        </div>
+                    </div>
+                    <div id="detailsView" class="col-xs-12 col-sm-10 col-md-5 hidden-xs hidden-sm">
+                        <div class="hidden-md hidden-lg">
+                            <button type="button" class="btn btn-default" ng-click="toggleDetailsView(null, true)"><span class="glyphicon glyphicon-chevron-left"></span>&amp;nbsp;Back to Workflows List</button>
+                        </div>
+                        <h2>Details</h2>
+                        <table class="table table-striped">
+                            <tr>
+                                <td style="width: 30%">Version:</td>
+                                <td>
+                                    <div ng-if="record.id &amp;&amp; versionsUrl">
+                                         <cris-url-dropdown url="{{versionsUrl}}" id-field="version" name-field="version" ng-model="record.versionNumber"></cris-url-dropdown>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Key:</td>
+                                <td>{{record.key}}</td>
+                            </tr>
+                            <tr>
+                                <td>Name:</td>
+                                <td>{{record.name}}</td>
+                            </tr>
+                            <tr>
+                                <td>Workflow File Name:</td>
+                                <td>{{record.content}}</td>
+                            </tr>
+                            <tr>
+                                <td>Status:</td>
+                                <td>{{getStatusName(record.statusId)}}</td>
+                            </tr>
+                            <tr>
+                                <td>Time Created:</td>
+                                <td>{{getTimeCreated(record)}}</td>
+                            </tr>
+                            <tr>
+                                <td>Last Updated:</td>
+                                <td>{{getLastUpdated(record)}}</td>
+                            </tr>
+                            <tr>
+                                <td>Export Link:</td>
+                                <td>
+                                    <div ng-if="record.content">
+                                        <a href="${urlExport}/{{record.id}}/?version={{record.versionNumber}}">{{record.content}}</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                 </div>
-            </div>
-        </div>
-
+            </uib-tab>
+        </uib-tabset>
+        
         <script type="text/ng-template" id="view_builder_json">
         <table class="form" style="width: 100%">
-            <tr ng-hide="error">
+            <tr>
+                <td></td>
+                <td>
+                    <br />
+                    <div class="form-horizontal">
+                        <input type="radio" value="builder" ng-model="jsonViewType[type]" ng-click="viewTypeChange('builder')" class="radio-inline" />
+                        <label style="display:initial;">&amp;nbsp;Builder&amp;nbsp;</label>
+                        &amp;nbsp;&amp;nbsp;&amp;nbsp;
+                        <input type="radio" value="advanced" ng-model="jsonViewType[type]" ng-click="viewTypeChange('advanced')" class="radio-inline" />
+                        <label style="display:initial;">&amp;nbsp;Advanced&amp;nbsp;</label>
+                    </div>
+                    <br />
+                </td>
+            </tr>
+            <tr ng-hide="error || jsonViewType[type]=='advanced'">
                 <td style="width: 8%">Queries:</td>
                 <td>
                     <cris-workflow-query queries="queries" task-id="{{task.id}}"></cris-workflow-query>
                 </td>
             </tr>
-            <tr>
+            <tr ng-hide="jsonViewType[type]=='advanced'">
                 <td style="width: 8%">Builder:</td>
                 <td>
                     <table style="width: 100%;">
                         <tr>
                             <td colspan="3" style="width:100%">
-                                <div class="floatLeft twoTenths">
-                                    <div ng-hide="error">
-                                        <span>Template <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addJsonVariable('template')" /></span>
-                                        &amp;nbsp;&amp;nbsp;&amp;nbsp;
-                                        <span>Variable <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addJsonVariable('variable')" /></span>
+                                <div class="container-fluid">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div ng-hide="error">
+                                                <span>Template <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addJsonVariable('template')" /></span>
+                                                &amp;nbsp;&amp;nbsp;&amp;nbsp;
+                                                <span>Variable <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addJsonVariable('variable')" /></span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-7">
+                                            <span ng-bind="error" class="error"></span>
+                                        </div>
+                                        <div class="col-md-2 text-right" style="padding-right:2px;">
+                                            <input type="button" value="Preview" class="btn btn-info" ng-disabled="!item || item.length === 0" data-ng-click="previewJson()" />
+                                        </div>
                                     </div>
-                                    &amp;nbsp;
-                                </div>
-                                <div class="floatLeft sevenTenths">
-                                    <span ng-bind="error" class="error"></span>
-                                </div>
-                                <div class="floatRight oneTenths right">
-                                    <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props='label: "Preview", disabled: {{!item || item.length === 0}}' data-ng-click="previewJson()" />
                                 </div>
                             </td>
                         </tr>
@@ -1025,48 +867,42 @@
                             <td>
                                 <div ng-switch="item[$index].variableType">
                                     <div ng-switch-when="template">
-                                        <cris-select items="{{getTemplates($index)}}" item="item[$index].variable" value="{{item[$index].variable}}" ng-blur="onJsonBuilderEdit($index)"/>
+                                        <span class="text-danger" ng-hide="templateIsValid(item[$index].variable)">*Referenced template is invalid</span>
+                                        <cris-dropdown items="{{getTemplates($index)}}" ng-model="item[$index].variable" on-blur="onJsonBuilderEdit($index)" />
                                     </div>
                                     <div ng-switch-when="variable">
-                                        <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item[$index].variable" ng-blur="onJsonBuilderEdit($index)"/>
+                                        <input type="text" class="form-control" data-ng-model="item[$index].variable" ng-blur="onJsonBuilderEdit($index)" />
                                     </div>
                                 </div>
                             </td>
                             <td>
                                 <div ng-show="item[$index].variableType=='template'">
-                                    <div>
-                                        <div>
-                                            <div style="float: left;">
-                                                Query:&amp;nbsp;
-                                            </div>
-                                            <div style="float: left;">
-                                                <cris-select items="{{queryAliases}}" item="item[$index].value" value="{{item[$index].value}}" ng-blur="onJsonBuilderEdit()"/>
-                                            </div>
-                                        </div>
-                                        &amp;nbsp;
-                                    </div>
                                     <div ng-show="item[$index].variable">
-                                        &amp;nbsp;
-                                        <table style="margin-bottom:1px;">
-                                            <tr>
-                                                <td colspan="3">
-                                                    Term&amp;nbsp;<img class="inlineIcon" src="${srcAddImg}" data-ng-click="addTermToMerge($index)" />
-                                                </td>
-                                            </tr>
-                                            <tr ng-show="item[$index].termsToMerge.length > 0">
-                                                <th style="width:3%"></th>
-                                                <th style="width:22%">Name</th>
-                                                <th>Value</th>
-                                            </tr>
+                                        <div>
+                                            Add Item&amp;nbsp;<img class="inlineIcon" src="${srcAddImg}" data-ng-click="addTermToMerge($index)" />
+                                        </div>
+                                        <br />
+                                       <table style="margin-bottom:1px;">
                                             <tr data-ng-repeat="term in item[$index].termsToMerge track by $index">
-                                                <td>
+                                                <td style="width:3%">
                                                     <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeTermToMerge($parent.$index, $index)" />
                                                 </td>
-                                                <td>
-                                                    <cris-select items="{{getTermNames(item[$parent.$index].variable)}}" item="term.variable" value="{{term.variable}}" ng-blur="onJsonBuilderEdit()"/>
+                                                <td style="width:10%">
+                                                    <cris-dropdown items="[{id: 'Term', name: 'Term'}, {id: 'Query', name: 'Query'}]" ng-model="term.itemType" on-blur="onJsonBuilderEdit()" />
+                                                </td>
+                                                <td style="width:22%">
+                                                    <div ng-show="term.itemType=='Term'">
+                                                        <span class="text-danger" ng-show="termIsValid(term, item[$parent.$index].variable)">*term is invalid</span>
+                                                        <cris-dropdown items="{{getTermNames(item[$parent.$index].variable)}}" ng-model="term.variable" on-blur="onJsonBuilderEdit(null, term, item[$parent.$index].variable)" />
+                                                    </div>
+                                                    <div ng-show="term.itemType=='Query'">
+                                                        <cris-dropdown items="{{queryAliases}}" ng-model="term.variable" on-blur="onJsonBuilderEdit()" />
+                                                    </div>
                                                 </td>
                                                 <td>
-                                                    <cris-workflow-variable-types item="term" queries="{{queryAliases}}"></cris-workflow-variable-types>
+                                                    <div ng-show="term.itemType=='Term'">
+                                                        <cris-workflow-variable-types item="term" queries="{{queryAliases}}" sub-terms="{{getTermNames(item[$parent.$index].variable, term.variable)}}" attach-to-data="{{getAttachToData(item[$parent.$index].variable, term.variable)}}"></cris-workflow-variable-types>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </table>
@@ -1075,9 +911,6 @@
                                 <div ng-show="item[$index].variableType=='variable'">
                                     <cris-workflow-variable-types item="item[$index]" queries="{{queryAliases}}"></cris-workflow-variable-types>
                                 </div>
-                            <!--
-                                <cris-workflow-variable-types item="item[$index]" queries="{{queryAliases}}"></cris-workflow-variable-types>
-                            -->
                             </td>
                             <td>
                                 <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeItem($index)" />
@@ -1086,9 +919,13 @@
                     </table>
                 </td>
             </tr>
-            <tr>
+            <tr ng-hide="jsonViewType[type]=='builder'">
                 <td style="width: 8%">Advanced:</td>
-                <td colspan="2"><input type="text" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 15' data-ng-model="task[type]" ng-blur="onJsonTextEdit(task[type])"/></td>
+                <td colspan="2">
+                    <!--For some reasong ng-blur isn't working for textarea. So I reverted to onblur and extracting scope when it's triggered-->
+                    <!--<textarea data-ng-model="task[type]" ng-blur="onJsonTextEdit(task[type]);" rows="30" class="form-control"></textarea>-->
+                    <textarea data-ng-model="task[type]" spellcheck="false" onblur="var _scope_ = angular.element(this).scope().$parent; _scope_.onJsonTextEdit(_scope_.task[type]);" rows="30" class="form-control" />
+                </td>
             </tr>
         </table>
         </script>
@@ -1096,58 +933,65 @@
         <script type="text/ng-template" id="view_builder_variable_types">
         <div style="display: table; width: 100%;">
             <div style="display: table-row;">
-                <div style="display: table-cell; width:22%;">
-                    <div ng-switch="item.valueType">
-                        <div ng-switch-when="object">
-                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.valueType" dojo-props="disabled: true" />
-                        </div>
-                        <div ng-switch-default="">
-                            <cris-select items="[{id: 'localVariable', name: 'Local Variable'}, {id: 'static', name: 'Static Value'}, {id: 'systemVariable', name: 'System Variable'}, {id: 'query', name: 'Query'}]" item="item.valueType" value="{{item.valueType}}" ng-blur="onJsonBuilderEdit('valueType')"/>
-                        </div>
-                    </div>
+                <div style="display: table-cell; width:22%; vertical-align: middle;">
+                    <cris-dropdown items="[{id: 'localVariable', name: 'Local Variable'}, {id: 'static', name: 'Static Value'}, {id: 'systemVariable', name: 'System Variable'}, {id: 'query', name: 'Query'}]" ng-model="item.valueType" on-blur="onJsonBuilderEdit('valueType')" placeholder="Value Type" />
                 </div>
-                <div style="display: table-cell; padding-left: 4px; width: 38%;">
-                    <div ng-switch="item.valueType">
-                        <div ng-switch-when="localVariable">
-                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()"/>
-                        </div>
-                        <div ng-switch-when="query">
-                            <cris-select items="{{queries}}" item="item.value" value="{{item.value}}" ng-blur="onJsonBuilderEdit('value')"/>
-                        </div>
-                        <div ng-switch-when="static">
-                            <cris-select items="[{id: 'Boolean', name: 'Boolean'},
-                                                {id: 'Date', name: 'Date'},
-                                                {id: 'Numeric', name: 'Numeric'},
-                                                {id: 'Text', name: 'Text'},
-                                                {id: 'Null', name: 'Null'}]" item="item.staticDataType" value="{{item.staticDataType}}" placeholder="static data type" ng-blur="onJsonBuilderEdit('staticDataType')"/>
-                        </div>
-                        <div ng-switch-when="systemVariable">
-                            <cris-select items="{{systemVariables}}" item="item.value" value="{{item.value}}" ng-blur="onJsonBuilderEdit()"/>
-                        </div>
+                <div style="display: table-cell; padding-left: 4px; width: 38%; vertical-align: middle;">
+                    <div ng-if="item.valueType === 'localVariable'">
+                        <input type="text" class="form-control" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()" />
+                    </div>
+                    <div ng-if="item.valueType === 'query'">
+                        <cris-dropdown items="{{queries}}" ng-model="item.value" on-blur="onJsonBuilderEdit('value')" />
+                    </div>
+                    <div ng-if="item.valueType === 'static'">
+                        <cris-dropdown items="{{getStaticDataTypes()}}" ng-model="item.staticDataType" placeholder="Static data type" on-blur="onJsonBuilderEdit('staticDataType')" is-read-only="{{item.isReadOnly}}" />
+                    </div>
+                    <div ng-if="item.valueType === 'systemVariable'">
+                        <span class="text-danger" ng-hide="valueIsValid(item.value,systemVariables)">*value is invalid</span>
+                        <cris-dropdown items="{{systemVariables}}" ng-model="item.value" on-blur="onJsonBuilderEdit()" />
                     </div>
                 </div>
                 <div style="display: table-cell; padding-left: 4px; width: 40%;">
-                    <div ng-switch="item.valueType">
-                        <div ng-switch-when="query">
-                            <div ng-show="item.value">
-                                <cris-select items="{{termNames()}}" item="item.subValue" value="{{item.subValue}}" placeholder="sub-value (optional)" ng-blur="onJsonBuilderEdit()"/>
+                    <div ng-if="item.valueType === 'query'">
+                        <div ng-show="item.value">
+                            <span class="text-danger" ng-hide="valueIsValid(item.subValue,termNames())">*value is invalid</span>
+                            <cris-dropdown items="{{termNames()}}" ng-model="item.subValue" placeholder="sub-value (optional)" on-blur="onJsonBuilderEdit()" />
+                        </div>
+                    </div>
+                    <div ng-if="item.valueType === 'static'">
+                        <div ng-hide="valueDataTypeIsValid(item.value, item.staticDataType)" class="text-danger">*value format is Invalid</div>
+                        <div ng-if="item.staticDataType === 'Boolean'">
+                            <cris-dropdown items="[{id: false, name: false}, {id: true, name: true}]" ng-model="item.value" on-blur="onJsonBuilderEdit()" />
+                        </div>
+                        <div ng-if="item.staticDataType === 'Date'">
+                            <cris-date-picker data-ng-model="item.value" type="date-time" ng-change="onJsonBuilderEdit()"/>
+                        </div>
+                        <div ng-if="item.staticDataType === 'Time'">
+                            <div style="padding:2px;">
+                                <cris-time-picker data-ng-model="item.value" ng-change="onJsonBuilderEdit()"/>
                             </div>
                         </div>
-                        <div ng-switch-when="static">
-                            <div ng-switch="item.staticDataType">
-                                <div ng-switch-when="Boolean">
-                                    <cris-select items="[{id: 'false', name: 'false'}, {id: 'true', name: 'true'}]" item="item.value" value="{{item.value}}" ng-blur="onJsonBuilderEdit()"/>
-                                </div>
-                                <div ng-switch-when="Date">
-                                    <input type="text" data-dojo-widget="dijit/form/DateTextBox" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()"/>
-                                </div>
-                                <div ng-switch-when="Numeric">
-                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.value" dojo-props="placeHolder: 'static value', regExp:'[\\d]+', invalidMessage:'Only numbers allowed!'" ng-blur="onJsonBuilderEdit()"/>
-                                </div>
-                                <div ng-switch-when="Text">
-                                    <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="item.value" dojo-props="placeHolder: 'static value', regExp:'[\\w\\s]+', invalidMessage:'Invalid value!'" ng-blur="onJsonBuilderEdit()"/>
-                                </div>
-                            </div>
+                        <div ng-if="item.staticDataType === 'Numeric'">
+                            <input type="number" class="form-control" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()" placeholder="static value" />
+                        </div>
+                        <div ng-if="item.staticDataType === 'Text'">
+                            <input type="text" class="form-control" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()" placeholder="static value" />
+                        </div>
+                        <div ng-if="item.staticDataType === 'Array'">
+                            <input type="button" class="form-control" ng-click="editValue(item.staticDataType)" value="View or Edit Array" />
+                        </div>
+                        <div ng-if="item.staticDataType === 'Object' || item.staticDataType === 'Composite'">
+                            <input type="button" class="form-control" ng-click="editValue(item.staticDataType)" value="View or Edit Object" />
+                        </div>
+                        <div ng-if="item.staticDataType === 'AttachTo'">
+                            <cris-dropdown items="{{getAttachToData(item.variable || item.term)}}" ng-model="item.value" on-blur="onJsonBuilderEdit()" />
+                        </div>
+                        <div ng-if="item.staticDataType === 'List'">
+                            <span class="text-danger" ng-hide="valueIsValid(item.value,item.listItemProps.items)">*value is invalid</span>
+                            <cris-dropdown items="{{item.listItemProps.items}}" ng-model="item.value" on-blur="onJsonBuilderEdit()" />
+                        </div>
+                        <div ng-if="item.staticDataType === 'File'">
+                            <input type="text" class="form-control" data-ng-model="item.value" ng-blur="onJsonBuilderEdit()" placeholder="StorageFile:ID" />
                         </div>
                     </div>
                 </div>
@@ -1161,93 +1005,216 @@
                     <td valign="top" style="width: 12%; background-color: #FFF;">
                         Queries <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addQuery()" />
                         <hr />
-                        <table style="table-layout: fixed; width: 100%; margin-top: 2px; margin-bottom: 2px;" class="form">
+                        <table style="margin-bottom: 2px;">
                             <tr data-ng-repeat="query in queries track by $index">
-                                <td style="height:25px; cursor: pointer; overflow: hidden; white-space: nowrap;" data-ng-click="querySelected($index, $event)">{{query.key}}</td>
+                                <td style="height:25px; cursor: pointer; overflow: hidden; white-space: nowrap;" data-ng-click="querySelected($index, $event)">
+                                    {{query.key}}
+                                    <br />
+                                    <span class="text-danger pull-right" ng-hide="queryValidator[query.key].isValid"><i>*has errors</i></span>
+                                </td>
                             </tr>
                         </table>
                     </td>
                     <td valign="top" style="background-color: #FFF;">
                         <div ng-show="isQuerySelected" style="margin-top: 5px; margin-bottom: 5px;">
-                            <div style="text-align: right;">
-                                <input type="button" data-dojo-widget="dijit/form/Button" data-dojo-props="label: 'Preview', disabled: {{selectedQuery.templateUUID.length === 0}}" data-ng-click="previewQuery()" style="float: right"/>
+                            <div style="text-align: right;padding-right:2px;">
+                                <input type="button" value="Preview" class="btn btn-info pull-right" ng-disabled="selectedQuery.templateUUID.length === 0" data-ng-click="previewQuery()" />
                             </div>
                             
                             <div style="float:left; width:50%;">
-                                Source Template:
-                                <cris-select items="{{templates}}" item="selectedQuery.templateUUID" value="{{selectedQuery.templateUUID}}" ng-blur="onQueryEdit()"/>
+                                <table class="plain">
+                                    <tr>
+                                        <td>Source&amp;nbsp;Template:</td>
+                                        <td>
+                                            <span class="text-danger pull-right">{{invalidTemplateError}}</span>
+                                            <cris-dropdown items="{{templates}}" ng-model="selectedQuery.templateUUID" on-blur="onQueryEdit()" />
+                                        </td>
+                                    </tr>
+                                </table>
                             </div>
-                            <div style="float:right; vertical-align:bottom; text-align:right; width:50%;">
+                            <div style="vertical-align:bottom; width:50%;padding-bottom:2px;" class="pull-right">
                                 <br />
-                                Expecting Multiple Records?
-                                &amp;nbsp;<cris-one-check-box items="[false, true]" item="selectedQuery.multipleRecords" ng-blur="onQueryEdit()"></cris-one-check-box>
+                                <div class="form-horizontal pull-right">Expecting Multiple Records?&amp;nbsp;<input type="checkbox"  class="checkbox-inline" data-ng-model="selectedQuery.multipleRecords" ng-true-value="true" ng-false-value="false" ng-blur="onQueryEdit()"/></div>
+                                &amp;nbsp;
                             </div>
                             <br /><br /><br />
                             
-                            <div ng-show="selectedQuery.templateUUID">
-                                <table class="form" style="width:100%; margin-top: 2px; margin-bottom: 2px;">
-                                    <tr>
-                                        <td colspan="4">
-                                            Where <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addQueryWhere()" />&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
-                                            <span>Current Job: <cris-one-check-box items="[false, true]" item="selectedQuery.addCurrentJobFilter"></cris-one-check-box></span>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th style="width:20%;">Term</th>
-                                        <th style="width:18%;">Query Operator</th>
-                                        <th>Value</th>
-                                        <th style="width:3%;"></th>
-                                    </tr>
-                                    <tr data-ng-repeat="whereItem in selectedQuery.where track by $index"> <!-- ng-controller="WhereItemController" -->
-                                        <td style="padding-right: 2px;">
-                                            <cris-select items="{{getTermNames($index)}}" item="whereItem.term" value="{{whereItem.term}}" ng-blur="onQueryEdit($index)"/>
-                                        </td>
-                                        <td style="padding-right: 2px;">
-                                            <cris-select items="[{id: '$eq', name: 'Equal To'},{id: '$gt', name: 'Greater Than'},
-                                                                 {id: '$gte', name: 'Greater Than or Equal To'},
-                                                                 {id: '$lt', name: 'Less Than'},
-                                                                 {id: '$lte', name: 'Less Than or Equal To'},
-                                                                 {id: '$ne', name: 'Not Equal To'},
-                                                                 {id: '$in', name: 'In'},
-                                                                 {id: '$nin', name: 'Not In'}]" 
-                                                                item="whereItem.queryOperator" value="{{whereItem.queryOperator}}" ng-blur="onQueryEdit($index)"/>
-                                        </td>
-                                        <td style="padding-right: 2px;">
-                                            <cris-workflow-variable-types item="whereItem" queries="{{getQueryAliases()}}"></cris-workflow-variable-types>
-                                        </td>
-                                        <td style="padding-right: 2px;">
-                                            <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeWhereItem($index)" />
-                                        </td>
-                                    </tr>
-                                </table>
-                                <br />
-                                <br />
-                                <table style="width: 100%;">
-                                    <tr>
-                                        <td style="border-style: none; padding-right: 2px;">
-                                            Limit:
-                                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="selectedQuery['$limit']" ng-blur="onQueryEdit()"/>
-                                        </td>
-                                        <td style="border-style: none; padding-right: 2px;">
-                                            Skip:
-                                            <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="selectedQuery['$skip']" ng-blur="onQueryEdit()"/>
-                                        </td>
-                                        <td style="border-style: none; padding-right: 2px;">
-                                            Order by:
-                                            <cris-select items="{{selectedQuery.termNames}}" item="selectedQuery['$orderby']" value="{{selectedQuery['$orderby']}}" ng-blur="onQueryEdit()"/>
-                                        </td>
-                                        <td style="border-style: none; padding-right: 2px;">
-                                            <br />
-                                            <cris-select items="[{id: 1, name: 'Ascending'}, {id: -1, name: 'Descending'}]" item="selectedQuery['orderbyOrder']" value="{{selectedQuery['orderbyOrder']}}" ng-blur="onQueryEdit()"/>
-                                        </td>
-                                    </tr>
-                                </table>
-                                <br />
-                                <div style="text-align: right;">
-                                    <!--
-                                    <input type="button" data-dojo-widget="dijit/form/Button"  data-dojo-props="label: 'Delete'" data-ng-click="deleteQuery(selectedQuery)"/>
-                                    -->
-                                </div>
+                            <table style="width:100%;" class="table-striped">
+                                <tr>
+                                    <td colspan="5">
+                                        Where <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addQueryWhere()" />&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;
+                                        <span class="form-horizontal">Current Job:&amp;nbsp;<input type="checkbox"  class="checkbox-inline" data-ng-model="selectedQuery.addCurrentJobFilter" ng-true-value="true" ng-false-value="false" /></span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th style="width:3%;"></th>
+                                    <th style="width:16%;">Term</th>
+                                    <th style="width:14%;">Query Operator</th>
+                                    <th>Value</th>
+                                    <th style="width:2%;"></th>
+                                </tr>
+                                <tr data-ng-repeat="whereItem in selectedQuery.where track by $index">
+                                    <td>    
+                                        <div ng-hide="$index===0">
+                                            <i>and</i>
+                                        </div>
+                                    </td>
+                                    <td colspan="3" style="padding:0;">
+                                        <div data-ng-repeat="groupItem in whereItem.orGroup track by $index">
+                                            <table style="width:100%;" class="plain">
+                                                <tr>
+                                                    <td style="padding-right: 2px;width:17%;">
+                                                        <span ng-hide="queryValidator[selectedQuery.key].termNameValidator[$parent.$index + '-' + $index].isValid" class="text-danger">*term is invalid</span>
+                                                        <cris-dropdown items="{{getTermNames(groupItem)}}" ng-model="groupItem.term" on-blur="onQueryEdit(groupItem)" />
+                                                    </td>
+                                                    <td style="padding-right: 2px;width:15%;">
+                                                        <span ng-hide="queryValidator[selectedQuery.key].queryOperatorValidator[$parent.$index + '-' + $index].isValid" class="text-danger">*operator is invalid</span>
+                                                        <cris-dropdown items="{{getQueryOperators(groupItem.dataType)}}" ng-model="groupItem.queryOperator" on-blur="onQueryEdit()" />
+                                                    </td>
+                                                    <td style="padding-right: 2px;">
+                                                        <table style="width:100%;" class="plain">
+                                                            <tr>
+                                                                <td>
+                                                                    <cris-workflow-variable-types item="groupItem" queries="{{getQueryAliases()}}" sub-terms="{{getSubTerms(groupItem.term)}}" check-validity="validateQueries()" attach-to-data="{{selectedQuery.attachToData}}"></cris-workflow-variable-types>
+                                                                </td>
+                                                                <td style="width:14%">
+                                                                    <div ng-show="$index===0">
+                                                                        Add "OR"&amp;nbsp;<img class="inlineIcon" src="${srcAddImg}" data-ng-click="addToGroup(whereItem.orGroup)" />
+                                                                    </div>
+                                                                    <div ng-show="$index!==0">
+                                                                        <span style="font-size:1.5em;">&amp;nbsp;__|</span>OR
+                                                                        &amp;nbsp;<a href="#" ng-click="deleteGroupItem(whereItem.orGroup, $index)">delete</a>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        </table>    
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeWhereItem($index)" />
+                                    </td>
+                                </tr>
+                            </table>
+                            <br />
+                            <br />
+                            <table style="width: 100%;">
+                                <tr><th colspan="3" style="text-align: center;">Filters</th></tr>
+                                <tr>
+                                    <td style="border-style: none; padding-right: 2px;">
+                                        <table class="plain">
+                                            <tr>
+                                                <td>Limit:</td>
+                                                <td><input type="number" class="form-control" data-ng-model="selectedQuery['$limit']" ng-blur="onQueryEdit()" /></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td style="border-style: none; padding-right: 2px;">
+                                        <table class="plain">
+                                            <tr>
+                                                <td>Skip:</td>
+                                                <td><input type="number" class="form-control" data-ng-model="selectedQuery['$skip']" ng-blur="onQueryEdit()" /></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td style="border-style: none; padding-right: 2px;"></td>
+                                </tr>
+                                <tr>
+                                    <td style="border-style: none; padding-right: 2px; width: 33%; padding-top: 6px; vertical-align: top;">
+                                        Projection <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addProjectionItem()" />
+                                        <table style="margin-top:2px;margin-bottom:2px;">
+                                            <tr ng-repeat="projectionItem in selectedQuery.projectionItems track by $index">
+                                                <td style="width: 61%">
+                                                    <span ng-hide="queryValidator[selectedQuery.key].projectionTermNameValidator[$index].isValid" class="text-danger">*term is invalid</span>
+                                                    <cris-dropdown items="{{getTermNames()}}" ng-model="projectionItem.term" on-blur="onQueryEdit()" />
+                                                </td>
+                                                <td>
+                                                    <span ng-hide="queryValidator[selectedQuery.key].projectionValueValidator[$index].isValid" class="text-danger">*value is invalid</span>
+                                                    <cris-dropdown items="[{id: false, name: false}, {id: true, name: true}]" ng-model="projectionItem.project" on-blur="onQueryEdit()" />
+                                                </td>
+                                                <td style="width:3%">
+                                                    <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeProjectionItem($index)" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td style="border-style: none; padding-right: 2px; width: 33%; padding-top: 6px; vertical-align: top;">
+                                        Distinct <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addDistinctItem()" />
+                                        <table style="margin-top:2px;margin-bottom:2px;">
+                                            <tr ng-repeat="distinctItem in selectedQuery.distinctItems track by $index">
+                                                <td style="width: 61%">
+                                                    <span ng-hide="queryValidator[selectedQuery.key].distinctTermNameValidator[$index].isValid" class="text-danger">*term is invalid</span>
+                                                    <cris-dropdown items="{{getTermNames()}}" ng-model="distinctItem.term" on-blur="onQueryEdit()" />
+                                                </td>
+                                                <td>
+                                                    <span ng-hide="queryValidator[selectedQuery.key].distinctValueValidator[$index].isValid" class="text-danger">*value is invalid</span>
+                                                    <cris-dropdown items="[{id: false, name: false}, {id: true, name: true}]" ng-model="distinctItem.isDistinct" on-blur="onQueryEdit()" />
+                                                </td>
+                                                <td style="width:3%">
+                                                    <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeDistinctItem($index)" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td style="border-style: none; padding-right: 2px; width: 33%; padding-top: 6px; vertical-align: top;">
+                                        Sort <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addSortItem()" />
+                                        <table style="margin-top:2px;margin-bottom:2px;">
+                                            <tr ng-repeat="sortItem in selectedQuery.sortItems track by $index">
+                                                <td style="width: 50%">
+                                                    <span ng-hide="queryValidator[selectedQuery.key].sortTermNameValidator[$index].isValid" class="text-danger">*term is invalid</span>
+                                                    <cris-dropdown items="{{getTermNames()}}" ng-model="sortItem.term" on-blur="onQueryEdit()" />
+                                                </td>
+                                                <td>
+                                                    <span ng-hide="queryValidator[selectedQuery.key].sortValueValidator[$index].isValid" class="text-danger">*value is invalid</span>
+                                                    <cris-dropdown items="[{id: 1, name: 'Ascending'}, {id: -1, name: 'Descending'}]" ng-model="sortItem.order" on-blur="onQueryEdit()" />
+                                                </td>
+                                                <td style="width:3%">
+                                                    <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeSortItem($index)" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-style: none; padding-right: 2px; padding-top: 6px; vertical-align: top;" colspan="2">
+                                        Group <img class="inlineIcon" src="${srcAddImg}" data-ng-click="addGroupItem()" />
+                                        <table style="margin-top:2px;margin-bottom:2px;">
+                                            <tr ng-repeat="groupItem in selectedQuery.groupItems track by $index" ng-hide="groupItem.groupAlias=='_id'">
+                                                <td>
+                                                    <input type="text" class="form-control" data-ng-model="groupItem.groupAlias" ng-blur="onQueryEdit()" placeholder="Group Alias" />
+                                                </td>
+                                                <td style="width: 40%">
+                                                    <span ng-hide="queryValidator[selectedQuery.key].groupItemTermNameValidator[$index].isValid" class="text-danger">*term is invalid</span>
+                                                    <cris-dropdown items="{{getTermNames()}}" ng-model="groupItem.term" on-blur="onQueryEdit()" />
+                                                </td>
+                                                <td style="width: 30%">
+                                                    <span ng-hide="queryValidator[selectedQuery.key].groupItemValueValidator[$index].isValid" class="text-danger">*value is invalid</span>
+                                                    <cris-dropdown items="[{id: '$sum', name: 'Sum'},
+                                                                            {id: '$avg', name: 'Average'},
+                                                                            {id: '$first', name: 'First'},
+                                                                            {id: '$last', name: 'Last'},
+                                                                            {id: '$max', name: 'Maximum'},
+                                                                            {id: '$min', name: 'Minimum'},
+                                                                            {id: '$stdDevPop', name: 'Population Standard Deviation'},
+                                                                            {id: '$stdDevSamp', name: 'Sample Standard Deviation'}]" 
+                                                                           ng-model="groupItem.operator" on-blur="onQueryEdit()"/>
+                                                </td>
+                                                <td style="width:3%">
+                                                    <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeGroupItem($index)" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                    <td style="border-style: none; padding-right: 2px; padding-top: 6px; vertical-align: top;"></td>
+                                </tr>
+                            </table>
+                            <br />
+                            <div style="text-align: right;">
+                                <!--
+                                <input type="button" value="Delete" class="btn btn-info" data-ng-click="deleteQuery(selectedQuery)" />
+                                -->
                             </div>
                         </div>
                     </td>
@@ -1255,34 +1222,104 @@
             </table>
         </script>
         
+        <script type="text/ng-template" id="view_builder_edit_value">
+        <div style="height:800px;width:100%;padding:5%;">
+            <div style="height:95%;width:100%;overflow-y:auto;">
+                <table class="table-striped" style="width:100%" ng-if="item.objectType==='Object' || item.objectType==='Composite'">
+                    <tr>
+                        <td colspan="3">
+                            <span>Add Property to Object&amp;nbsp;&amp;nbsp;<img class="inlineIcon" src="${srcAddImg}" data-ng-click="addObjectItem()" /></span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="text-center">
+                            Name
+                        </th>
+                        <th class="text-center" colspan="2">
+                            Value
+                        </th>
+                    </tr>
+                    <tr ng-repeat="record in item.value track by $index">
+                        <td style="width:20%">
+                            <div ng-if="!subTerms">
+                                <input type="text" class="form-control" ng-model="record.variable" placeholder="property name" on-blur="onJsonBuilderEdit()" />
+                            </div>
+                            <div ng-if="subTerms">
+                                <span class="text-danger" ng-hide="termIsValid(record.variable)">*term is invalid</span>
+                                <cris-dropdown items="{{subTerms}}" ng-model="record.variable"  on-blur="onObjectEdit(record)" on-change="objectTermChanged(record.value, record.variable)" />
+                            </div>
+                        </td>
+                        <td>
+                            <cris-workflow-variable-types item="record.value" sub-terms="{{getSubTerms(record.variable)}}" attach-to-data="{{attachToData}}" queries="{{queries}}"></cris-workflow-variable-types>
+                        </td>
+                        <td style="width:3%">
+                            <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeObjectItem($index)" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3">
+                            <br />
+                            <label>Object Preview</label>
+                            <p style="white-space:pre-wrap">{{objectToPreview}}</p>
+                        </td>
+                    </tr>
+                </table>
+                <table  class="table-striped" style="width:100%" ng-if="item.objectType==='Array'">
+                    <tr>
+                        <th colspan="3">
+                            <span>Add Item to Array&amp;nbsp;&amp;nbsp;<img class="inlineIcon" src="${srcAddImg}" data-ng-click="addArrayItem()" /></span>
+                        </th>
+                    </tr>
+                    <tr ng-repeat="record in item.value">
+                        <td>
+                            <cris-workflow-variable-types item="record" sub-terms="{{subTerms}}" attach-to-data="{{attachToData}}" queries="{{queries}}"></cris-workflow-variable-types>
+                        </td>
+                        <td style="width:3%">
+                            <img class="inlineIcon" src="${srcDeleteImg}" data-ng-click="removeObjectItem($index)" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3">
+                            <br />
+                            <label>Array Preview</label>
+                            <p style="white-space:pre-wrap">{{objectToPreview}}</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <input type="button" value="Close" class="btn btn-warning pull-right" style="position:absolute;right:5%;bottom:3%;" data-ng-click="close()" />
+        </div>
+        </script>
+        
         <script type="text/ng-template" id="view_json_preview">
-        <div style="height:680px;width:100%;">
+        <div style="height:800px;width:100%;padding:2%;">
             <div ng-show="previewVariables.length > 0">
                 <span style="font-weight:bold;">
                     Please enter test values for the required parameters
                 </span>
                 <div style="max-height:150px;overflow:auto;">
-                    <table class="form" style="width:100%;">
+                    <table class="table-striped" style="width:100%;">
                         <tr ng-repeat="previewVariable in previewVariables" ng-hide="!previewVariable.variable">
                             <td style="width:35%">
                                 <span>{{previewVariable.variable}}</span>
                             </td>
                             <td>
-                                <input type="text" data-dojo-widget="dijit/form/ValidationTextBox" data-ng-model="previewVariable.value" />
+                                <input type="text" class="form-control" data-ng-model="previewVariable.value" />
                             </td>
                         </tr>
                     </table>
                     <br />
                 </div>
             </div>
-            <div style="height:530px;width:100%">
+            <div style="height:630px;width:100%">
                 <span style="font-weight:bold;">
                     Fully evaluated JSON
                 </span>
                 <div>
-                    <input type="text" name="jsonIn" data-dojo-widget="dijit/form/SimpleTextarea" data-dojo-props='rows: 32, style: "width:99%", readOnly: true' data-ng-model="jsonToPreview"/>
+                    <textarea data-ng-model="jsonToPreview" class="form-control" rows="27" disabled="disabled"></textarea>
                 </div>
             </div>
+            <input type="button" value="Close" class="btn btn-warning pull-right" style="position:absolute;right:2%;bottom:3%;" data-ng-click="close()" />
         </div>
         </script>
         

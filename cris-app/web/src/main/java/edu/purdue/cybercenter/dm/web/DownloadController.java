@@ -77,13 +77,23 @@ public class DownloadController {
 
     @RequestMapping(value="/download/{StorageFile:StorageFile:[0-9]+}", method = RequestMethod.GET, produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public void getStorageFile(@PathVariable("StorageFile") String filename, HttpServletRequest request, HttpServletResponse response) {
+        String[] fields = filename.split(":");
+        String sId;
+        if (fields.length == 2) {
+            sId = fields[1];
+        } else {
+            throw new RuntimeException("Invalid StorageFile ID: " + filename);
+        }
+        Integer id = Integer.parseInt(sId);
+        StorageFile storageFile = domainObjectService.findById(id, StorageFile.class);
+
         String downloadPath = (String) request.getSession().getAttribute(AppConfigConst.SESSION_TMP_PATH) + AppConfigConst.FILE_SEPARATOR;
         File dir = new File(downloadPath);
         dir.mkdir();
 
         String file;
         try {
-            file = storageFileManager.getFile(StorageFile.toStorageFile(filename), downloadPath, true);
+            file = storageFileManager.getFile(storageFile, downloadPath, true);
         } catch (Exception ex) {
             throw new RuntimeException("StorageFile does not exist: " + filename + ": " + ex.getMessage(), ex);
         }

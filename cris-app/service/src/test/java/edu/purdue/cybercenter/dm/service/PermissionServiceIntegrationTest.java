@@ -118,16 +118,21 @@ public class PermissionServiceIntegrationTest {
         // test update with permission
         UserId.set(USER_ID_4);
         SecurityHelper.setAuthentication(USER_ID_4);
-        resultUpdate = datasetService.putValue(UUID.fromString(TEMPLATE_UUID), null, result);
+        try {
+            resultUpdate = datasetService.putValue(UUID.fromString(TEMPLATE_UUID), null, result);
+            throw new RuntimeException("shoudn't be able to update a dataset");
+        } catch (AccessDeniedException ex) {
+            // expect to be denied
+        }
 
-        Assert.assertNotNull("document is not null", resultUpdate);
-        Assert.assertNotNull("field _id:", resultUpdate.get("_id"));
-        Assert.assertNotNull("field timeCreated", resultUpdate.get(MetaField.TimeCreated));
-        Assert.assertNotNull("field timeUpdated", resultUpdate.get(MetaField.TimeUpdated));
-        Assert.assertEquals("field createdBy", USER_ID_4, (int) resultUpdate.get(MetaField.CreatorId));
-        Assert.assertEquals("field updatedBy", USER_ID_4, (int) resultUpdate.get(MetaField.UpdaterId));
-        Assert.assertNotSame("timeCreated != timeUpdated", resultUpdate.get(MetaField.TimeCreated), resultUpdate.get(MetaField.TimeUpdated));
-        Assert.assertSame("createdBy == updatedBy", resultUpdate.get(MetaField.CreatorId), resultUpdate.get(MetaField.UpdaterId));
+//        Assert.assertNotNull("document is not null", resultUpdate);
+//        Assert.assertNotNull("field _id:", resultUpdate.get("_id"));
+//        Assert.assertNotNull("field timeCreated", resultUpdate.get(MetaField.TimeCreated));
+//        Assert.assertNotNull("field timeUpdated", resultUpdate.get(MetaField.TimeUpdated));
+//        Assert.assertEquals("field createdBy", USER_ID_4, (int) resultUpdate.get(MetaField.CreatorId));
+//        Assert.assertEquals("field updatedBy", USER_ID_4, (int) resultUpdate.get(MetaField.UpdaterId));
+//        Assert.assertNotSame("timeCreated != timeUpdated", resultUpdate.get(MetaField.TimeCreated), resultUpdate.get(MetaField.TimeUpdated));
+//        Assert.assertSame("createdBy == updatedBy", resultUpdate.get(MetaField.CreatorId), resultUpdate.get(MetaField.UpdaterId));
 
         /*
          * delete
@@ -150,7 +155,13 @@ public class PermissionServiceIntegrationTest {
         UserId.set(USER_ID_4);
         SecurityHelper.setAuthentication(USER_ID_4);
 
-        datasetService.delete(termUuid, resultUpdate);
+        try {
+            datasetService.delete(termUuid, resultUpdate);
+            throw new RuntimeException("shoudn't be able to update a dataset");
+        } catch (AccessDeniedException ex) {
+            // expect to be denied
+        }
+        
         Map<String, Object> aggregators = new HashMap<>();
         aggregators.put(DocumentService.AGGREGATOR_MATCH, resultUpdate);
         Object objectFound = datasetService.find(termUuid, aggregators);

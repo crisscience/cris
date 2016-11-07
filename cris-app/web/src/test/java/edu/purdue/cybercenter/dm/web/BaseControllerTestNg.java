@@ -812,8 +812,10 @@ public abstract class BaseControllerTestNg extends AbstractTransactionalTestNGSp
         context.put(KEY_HEADERS, headers);
 
         Map<String, Cookie> cookies = new HashMap<>();
-        for (Cookie cookie : request.getCookies()) {
-            cookies.put(cookie.getName(), cookie);
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                cookies.put(cookie.getName(), cookie);
+            }
         }
         context.put(KEY_COOKIES, cookies);
 

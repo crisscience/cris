@@ -19,6 +19,7 @@ import edu.purdue.cybercenter.dm.util.TermName;
 import edu.purdue.cybercenter.dm.service.WorkflowService;
 import edu.purdue.cybercenter.dm.web.util.WebHelper;
 import edu.purdue.cybercenter.dm.xml.vocabulary.Term;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -77,7 +78,7 @@ public class RestController {
     /*********************************************************
      * Objectus
      *********************************************************/
-    @RequestMapping(value = "/rest/objectus/validate", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus/validate", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String validateJson(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         // build
@@ -88,7 +89,7 @@ public class RestController {
         return validateJson(objectuses);
     }
 
-    @RequestMapping(value = "/rest/objectus", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public Object listJson(HttpServletRequest request, HttpServletResponse response) {
         String name = request.getParameter("name");
@@ -106,7 +107,7 @@ public class RestController {
 
     @RequestMapping(value = "/rest/objectus", method = RequestMethod.POST, produces = MediaType.TEXT_HTML_VALUE)
     @ResponseBody
-    public String createFromMultipart(MultipartHttpServletRequest request, HttpServletResponse response) {
+    public String createFromMultipart(MultipartHttpServletRequest request, HttpServletResponse response) throws IOException {
         String sProjectId = request.getParameter("projectId");
         String sExperimentId = request.getParameter("experimentId");
         String sJobId = request.getParameter("jobId");
@@ -120,7 +121,7 @@ public class RestController {
         return WebHelper.buildIframeResponse(jsonResponse);
     }
 
-    @RequestMapping(value = "/rest/objectus", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String createFromJson(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         Map object = (Map) DatasetUtils.deserialize(json);
@@ -136,13 +137,13 @@ public class RestController {
         return DatasetUtils.serialize(result);
     }
 
-    @RequestMapping(value = "/rest/objectus", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String updateFromJson(@RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         return createFromJson(json, request, response);
     }
 
-    @RequestMapping(value = "/rest/objectus/validate/{datasetUuid}", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus/validate/{datasetUuid}", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String validateDatasetJson(@PathVariable("datasetUuid") String datasetUuid, @RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         // build
@@ -154,7 +155,7 @@ public class RestController {
         return validateJson(objectuses);
     }
 
-    @RequestMapping(value = "/rest/objectus/{datasetUuid}/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus/{datasetUuid}/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String showDatasetJson(@PathVariable("datasetUuid") UUID datasetUuid, @PathVariable("id") String id, HttpServletRequest request, HttpServletResponse response) {
         Object found;
@@ -176,7 +177,7 @@ public class RestController {
         return DatasetUtils.serialize(found);
     }
 
-    @RequestMapping(value = "/rest/objectus/{datasetUuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus/{datasetUuid}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String listDatasetJson(@PathVariable("datasetUuid") String datasetUuid, HttpServletRequest request, HttpServletResponse response) {
         Map<String, String[]> params = request.getParameterMap();
@@ -203,7 +204,7 @@ public class RestController {
         return result;
     }
 
-    @RequestMapping(value = "/rest/objectus/{datasetUuid}", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus/{datasetUuid}", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String createFromDatasetJson(@PathVariable("datasetUuid") String datasetUuid, @RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         Map object = (Map) DatasetUtils.deserialize(json);
@@ -215,14 +216,14 @@ public class RestController {
         return DatasetUtils.serialize(result);
     }
 
-    @RequestMapping(value = "/rest/objectus/{datasetUuid}/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus/{datasetUuid}/{id}", method = RequestMethod.PUT, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String updateFromDatasetJson(@PathVariable("datasetUuid") String datasetUuid, @PathVariable("id") String id, @RequestBody String json, HttpServletRequest request, HttpServletResponse response) {
         // for update the "id" is contained in the request body.
         return createFromDatasetJson(datasetUuid, json, request, response);
     }
 
-    @RequestMapping(value = "/rest/objectus/{datasetUuid}/{id}", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequestMapping(value = "/rest/objectus/{datasetUuid}/{id}", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
     @ResponseBody
     public String deleteFromDatasetJson(@PathVariable("datasetUuid") UUID datasetUuid, @PathVariable("id") String id, HttpServletRequest request, HttpServletResponse response) {
         Map query = (Map) DatasetUtils.deserialize(String.format("{_id:{$oid:\"%s\"}}", id));
@@ -277,7 +278,7 @@ public class RestController {
         if (paramsString == null || paramsString.trim().isEmpty()) {
             paramsString = "{}";
         }
-        Map<String, Object> params = Helper.deserialize(paramsString, Map.class);
+        Map<String, Object> params = (Map<String, Object>) DatasetUtils.deserialize(paramsString);
         Map<String, Object> match;
         Object distinct;
         Map<String, Object> group;
@@ -370,48 +371,56 @@ public class RestController {
             skip = a[0];
             limit = a[1] - skip + 1;
         }
-        int count = (int) datasetService.count(templateUuid, match);
+
+        Map<String, Object> aggregators = new HashMap<>();
+        aggregators.put(DocumentService.AGGREGATOR_MATCH, match);
+        if (distinct != null && distinct instanceof Map) {
+            aggregators.put(DocumentService.AGGREGATOR_DISTINCT, distinct);
+        }
+        aggregators.put(DocumentService.AGGREGATOR_GROUP, group);
+
+        int count = (int) datasetService.count(templateUuid, aggregators);
         String result;
-        if (count > 0) {
-            Map<String, Object> aggregators = new HashMap<>();
-            aggregators.put(DocumentService.AGGREGATOR_MATCH, match);
-            if (distinct != null && distinct instanceof Map) {
-                aggregators.put(DocumentService.AGGREGATOR_DISTINCT, distinct);
-            }
-            aggregators.put(DocumentService.AGGREGATOR_GROUP, group);
-            aggregators.put(DocumentService.AGGREGATOR_SORT, sort);
-            aggregators.put(DocumentService.AGGREGATOR_SKIP, skip);
-            aggregators.put(DocumentService.AGGREGATOR_LIMIT, limit);
-            aggregators.put(DocumentService.AGGREGATOR_PROJECT, project);
-            List object = datasetService.find(templateUuid, aggregators);
-            int numOfRecord = object.size();
-            if (distinct != null && distinct instanceof Boolean) {
-                object = (List) DatasetUtils.extractField(alias, object, (Boolean) distinct);
-            } else {
-                object = (List) DatasetUtils.extractField(alias, object);
-            }
-            if (isList != null && isList) {
-                result = DatasetUtils.serialize(object);
-            } else {
-                if (object.size() == 1) {
-                    result = DatasetUtils.serialize(object.get(0));
-                } else if (object.isEmpty()) {
-                    throw new RuntimeException(name + " has no records");
-                } else {
-                    throw new RuntimeException(name + " has more than one records: " + numOfRecord);
-                }
-            }
-            if (skip != null) {
-                WebHelper.setDojoGridPaginationInfo(skip, skip + (numOfRecord - 1), count, response);
-            }
+
+        String op = request.getParameter("op");
+        if (op != null && op.equalsIgnoreCase("count")) {
+            result = "" + count;
         } else {
-            if (skip != null) {
-                WebHelper.setDojoGridPaginationInfo(skip, skip, 0, response);
-            }
-            if (isList != null && isList) {
-                result = "[]";
+            if (count > 0) {
+                aggregators.put(DocumentService.AGGREGATOR_SORT, sort);
+                aggregators.put(DocumentService.AGGREGATOR_SKIP, skip);
+                aggregators.put(DocumentService.AGGREGATOR_LIMIT, limit);
+                aggregators.put(DocumentService.AGGREGATOR_PROJECT, project);
+                List object = datasetService.find(templateUuid, aggregators);
+                int numOfRecord = object.size();
+                if (distinct != null && distinct instanceof Boolean) {
+                    object = (List) DatasetUtils.extractField(alias, object, (Boolean) distinct);
+                } else {
+                    object = (List) DatasetUtils.extractField(alias, object);
+                }
+                if (isList != null && isList) {
+                    result = DatasetUtils.serialize(object);
+                } else {
+                    if (object.size() == 1) {
+                        result = DatasetUtils.serialize(object.get(0));
+                    } else if (object.isEmpty()) {
+                        throw new RuntimeException(name + " has no records");
+                    } else {
+                        throw new RuntimeException(name + " has more than one records: " + numOfRecord);
+                    }
+                }
+                if (skip != null) {
+                    WebHelper.setDojoGridPaginationInfo(skip, skip + (numOfRecord - 1), count, response);
+                }
             } else {
-                result = "null";
+                if (skip != null) {
+                    WebHelper.setDojoGridPaginationInfo(skip, skip, 0, response);
+                }
+                if (isList != null && isList) {
+                    result = "[]";
+                } else {
+                    result = "null";
+                }
             }
         }
 

@@ -10,11 +10,12 @@ import edu.purdue.cybercenter.dm.domain.Project;
 import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.repository.ExperimentRepository;
 import edu.purdue.cybercenter.dm.repository.ProjectRepository;
+import edu.purdue.cybercenter.dm.security.CustomPermission;
 import edu.purdue.cybercenter.dm.security.UserDetailsAdapter;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.acls.AclPermissionEvaluator;
+import org.springframework.security.access.PermissionEvaluator;
 import org.springframework.security.acls.domain.BasePermission;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,7 +29,7 @@ import org.springframework.stereotype.Service;
 public class SecurityService {
 
     @Autowired
-    private AclPermissionEvaluator aclPermissionEvaluator;
+    private PermissionEvaluator permissionEvaluator;
 
     @Autowired
     private ProjectRepository projectRepository;
@@ -42,7 +43,8 @@ public class SecurityService {
         User user = ((UserDetailsAdapter) authentication.getPrincipal()).getUser();
         List<Project> projects = projectRepository.findAll();
         for (Project project : projects) {
-            if (user.isAdmin() || aclPermissionEvaluator.hasPermission(authentication, project, BasePermission.READ)) {
+            boolean isPublic = project.getIsPublic() == null ? false : project.getIsPublic();
+            if (user.isAdmin() || isPublic || permissionEvaluator.hasPermission(authentication, project.getId(), project.getClass().getName(), BasePermission.READ)) {
                 projectIds.add(project.getId());
             }
         }
@@ -56,12 +58,39 @@ public class SecurityService {
         User user = ((UserDetailsAdapter) authentication.getPrincipal()).getUser();
         List<Experiment> experiments = experimentRepository.findAll();
         for (Experiment experiment : experiments) {
-            if (user.isAdmin() || aclPermissionEvaluator.hasPermission(authentication, experiment, BasePermission.READ)) {
+            boolean isPublic = experiment.getIsPublic() == null ? false : experiment.getIsPublic();
+            if (user.isAdmin() || isPublic || permissionEvaluator.hasPermission(authentication, experiment.getId(), experiment.getClass().getName(), BasePermission.READ)) {
                 experimentIds.add(experiment.getId());
             }
         }
-        
+
         return experimentIds;
+    }
+
+    public List<Integer> getOwnerExperimentIds() {
+        List<Integer> experimentIds = new ArrayList<>();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        List<Experiment> experiments = experimentRepository.findAll();
+        for (Experiment experiment : experiments) {
+            if (permissionEvaluator.hasPermission(authentication, experiment.getId(), experiment.getClass().getName(), CustomPermission.OWNER)) {
+                experimentIds.add(experiment.getId());
+            }
+        }
+
+        return experimentIds;
+    }
+
+    public List<Integer> getOwnerProjectIds() {
+        List<Integer> projectIds = new ArrayList<>();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        List<Project> projects = projectRepository.findAll();
+        for (Project project : projects) {
+            if (permissionEvaluator.hasPermission(authentication, project.getId(), project.getClass().getName(), CustomPermission.OWNER)) {
+                projectIds.add(project.getId());
+            }
+        }
+
+        return projectIds;
     }
 
 }

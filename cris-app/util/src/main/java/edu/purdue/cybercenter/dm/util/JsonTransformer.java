@@ -127,34 +127,10 @@ public class JsonTransformer {
         List<Map> objects = (List) object;
         Map<String, Object> mergedObject = new HashMap<>();
         for (Map o : objects) {
-            mergeMaps(mergedObject, o);
+            Helper.mergeMaps(mergedObject, o);
         }
         return mergedObject;
     }
 
-    private static Map<String, Object> mergeMaps(Map<String, Object> map1, Map<String, Object> map2) {
-        if (map2 != null) {
-            for (Entry<String, Object> entry2 : map2.entrySet()) {
-                String key2 = entry2.getKey();
-                Object value1 = map1.get(key2);
-                Object value2 = entry2.getValue();
-                if (value1 == null) {
-                    map1.put(key2, value2);
-                } else if (value2 == null) {
-                    if (value1 instanceof Map) {
-                        // ignore merge null into composite type
-                    } else {
-                        // merge null into primitive type
-                        map1.put(key2, value2);
-                    }
-                } else if (!(value1 instanceof Map) || !(value2 instanceof Map)) {
-                    map1.put(key2, value2);
-                } else {
-                    mergeMaps((Map) value1, (Map) value2);
-                }
-            }
-        }
-        return map1;
-    }
 
 }

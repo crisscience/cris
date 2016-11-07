@@ -92,19 +92,19 @@ public class AttachToDto {
     protected String latestVersion;
 
     public Boolean getIsTermValid() {
-        return isLatest;
+        return isTermValid;
     }
 
-    public void setIsTermValid(Boolean isLatest) {
-        this.isLatest = isLatest;
+    public void setIsTermValid(Boolean isTermValid) {
+        this.isTermValid = isTermValid;
     }
 
     public Boolean getIsVersionValid() {
-        return isLatest;
+        return isVersionValid;
     }
 
-    public void setIsVersionValid(Boolean isLatest) {
-        this.isLatest = isLatest;
+    public void setIsVersionValid(Boolean isVersionValid) {
+        this.isVersionValid = isVersionValid;
     }
 
     public Boolean getIsLatest() {

@@ -42,15 +42,9 @@ public interface CrisEntity extends Serializable {
 
     void persist();
 
-    void persistAndFlush();
-
     <T extends CrisEntity> T merge();
 
-    <T extends CrisEntity> T mergeAndFlush();
-
     void remove();
-
-    void removeAndFlush();
 
     void flush();
 

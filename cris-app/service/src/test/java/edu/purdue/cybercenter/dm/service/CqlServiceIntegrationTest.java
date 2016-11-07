@@ -6,6 +6,7 @@ package edu.purdue.cybercenter.dm.service;
 
 import edu.purdue.cybercenter.dm.domain.MetaField;
 import edu.purdue.cybercenter.dm.domain.Project;
+import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.threadlocal.TenantId;
 import edu.purdue.cybercenter.dm.threadlocal.UserId;
 import edu.purdue.cybercenter.dm.util.DatasetUtils;
@@ -173,5 +174,23 @@ public class CqlServiceIntegrationTest {
         Map<String, Object> data = hplcData.get(0);
         assertEquals(MetaField.TenantId, 1, data.get(MetaField.TenantId));
         assertEquals(MetaField.ContextId, 2147483647, data.get(MetaField.ContextId));
+    }
+
+    @Test
+    public void testFullName() {
+        TenantId.set(tenantId1);
+        UserId.set(userId1);
+        SecurityHelper.setAuthentication(userId1);
+
+        User user = User.findUser(userId1);
+        Map<String, Object> context = new HashMap<>();
+        context.put("_user", user);
+
+        String expression = "{\"fullName\" : #{current_user.fullName}}";
+
+        String result = cqlService.eval(expression, context);
+        Map mapResult = (Map<String, Object>) DatasetUtils.deserialize(result);
+
+        assertEquals("fullName", "George Washington", mapResult.get("fullName"));
     }
 }

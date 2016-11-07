@@ -6,10 +6,12 @@ package edu.purdue.cybercenter.dm.service;
 
 import com.mongodb.util.JSON;
 import edu.purdue.cybercenter.dm.domain.Experiment;
+import edu.purdue.cybercenter.dm.domain.Group;
 import edu.purdue.cybercenter.dm.domain.Job;
 import edu.purdue.cybercenter.dm.domain.JobContext;
 import edu.purdue.cybercenter.dm.domain.MetaField;
 import edu.purdue.cybercenter.dm.domain.Project;
+import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.repository.ExperimentRepository;
 import edu.purdue.cybercenter.dm.repository.JobContextRepository;
 import edu.purdue.cybercenter.dm.repository.JobRepository;
@@ -17,6 +19,7 @@ import edu.purdue.cybercenter.dm.repository.ProjectRepository;
 import edu.purdue.cybercenter.dm.util.ActivitiHelper;
 import edu.purdue.cybercenter.dm.util.DatasetUtils;
 import edu.purdue.cybercenter.dm.util.DomainObjectHelper;
+import edu.purdue.cybercenter.dm.util.ServiceUtils;
 import edu.purdue.cybercenter.dm.util.TermName;
 import edu.purdue.cybercenter.dm.vocabulary.util.VocabularyUtils;
 import edu.purdue.cybercenter.dm.vocabulary.validators.BooleanValidator;
@@ -37,8 +40,8 @@ import java.util.UUID;
 import javax.persistence.Query;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.apache.commons.lang.StringUtils;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PostFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -49,12 +52,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class DatasetService {
 
-    static final private String PostFilterRead = "hasGroup('Admin Group') or hasDatasetPermission(filterObject, 'read')";
-    static final private String PreAuthorizeSave = "hasGroup('Admin Group') or hasDatasetPermission(#value, 'update')";
-    static final private String PreAuthorizeCreate = "hasGroup('Admin Group') or hasDatasetPermission(#value, 'create')";
-    static final private String PreAuthorizeRead = "hasGroup('Admin Group') or hasDatasetPermission(#value, 'read')";
-    static final private String PreAuthorizeUpdate = "hasGroup('Admin Group') or hasDatasetPermission(#value, 'update')";
-    static final private String PreAuthorizeDelete = "hasGroup('Admin Group') or hasDatasetPermission(#value, 'delete')";
+    static final public String PRE_AUTHORIZE_SAVE = "isAdmin() or isDatasetOwner(#value) or hasDatasetPermission(#value, 'update')";
+    static final public String PRE_AUTHORIZE_DELETE = "isAdmin() or isDatasetOwner(#value) or hasDatasetPermission(#value, 'delete')";
 
     @Autowired
     private VocabularyValidator termValueValidator;
@@ -80,6 +79,9 @@ public class DatasetService {
     @Autowired
     private ProjectRepository projectRepository;
 
+    @Autowired
+    private SecurityService securityService;
+
     // values must be in json format
     public List<Map> putValues(UUID termUuid, UUID termVersion, List<Map<String, Object>> value, Map<String, Object> context) {
         List<Map> savedValues = new ArrayList<>();
@@ -98,23 +100,28 @@ public class DatasetService {
     }
 
     // value must be in jason format
-    @PreAuthorize(PreAuthorizeSave)
+    @PreAuthorize(PRE_AUTHORIZE_SAVE)
     public Map putValue(UUID termUuid, UUID termVersion, Map<String, Object> value) {
         Map savedValue = null;
 
-        Integer jobId = null;
-        if (value != null) {
-            jobId = (Integer) value.get(MetaField.JobId);
-        }
-
-        UUID versionFromDataset = (UUID) value.get(MetaField.TemplateVersion);
-        if (termVersion == null && versionFromDataset == null) {
-            // use the most recent version of the template
-            Term template = termService.getTerm(termUuid, null, false);
-            termVersion = UUID.fromString(template.getVersion());
-        }
-
         if (termUuid != null) {
+            Integer jobId = null;
+            if (value != null) {
+                jobId = (Integer) value.get(MetaField.JobId);
+            }
+
+            UUID versionFromDataset = (UUID) value.get(MetaField.TemplateVersion);
+            if (termVersion == null && versionFromDataset == null) {
+                // use the most recent version of the template
+                Term template = termService.getTerm(termUuid, null, false);
+                termVersion = UUID.fromString(template.getVersion());
+            }
+
+            // added owner policy
+            Integer groupId = edu.purdue.cybercenter.dm.threadlocal.GroupId.get();
+            Group group = Group.findGroup(groupId);
+            value.put(MetaField.IsGroupOwner, group == null ? null : group.getIsGroupOwner());
+
             savedValue = documentService.save(termUuid, termVersion, value);
 
             // remember the uuid of the template
@@ -130,23 +137,24 @@ public class DatasetService {
         return savedValue;
     }
 
-    @PostFilter(PostFilterRead)
     public List find(UUID termUuid, Map<String, Object> aggregators) {
+        addSecurity(aggregators);
         List<Map<String, Object>> results = documentService.find(termUuid, null, aggregators);
         return results;
     }
 
-    @PostFilter(PostFilterRead)
     public List find(UUID termUuid, Map<String, Object> aggregators, File file) {
+        addSecurity(aggregators);
         List<Map<String, Object>> results = documentService.find(termUuid, null, aggregators, file);
         return results;
     }
 
-    public long count(UUID termUuid, Map<String, Object> query) {
-        return documentService.count(termUuid, null, query);
+    public long count(UUID termUuid, Map<String, Object> aggregators) {
+        addSecurity(aggregators);
+        return documentService.count(termUuid, null, aggregators);
     }
 
-    @PreAuthorize(PreAuthorizeDelete)
+    @PreAuthorize(PRE_AUTHORIZE_DELETE)
     public Object delete(UUID termUuid, Map<String, Object> value) {
         if (value != null) {
             documentService.delete(termUuid, null, value);
@@ -158,24 +166,75 @@ public class DatasetService {
         return mergeValueToObjectus(objectuses, key, value, false);
     }
 
+    private void addSecurity(Map<String, Object> aggregators) {
+        Boolean isAdmin = isAdmin();
+        List<Integer> projectIds = securityService.getPermittedProjectIds();
+        List<Integer> experimentIds = securityService.getPermittedExperimentIds();
+        List<Integer> ownerProjectIds = securityService.getOwnerProjectIds();
+        List<Integer> ownerExperimentIds = securityService.getOwnerExperimentIds();
+        aggregators.put(DocumentService.IS_ADMIN, isAdmin);
+        aggregators.put(DocumentService.PROJECT_IDS, projectIds);
+        aggregators.put(DocumentService.EXPERIMENT_IDS, experimentIds);
+        aggregators.put(DocumentService.OWNER_PROJECT_IDS, ownerProjectIds);
+        aggregators.put(DocumentService.OWNER_EXPERIMENT_IDS, ownerExperimentIds);
+    }
+
+    private Boolean isAdmin() {
+        Integer userId = edu.purdue.cybercenter.dm.threadlocal.UserId.get();
+        User user = User.findUser(userId);
+        return user.isAdmin();
+    }
+
+    private Object getValue(String alias, Object parent) {
+        Map<String, Object> result = ServiceUtils.processArrayNotation(alias);
+        String base = (String) result.get("base");
+        Integer index = (Integer) result.get("index");
+
+        Object termValue = ((Map) parent).get(base);
+        if (index == null) {
+            // map
+            if (termValue == null) {
+                termValue = new HashMap();
+                ((Map) parent).put(base, termValue);
+            }
+        } else {
+            // list
+            List list = (List) termValue;
+            if (list == null) {
+                list = new ArrayList();
+                ((Map) parent).put(base, list);
+            }
+            if (list.size() < (index + 1)) {
+                // fill the list up to index + 1 elements with null
+                for (int i = list.size(); i < (index + 1); i++) {
+                    list.add(null);
+                }
+            }
+            termValue = list.get(index);
+        }
+
+        return termValue;
+    }
+
     public String[] mergeValueToObjectus(Map<String, Object> objectuses, String key, Object value, boolean mergeArray) {
         TermName termName = new TermName(key);
         String templateName;
-        String termAlias;
+        String termPath;
         Term term;
         if (termName.getUuid() != null) {
             Term template = termService.getTerm(termName.getUuid(), termName.getVersion(), true);
             templateName = new TermName(template).getName();
-            termAlias = termName.getAlias();
-            term = termService.getSubTerm(template, termAlias);
+            termPath = termName.getAlias();
+            term = termService.getSubTerm(template, termPath);
         } else {
             templateName = termName.getAlias();
-            termAlias = "";
+            termPath = null;
             term = null;
         }
+
         Object convertedValue = convertValue(term, value, null);
         String[] aliases = null;
-        if (termAlias == null || termAlias.isEmpty()) {
+        if (StringUtils.isEmpty(termPath)) {
             objectuses.put(templateName, convertedValue);
         } else {
             Map<String, Object> objectus;
@@ -184,39 +243,48 @@ public class DatasetService {
                 objectus = new HashMap<>();
                 objectuses.put(templateName, objectus);
             }
-            aliases = termAlias.split("\\.");
-            if (aliases.length > 1) {
-                for (int i = 0; i < aliases.length - 1; i++) {
-                    if (objectus.get(aliases[i]) == null) {
-                        objectus.put(aliases[i], new HashMap<>());
-                    }
-                    objectus = (Map<String, Object>) objectus.get(aliases[i]);
-                }
+
+            // find the value to be merged
+            aliases = termPath.split("\\.");
+            Object parent = objectus;
+            for (int i = 0; i < aliases.length - 1; i++) {
+                String alias = aliases[i];
+                parent = getValue(alias, parent);
             }
-            String alias = aliases[aliases.length - 1];
-            Object oldValue = objectus.get(alias);
-            if (mergeArray && oldValue != null && (oldValue instanceof List || oldValue instanceof Object[])) {
+
+            String termAlias = aliases[aliases.length - 1];
+            Object termValue = getValue(termAlias, parent);
+
+            Map<String, Object> result = ServiceUtils.processArrayNotation(termAlias);
+            String base = (String) result.get("base");
+            Integer index = (Integer) result.get("index");
+
+            // merge values
+            if (mergeArray && termValue != null && (termValue instanceof List || termValue instanceof Object[])) {
+                // array
                 if (convertedValue != null) {
-                    if (oldValue instanceof List) {
-                        if (convertedValue instanceof List) {
-                            ((List) oldValue).addAll((List) convertedValue);
-                        } else {
-                            ((List) oldValue).addAll(Arrays.asList((Object[]) convertedValue));
-                        }
+                    List newList;
+                    if (termValue instanceof List) {
+                        newList = (List) termValue;
                     } else {
-                        List newList = new ArrayList(Arrays.asList((Object[]) oldValue));
-                        if (convertedValue instanceof List) {
-                            newList.addAll((List) convertedValue);
-                        } else {
-                            newList.addAll(Arrays.asList((Object[]) convertedValue));
-                        }
-                        objectus.put(alias, newList);
+                        newList = new ArrayList(Arrays.asList((Object[]) termValue));
+                    }
+                    ((Map) parent).put(base, newList);
+
+                    if (index != null) {
+                        newList.set(index, convertedValue);
+                    } else if (convertedValue instanceof List) {
+                        newList.addAll((List) convertedValue);
+                    } else {
+                        newList.addAll(Arrays.asList((Object[]) convertedValue));
                     }
                 }
             } else {
-                objectus.put(alias, convertedValue);
+                // map
+                ((Map) parent).put(base, convertedValue);
             }
         }
+
         return aliases;
     }
 
@@ -360,25 +428,14 @@ public class DatasetService {
         return isValid;
     }
 
-    //@PreAuthorize(PreAuthorizeUpdate)
-    public void updateStateByJob(Integer stateId, Integer jobId, Set<String> templateUuids) {
-        Set<String> collectionNames;
-        if (templateUuids == null) {
-            collectionNames = documentService.getCollectionNames();
-        } else {
-            collectionNames = DatasetUtils.uuidsToCollectionNames(templateUuids);
-        }
-        Map<String, Object> query = new HashMap<>();
-        query.put(MetaField.JobId, jobId);
-        Map<String, Object> data = new HashMap<>();
-        data.put(MetaField.State, stateId);
-        collectionNames.stream().forEach((collectionName) -> {
-            documentService.update(collectionName, query, data);
-        });
+    // THIS METHOD IS UNSAFE AND SHOULD ONLY BE USER INTERNALLY
+    public Map<String, Object> findByIdUnsecured(UUID termUuid, ObjectId id) {
+        Map<String, Object> doc = documentService.findById(termUuid, id);
+        return doc;
     }
 
-    //@PreAuthorize(PreAuthorizeUpdate)
-    public void updateState(Integer stateId, Map<String, Object> query, Set<String> templateUuids) {
+    // THIS METHOD IS UNSAFE AND SHOULD ONLY BE USER INTERNALLY
+    public void updateStateUnsecured(Integer stateId, Map<String, Object> query, Set<String> templateUuids) {
         Set<String> collectionNames;
         if (templateUuids == null) {
             collectionNames = new HashSet<>();

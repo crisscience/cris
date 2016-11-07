@@ -1,6 +1,5 @@
 package edu.purdue.cybercenter.dm.web;
 
-import org.springframework.format.FormatterRegistry;
 import org.springframework.format.support.FormattingConversionServiceFactoryBean;
 import org.springframework.stereotype.Service;
 
@@ -9,10 +8,4 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ApplicationConversionServiceFactoryBean extends FormattingConversionServiceFactoryBean {
-
-    @Override
-    protected void installFormatters(FormatterRegistry registry) {
-        super.installFormatters(registry);
-        // Register application converters and formatters
-    }
 }

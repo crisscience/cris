@@ -127,14 +127,14 @@ function createJsonRestStore(url, idAttribute, labelAttribute) {
             labelAttribute: labelAttribute
         });
 
-        // For filtering select, add empty option on top of dropdown
         require(["dojo/aspect"], function(aspect) {
             aspect.after(jsonRestStore, 'fetch', function(fetchResult) {
+                // For filtering select, add empty option on top of dropdown if user removes text from input
                 if (fetchResult && (fetchResult.results instanceof Array) && fetchResult.query && fetchResult.query[jsonRestStore.labelAttribute] === "") {
-                    var noValue = {};
-                    noValue[jsonRestStore.idAttribute || "id"] = "";
-                    noValue[jsonRestStore.labelAttribute] = "";
-                    fetchResult.results.unshift(noValue);
+                        var noValue = {};
+                        noValue[jsonRestStore.idAttribute || "id"] = "";
+                        noValue[jsonRestStore.labelAttribute] = "";
+                        fetchResult.results.unshift(noValue);
                 }
             });
         });
@@ -211,13 +211,13 @@ function createGrid(store, layout, node, args) {
     },
     args.htmlTag || document.createElement('div'));
     dojo.byId(node).appendChild(grid.domNode);
-    
+
     if (args.filter) {
         try {
             grid.setFilter(args.filter);
         } catch (e) {}
     }
-    
+
     grid.startup();
 
     return grid;
@@ -230,7 +230,7 @@ function createScrollableGrid(store, layout, node, args) {
         store: store,
         structure: layout,
         query: args.query || {},
-        rowsPerPage: args.rowsPerPage || 20,
+        rowsPerPage: args.rowsPerPage || 50,
         sortFields: args.sortFields || [{attribute: "name", descending: false}],
         plugins: {
             selector: {
@@ -281,11 +281,11 @@ function createScrollableGrid(store, layout, node, args) {
         }
     }, node);
     grid.showFilterBar(false);
-    
+
     if (args.filter) {
         grid.setFilter(args.filter);
     }
-    
+
     grid.startup();
 
     return grid;
@@ -395,6 +395,67 @@ function showConfirmYesNo(attrs) {
     dialog.show();
 
     return dialog;
+}
+
+function showYesNoModal(attrs) {
+    var modalTemplate = '<div> \
+                            <div class="modal-body"> \
+                                <p>' + attrs.message + '</p> \
+                            </div> \
+                            <div class="modal-footer"> \
+                                <span class="pull-left"><input type="button" value="Yes" class="btn btn-primary" ng-click="ok()" /></span> \
+                                <span class="pull-right"><input type="button" value="No" class="btn btn-warning" ng-click="cancel()" /></span> \
+                            </div> \
+                        </div>';
+    attrs.uibModal.open({
+        animation: true,
+        template: modalTemplate,
+        size: 'sm',
+        controller: function ($scope, $uibModalInstance) {
+            $scope.ok = function () {
+                attrs.okCallback();
+                $uibModalInstance.close();
+            };
+            $scope.cancel = function () {
+                $uibModalInstance.dismiss();
+            };
+        }
+    });
+}
+
+function showMessageModal(attrs) {
+    var modalTemplate = '<div> \
+                            <div class="modal-body"> \
+                                <p>' + attrs.message + '</p> \
+                            </div> \
+                            <div class="modal-footer"> \
+                                <span class="pull-right"><input type="button" value="Ok" class="btn btn-warning" ng-click="cancel()" /></span> \
+                            </div> \
+                        </div>';
+    attrs.uibModal.open({
+        animation: true,
+        template: modalTemplate,
+        size: 'sm',
+        controller: function ($scope, $uibModalInstance) {
+            $scope.cancel = function () {
+                $uibModalInstance.dismiss();
+            };
+        }
+    });
+}
+
+function showProgressModal(attrs) {
+    var modalTemplate = '<div> \
+                            <div class="modal-body"> \
+                                <uib-progressbar class="progress-striped active" max="100" value="100"></uib-progressbar> \
+                            </div> \
+                        </div>';
+    var mdl = attrs.uibModal.open({
+        animation: true,
+        template: modalTemplate,
+        size: 'sm'
+    });
+    return mdl;
 }
 
 function objectusPostAndResultHandling(url) {
@@ -771,7 +832,7 @@ function buildDownloadLinks(storageFiles) {
 };
 
 function buildGlobusDownloadLink(storageFile, name) {
-    var htmlTemplate = "<a href='' data-ng-click='browseFile(path, multiple, {storageFile})'>{name}</a>";
+    var htmlTemplate = "<a href='' data-ng-click='browseFile(path, multiple, {storageFile}, fileList)'>{name}</a>";
     var html = dojo.replace(htmlTemplate, {
         storageFile: storageFile,
         name: name ? name : storageFile
@@ -813,15 +874,15 @@ function getTerm(uuid, version, dereference) {
     if (dereference) {
         content.dereference = true;
     }
-
+    
     var urlTemplateXml = cris.baseUrl + "templates/xml/";
-    var data = dojo.xhr.get({
+    var data = dojo.xhrGet({
         url: urlTemplateXml + uuid,
         content: content,
         handleAs: "text",
         sync: true
     }).results;
-
+    
     var term = convertXmlToJson(data[0]);
 
     return term;
@@ -829,14 +890,14 @@ function getTerm(uuid, version, dereference) {
 
 function getLatestTerm(uuid) {
     var url = cris.baseUrl + "templates/load/?uuid=" + uuid;
-    var data = dojo.xhr.get({
+    var data = dojo.xhrGet({
         url: url,
         content: {dereference: true},
         handleAs: "json",
         sync: true
     }).results;
     var term = data[0];
-
+    
     return term;
 }
 
@@ -905,7 +966,7 @@ function isJsonLike(text) {
 function destroyNodeWidgets (node) {
     var widgets = dijit.registry.findWidgets(node);
     dojo.forEach(widgets, function(widget){
-       widget.destroyRecursive(); 
+       widget.destroyRecursive();
     });
 }
 
@@ -916,7 +977,10 @@ function updateTermProperties (newTerm, oldTerm, propertiesToUpdate) {
 }
 
 function updateTerm (newTerm, oldTerm, propertiesToExclude) { // Update reference term...Vocabulary term -> Template term
-    var propertiesToUpdate = ['version', 'name', 'description', 'validation', 'isLatest', 'unit', 'value', 'term', 'required', 'requiredExpression', 'readOnly', 'readOnlyExpression', 'list', 'grid'];
+    var propertiesToUpdate = ['version', 'name', 'description', 'validation', 'isLatest', 'unit', 'value', 'term', 'required', 'requiredExpression', 'readOnly', 'readOnlyExpression', 'list', 'grid', 'latestVersion'];
+    if (oldTerm.type === 'attachTo') {
+        propertiesToUpdate = ['version', 'description', 'isLatest', 'latestVersion'];
+    }
     if (propertiesToExclude) {
         dojo.forEach(propertiesToExclude, function(property){
             var index = propertiesToUpdate.indexOf(property);
@@ -926,5 +990,6 @@ function updateTerm (newTerm, oldTerm, propertiesToExclude) { // Update referenc
     if (newTerm.type === 'composite' && newTerm.term.length !== oldTerm.term.length) {
         oldTerm.term = newTerm.term;
     }
+
     updateTermProperties(newTerm, oldTerm, propertiesToUpdate);
 }
