@@ -7,9 +7,6 @@ import edu.purdue.cybercenter.dm.storage.AccessMethodType;
 import edu.purdue.cybercenter.dm.storage.StorageFileManager;
 import edu.purdue.cybercenter.dm.util.Helper;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -18,11 +15,16 @@ import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.net.util.Base64;
+import org.apache.commons.lang.StringUtils;
+import org.apache.oltu.oauth2.client.OAuthClient;
+import org.apache.oltu.oauth2.client.URLConnectionClient;
+import org.apache.oltu.oauth2.client.request.OAuthBearerClientRequest;
+import org.apache.oltu.oauth2.client.request.OAuthClientRequest;
+import org.apache.oltu.oauth2.client.response.OAuthJSONAccessTokenResponse;
+import org.apache.oltu.oauth2.common.exception.OAuthProblemException;
+import org.apache.oltu.oauth2.common.exception.OAuthSystemException;
+import org.apache.oltu.oauth2.common.message.types.GrantType;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +40,11 @@ public class GlobusController {
     private final String clientName = "CRIS Development (local)";
     private final String clientId = "747d66f2-fdb6-11e5-b59b-8c705ad34f60";
     private final String clientSecret = "UO/GwR3Ls9979i5v7a+otbPmUCjnitRpnbv8yVclk5MqJXV0sKGvmIawInfVhaET6Cz+ZU3Q6Q7JutxbmQdmOg==";
+    private final String redirectUrl = "/globus/loginCallback";
+    private final String fileSelectCallbackUrl = "/globus/fileSelectCallback";
+    private final String globusAuthUrl = "https://auth.globus.org/v2/oauth2/authorize";
+    private final String globusTokenUrl = "https://auth.globus.org/v2/oauth2/token";
+    private final String globusXferUrl = "https://www.globus.org/xfer/BrowseEndpoint";
 
     private StorageFileManager storageFileManager;
     @Autowired
@@ -49,83 +56,64 @@ public class GlobusController {
     private DomainObjectService domainObjectService;
 
     @RequestMapping(value = "/browseFile", method = RequestMethod.GET)
-    public void browseFile(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    public void browseFile(HttpServletRequest request, HttpServletResponse response) throws IOException, OAuthSystemException {
         String baseUrl = getBaseUrl(request);
+
+        // store request parameters in session and they are needed later on
         String key = request.getParameter("key");
         String alias = request.getParameter("alias");
-        String storageFile = request.getParameter("storageFile");
-        String fileId = "";
-        if (storageFile != null && !storageFile.isEmpty()) {
-            String[] parts = storageFile.split(":");
-            if (parts.length != 2) {
-                throw new RuntimeException("Invalid storage file format: " + storageFile);
-            } else {
-                fileId = parts[1];
-            }
-        }
         String multiple = request.getParameter("multiple");
-        if (!"false".equals(multiple)) {
-            multiple = "true";
-        }
+        String storageFile = request.getParameter("storageFile");
+        Map<String, String> globus = new HashMap<>();
+        globus.put("key", key);
+        globus.put("alias", alias);
+        globus.put("multiple", multiple);
+        globus.put("fileId", StringUtils.isEmpty(storageFile) ? null : storageFile.split(":")[1]);
+        request.getSession().setAttribute("globus", globus);
 
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString("https://auth.globus.org/v2/oauth2/authorize");
-        uriBuilder.queryParam("response_type", "code");
-        uriBuilder.queryParam("client_id", clientId);
-        //uriBuilder.queryParam("redirect_uri", URLEncoder.encode(baseUrl + "/globus/loginCallback?key=" + key + "&alias=" + alias + "&fileId=" + fileId + "&multiple=" + multiple, "UTF-8"));
-        uriBuilder.queryParam("redirect_uri", URLEncoder.encode(baseUrl + "/globus/loginCallback", "UTF-8"));
-
-        String redirectUrl = uriBuilder.build(true).toUriString();
-        response.setContentType("text/plain");
-        response.getWriter().println(redirectUrl);
+        OAuthClientRequest oauthRequest = OAuthClientRequest
+                .authorizationLocation(globusAuthUrl)
+                .setResponseType("code")
+                .setClientId(clientId)
+                .setRedirectURI(baseUrl + redirectUrl)
+                .buildQueryMessage();
+        response.setContentType(MediaType.TEXT_PLAIN_VALUE);
+        response.getWriter().println(oauthRequest.getLocationUri());
     }
 
     @RequestMapping(value = "/loginCallback", method = RequestMethod.GET)
-    public void loginCallback(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    public void loginCallback(HttpServletRequest request, HttpServletResponse response) throws IOException, OAuthSystemException, OAuthProblemException {
         // login and get access token
+        String baseUrl = getBaseUrl(request);
         String code = request.getParameter("code");
-        String requestUrl = request.getRequestURL().toString();
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString("https://auth.globus.org/v2/oauth2/token");
-        uriBuilder.queryParam("grant_type", "authorization_code");
-        uriBuilder.queryParam("code", URLEncoder.encode(code, "UTF-8"));
-        uriBuilder.queryParam("redirect_url", URLEncoder.encode(requestUrl, "UTF-8"));
-        System.out.println(requestUrl);
-        uriBuilder.queryParam("client_id", clientId);
-        URL url = new URL(uriBuilder.build(true).toUriString());
 
-        String userpass = clientId + ":" + clientSecret;
-        String basicAuth = "Basic " + new String(Base64.encodeBase64(userpass.getBytes()));
-        System.out.println(basicAuth);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod(HttpMethod.POST.name());
-        connection.setRequestProperty(HttpHeaders.AUTHORIZATION, basicAuth);
-        connection.setRequestProperty(HttpHeaders.CONTENT_TYPE, "application/x-www-form-urlencoded");
-        connection.setRequestProperty(HttpHeaders.ACCEPT, "application/json");
-        System.out.println("****************");
-        System.out.println(connection.getURL());
-        System.out.println(connection.getRequestMethod());
-        System.out.println(connection.getRequestProperties());
-        try {
-            System.out.println(connection.getResponseCode());
-            System.out.println(connection.getResponseMessage());
-            System.out.println(IOUtils.toString(connection.getInputStream()));
-        } catch (Exception ex) {
-            System.out.println(connection.getResponseCode());
-            System.out.println(connection.getResponseMessage());
-            System.out.println(IOUtils.toString(connection.getErrorStream()));
-            throw ex;
-        }
-        Map<String, Object> responseMap = Helper.deserialize(IOUtils.toString(connection.getInputStream()), Map.class);
-        String accessToken = (String) responseMap.get("access_token");
-        System.out.println(accessToken);
+        OAuthClientRequest oauthRequest = OAuthClientRequest
+                .tokenLocation(globusTokenUrl)
+                .setGrantType(GrantType.AUTHORIZATION_CODE)
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRedirectURI(baseUrl + redirectUrl)
+                .setCode(code)
+                .buildQueryMessage();
+
+        OAuthClient oauthClient = new OAuthClient(new URLConnectionClient());
+        OAuthJSONAccessTokenResponse oauthResponse = oauthClient.accessToken(oauthRequest);
+        String accessToken = oauthResponse.getAccessToken();
+        Long expiresIn = oauthResponse.getExpiresIn();
+        System.out.println(accessToken + ": " + expiresIn);
+
+        // put access token in session
+        Map<String, String> globus = (Map) request.getSession().getAttribute("globus");
+        globus.put("accessToken", accessToken);
 
         // redirect to file selection
-        String baseUrl = getBaseUrl(request);
-        String key = request.getParameter("key");
-        String alias = request.getParameter("alias");
-        String fileId = request.getParameter("fileId");
-        String multiple = request.getParameter("multiple");
-        uriBuilder = UriComponentsBuilder.fromUriString("https://www.globus.org/xfer/BrowseEndpoint");
-        if (fileId != null && !fileId.isEmpty()) {
+        String key = globus.get("key");
+        String alias = globus.get("alias");
+        String multiple = globus.get("multiple");
+        String fileId = globus.get("fileId");
+
+        UriComponentsBuilder uriBuilder = UriComponentsBuilder.newInstance();
+        if (StringUtils.isNotEmpty(fileId)) {
             uriBuilder.queryParam("fileId", fileId);
             uriBuilder.queryParam("filelimit", "0");
             uriBuilder.queryParam("folderlimit", "1");
@@ -135,14 +123,19 @@ public class GlobusController {
             }
             uriBuilder.queryParam("folderlimit", "0");
         }
-        uriBuilder.queryParam("action", URLEncoder.encode(baseUrl + "/globus/fileSelectCallback", "UTF-8"));
+        uriBuilder.queryParam("action", URLEncoder.encode(baseUrl + fileSelectCallbackUrl, "UTF-8"));
         uriBuilder.queryParam("accessToken", URLEncoder.encode(accessToken, "UTF-8"));
         uriBuilder.queryParam("key", key);
         uriBuilder.queryParam("alias", alias);
-        response.sendRedirect(uriBuilder.build(true).toUriString());
+
+        OAuthClientRequest clientRequest = new OAuthBearerClientRequest(globusXferUrl + "?" + uriBuilder.build().getQuery())
+                .setAccessToken(accessToken)
+                .buildQueryMessage();
+
+        response.sendRedirect(clientRequest.getLocationUri());
     }
 
-    @RequestMapping(value = "/fileSelectCallback", method = RequestMethod.GET)
+    @RequestMapping(value = "/fileSelectCallback", method = RequestMethod.POST)
     public void fileSelectCallback(HttpServletRequest request, HttpServletResponse response, @RequestParam Map<String, String> params) throws IOException {
         System.out.println(Helper.deepSerialize(params));
 
@@ -155,17 +148,18 @@ public class GlobusController {
             transferToFolder = params.get("path") + params.get("folder[" + index + "]");
         }
 
-        response.setContentType("text/plain");
+        response.setContentType(MediaType.TEXT_PLAIN_VALUE);
         if (!filesToTransfer.isEmpty() || !transferToFolder.isEmpty()) {
-            String accessToken = params.get("accessToken");
-            String key = params.get("key");
-            String alias = params.get("alias");
-            String endpoint = URLDecoder.decode(params.get("endpoint"));
+            Map<String, String> globus = (Map) request.getSession().getAttribute("globus");
+            String accessToken = globus.get("accessToken");
+            String key = globus.get("key");
+            String alias = globus.get("alias");
+            String fileId = globus.get("fileId");
+            String endpoint = URLDecoder.decode(params.get("endpoint"), "UTF-8");
+
             Map inputObj = new HashMap();
             inputObj.put("accessToken", accessToken);
-
-            String fileId = params.get("fileId");
-            if (fileId != null && !fileId.isEmpty()) {
+            if (StringUtils.isNotEmpty(fileId)) {
                 // get file out of cris
                 inputObj.put("destinationEndpoint", endpoint);
                 inputObj.put("destinationFolder", transferToFolder);

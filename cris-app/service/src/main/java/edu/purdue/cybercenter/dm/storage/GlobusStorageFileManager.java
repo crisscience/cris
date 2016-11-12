@@ -25,12 +25,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.core.task.TaskExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -52,6 +52,8 @@ public class GlobusStorageFileManager extends AbstractStorageFileManager {
     private TaskExecutor taskExecutor;
     @Autowired
     private TaskExecutor syncTaskExecutor;
+
+    static final private Logger LOGGER = LoggerFactory.getLogger(GlobusStorageFileManager.class.getName());
 
     private class CheckAndUpdateTransferStatusTask implements Runnable {
         private final List<String> fileLinks;
@@ -79,7 +81,7 @@ public class GlobusStorageFileManager extends AbstractStorageFileManager {
                         System.out.println("Waiting: " + status);
                         Thread.sleep(10000);
                     } catch (InterruptedException ex) {
-                        Logger.getLogger(GlobusStorageFileManager.class.getName()).log(Level.SEVERE, null, ex);
+                        LOGGER.error("wait for transfer is interrupted", ex);
                     }
 
                     connection = makeStatusCheckConnection(taskId, token);
@@ -107,7 +109,7 @@ public class GlobusStorageFileManager extends AbstractStorageFileManager {
                     throw new RuntimeException("Transfer Failed");
                 }
             } catch (IOException ex) {
-                Logger.getLogger(GlobusStorageFileManager.class.getName()).log(Level.SEVERE, null, ex);
+                LOGGER.error("", ex);
             }
 
         }
@@ -292,7 +294,7 @@ public class GlobusStorageFileManager extends AbstractStorageFileManager {
                 Thread.sleep(10000);
                 System.out.println("Active Waiting");
             } catch (InterruptedException ex) {
-                Logger.getLogger(GlobusStorageFileManager.class.getName()).log(Level.SEVERE, null, ex);
+                LOGGER.error("", ex);
             }
             connection = (HttpURLConnection) task.openConnection();
             connection.setRequestProperty("Accept", "application/json");
@@ -306,7 +308,7 @@ public class GlobusStorageFileManager extends AbstractStorageFileManager {
                 Thread.sleep(10000);
                 System.out.println("Inactive Waiting");
             } catch (InterruptedException ex) {
-                Logger.getLogger(GlobusStorageFileManager.class.getName()).log(Level.SEVERE, null, ex);
+                LOGGER.error("", ex);
             }
             connection = (HttpURLConnection) task.openConnection();
             connection.setRequestProperty("Accept", "application/json");

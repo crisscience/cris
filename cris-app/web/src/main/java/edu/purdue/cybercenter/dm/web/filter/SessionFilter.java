@@ -116,7 +116,7 @@ public class SessionFilter implements Filter {
 
                 // redirect to the home page of the workspace
                 if (tenantId != null && !tenantInQuery) {
-                    httpResponse.sendRedirect(httpRequest.getContextPath());
+                    httpResponse.sendRedirect(httpRequest.getContextPath() + "/");
                     return;
                 }
             }

@@ -3,6 +3,8 @@
 
     <jsp:output omit-xml-declaration="yes"/>
 
+    <spring:url value="/projects" var="urlProjects"/>
+    <spring:url value="/experiments" var="urlExperiments"/>
     <spring:url value="/jobs/json/list" var="urlJobs"/>
     <spring:url value="/jobs/?form" var="urlJobsForm"/>
     <spring:url value="/jobs/cancel/" var="urlJobsCancel"/>
@@ -19,7 +21,11 @@
     <script type="text/javascript">
     // <![CDATA[
     angular.module("crisJob", ["angular-dojo"]).controller("jobController", ["$scope", "$http", function($scope, $http) {
-        
+        $scope.selectedProject = "";
+        $scope.selectedExperiment = "";
+        $scope.experimentQueryStr = "";
+        $scope.urlFilter = "";
+
         // ui-grid column definitions
         $scope.gridColumnDefs = [
             {field: 'id', name: 'Job ID', displayName: 'Job ID', enableSorting: true, width: 60},
@@ -32,7 +38,7 @@
 
         $scope.formatDisplayValue = function (value, rowData, isDate) {
             if (isDate) {
-                return stringDate(value); 
+                return stringDate(value);
             } else {
                 var newValue;
                 if (value) {
@@ -43,7 +49,7 @@
                 return newValue;
             }
         };
-        
+
         var status;
         if ("${status}") {
             status = "${status}";
@@ -51,7 +57,7 @@
             status = "true,true,true";
         }
         $scope.url = cris.baseUrl + 'jobs/json/list/?status=' + (status ? status : "true,true,true");
-        
+
         var dateFilter = '${param["dateFilter"]}';
         if (dateFilter) {
             $scope.url = $scope.url + '&' + dateFilter;
@@ -61,7 +67,7 @@
         $scope.sortDirection = 'desc';
 
         $scope.deprecateButtonDisabled = true;
-        
+
         $scope.rowSelectCallback = function (rowData) {
             $scope.selectedRow = rowData;
             // ui-grid doesn't support dots in field name. The function formatUnsupportedFieldName is accessible in row Object
@@ -72,7 +78,7 @@
                 $scope.deprecateButtonDisabled = false;
             }
         };
-        
+
         $scope.onDelete = function() {
             if ($scope.selectedRow) {
                 // ui-grid doesn't support dots in field name. The function formatUnsupportedFieldName is accessible in row Object
@@ -104,7 +110,7 @@
                 }
             }
         }
-        
+
         $scope.errorMessage = "";
         $scope.status = [];
         var arrayStatus = dojo.fromJson("[" + status + "]");
@@ -133,7 +139,24 @@
                 refreshGrid();
             }
         }, true);
-        
+
+        $scope.$watch("selectedProject", function(newValue, oldValue) {
+            $scope.selectedExperiment = null;
+            $scope.experimentQueryStr = "/?sort(+name)" + (newValue ? ("&projectId=" + newValue) : "&projectId=0");
+
+            if (newValue) {
+                $scope.urlFilter = '{"op":"equal","data":[{"op":"number","data":"projectId.id","isCol":true},{"op":"number","data":' + newValue + ',"isCol":false}]}';
+                refreshGrid();
+            }
+        });
+
+        $scope.$watch("selectedExperiment", function(newValue, oldValue) {
+            if (newValue) {
+                $scope.urlFilter =  '{"op":"equal","data":[{"op":"number","data":"experimentId.id","isCol":true},{"op":"number","data":' + newValue + ',"isCol":false}]}';
+                refreshGrid();
+            }
+        });
+
         function refreshGrid () {
             if ($scope.gridRef) {
                 $scope.gridRef.refreshGrid();
@@ -169,8 +192,24 @@
         </div>
         <br />
         <div class="row">
+            <form class="form-horizontal col-lg-10 col-lg-offset-1">
+                <div class="form-group">
+                    <label class="col-sm-1 control-label" for="idProject">Project:</label>
+                    <div id="idProject" class="col-sm-2">
+                        <cris-url-dropdown placeholder="select a project..." url="${urlProjects}" ng-model="selectedProject" id-field="id" name-field="name"></cris-url-dropdown>
+                    </div>
+                    <label class="col-sm-1  control-label" for="idExperiment">Experiment:</label>
+                    <div id="idExperiment" class="col-sm-2">
+                        <cris-url-dropdown placeholder="select an experiment..." url="${urlExperiments}{{experimentQueryStr}}" ng-model="selectedExperiment" id-field="id" name-field="name"></cris-url-dropdown>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+
+        <div class="row">
             <div class="col-lg-10 col-lg-offset-1">
-                <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" sort-field="sortField" sort-direction="{{sortDirection}}" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)"><!----></cris-ui-grid>
+                <cris-ui-grid column-defs="gridColumnDefs" url="url" grid-ref="gridRef" sort-field="sortField" sort-direction="{{sortDirection}}" enable-filtering="true" row-select-callback="rowSelectCallback(rowData)" format-display-value="formatDisplayValue(value,rowData,isDate)" url-filter="urlFilter"><!----></cris-ui-grid>
             </div>
         </div>
     </div>

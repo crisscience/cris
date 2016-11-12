@@ -10,7 +10,7 @@ if (!String.prototype.trim) {
     };
 }
 
-angular.module('angular-dojo', ['ui.bootstrap', 'ui.grid', 'ui.grid.autoResize', 'ui.grid.selection', 'ui.grid.pagination', 'ngSanitize']);
+angular.module('angular-dojo', ['ui.bootstrap', 'ui.grid', 'ui.grid.autoResize', 'ui.grid.selection', 'ui.grid.pagination', 'ngSanitize', 'ui.grid.resizeColumns']);
 
 angular.module('angular-dojo').directive('crisContextmenu', function($parse) {
     return function(scope, element, attrs) {
@@ -2046,12 +2046,12 @@ angular.module('angular-dojo').directive('crisUrlDropdown', function($compile, $
                         // For now we are using the dojo way to filter records...this will change in the future with server-side changes
                         // E.g.1 filter string: filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":1,"isCol":false}]}
                         // E.g.2 filter string(multiple filters): filter={"op":"any","data":[{"op":"equal","data":[{"op":"number","data":"projectId.id","isCol":true},{"op":"number","data":5000,"isCol":false}]},{"op":"equal","data":[{"op":"number","data":"experimentId.id","isCol":true},{"op":"number","data":2000,"isCol":false}]}]}
-                        if (url.indexOf('?filter=') !== -1) {
+                        if (url.indexOf('filter=') !== -1) {
                             var filterStr = /filter\s*=\s*(\{.+\})\s*(?:$|\&)/.exec(url)[1];
 
                             if (filterStr) { // A filter query string exists
                                 // Remove old filter string. A new one will be created that includes the search term
-                                url = url.replace(/\/?\??filter\s*=\s*\{.+\}\s*\&/g, '/?').replace(/\&filter\s*=\s*\{.+\}\s*/g, '');
+                                url = url.replace(/\/?\?filter\s*=\s*\{.+\}\s*\&/g, '/?').replace(/\&filter\s*=\s*\{.+\}\s*/g, '');
 
                                 var filterObj = JSON.parse(filterStr);
                                 var newObj = {};
@@ -2071,10 +2071,10 @@ angular.module('angular-dojo').directive('crisUrlDropdown', function($compile, $
                             queryStr += '&filter=' + JSON.stringify(newObj);
                         } else {
                             var ampersand = "";
-                            if (url.indexOf('&') !== -1 && !url.endsWith('&')) {
+                            if ((url.indexOf('&') !== -1 && !url.endsWith('&')) || url.indexOf('/?') !== -1) {
                                 ampersand = "&";
                             }
-                            if (url.indexOf('&') === -1 && !url.trim().endsWith('/?')) {
+                            if (url.indexOf('&') === -1 && !url.trim().endsWith('/?') && url.indexOf('/?') === -1) {
                                 ampersand = '/?';
                             }
                             //var ampersand = url.match(/\/\?.+$/) ? "" : "&"; // If there is a query string, do not add ampersand before filter string
@@ -2261,16 +2261,20 @@ angular.module('angular-dojo').directive('crisFileUploader', function($compile) 
                     ngModelController.$setValidity('fileError', (value.length > 0 || !scope.isRequired));
                 }
             });
-
+            
             // Set validity based on number of existing files
-            if (scope.ngModel && scope.ngModel instanceof Array) {
-                scope.$watchCollection('ngModel', function (value) {
-                    if (value) {
-                        var filesUploaded = (scope.fileList && scope.fileList.length > 0);
+            scope.$watch('ngModel', function (value) {
+                var filesUploaded = (scope.fileList && scope.fileList.length > 0);
+                if (!value) {
+                    ngModelController.$setValidity('fileError', ((!scope.isRequired || filesUploaded) ? true : false));
+                } else if (value) {
+                    if (value instanceof Array) {
                         ngModelController.$setValidity('fileError', (value.length > 0 || filesUploaded || !scope.isRequired));
+                    } else {
+                        ngModelController.$setValidity('fileError', true);
                     }
-                });
-            }
+                }
+            }, true);
             
             // event to reset single-file uploader
             scope.$on('ResetSingleFileUploader', function () {
@@ -2327,7 +2331,7 @@ angular.module('angular-dojo').directive('crisUiGrid', ['$http', '$timeout', 'ui
             sortDirection: "@" // "asc" or "desc"
         },
         template: '<div> \
-                        <div ui-grid="gridOptions" ui-grid-auto-resize ui-grid-pagination ui-grid-selection ng-style="{height: getGridHeight() + \'px\'}"></div> \
+                        <div ui-grid="gridOptions" ui-grid-auto-resize ui-grid-pagination ui-grid-selection ui-grid-resize-columns ng-style="{height: getGridHeight() + \'px\'}"></div> \
                    </div>',
         link: function (scope, element, attrs) {
             console.log('**** ui-grid init *******');
@@ -2360,6 +2364,7 @@ angular.module('angular-dojo').directive('crisUiGrid', ['$http', '$timeout', 'ui
                 paginationPageSize: 10,
                 useExternalPagination: true,
                 useExternalSorting: true,
+                enableColumnResizing: true,
                 onRegisterApi: function (gridApi)  {
                     console.dir(gridApi)
                     scope.gridApi = gridApi;

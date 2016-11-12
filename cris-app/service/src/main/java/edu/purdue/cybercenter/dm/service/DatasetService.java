@@ -38,10 +38,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import javax.persistence.Query;
+import org.activiti.engine.RuntimeService;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.apache.commons.lang.StringUtils;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -81,6 +83,94 @@ public class DatasetService {
 
     @Autowired
     private SecurityService securityService;
+
+    @Autowired
+    private RuntimeService runtimeService;
+
+    public Map<String, Object> buildAggregators(String queryString) {
+        if (StringUtils.isBlank(queryString)) {
+            queryString = "{}";
+        }
+        Map<String, Object> queryObject = (Map<String, Object>) DatasetUtils.deserialize(queryString);
+        Map<String, Object> match;
+        Object distinct;
+        Map<String, Object> group;
+        Map<String, Integer> sort;
+        Integer skip;
+        Integer limit;
+        Map<String, Boolean> project;
+        if (queryObject.isEmpty()) {
+            match = new HashMap<>();
+            distinct = null;
+            group = null;
+            sort = null;
+            skip = null;
+            limit = null;
+            project = null;
+        } else {
+            distinct = (Object) queryObject.get(DocumentService.AGGREGATOR_DISTINCT);
+            group = (Map<String, Object>) queryObject.get("$group");
+            if (queryObject.get(DocumentService.AGGREGATOR_SORT) != null) {
+                // this syantax should be used
+                sort = (Map) queryObject.get(DocumentService.AGGREGATOR_SORT);
+            } else {
+                // to be compatible with older version
+                sort = (Map) queryObject.get("$orderby");
+            }
+            skip = (Integer) queryObject.get(DocumentService.AGGREGATOR_SKIP);
+            limit = (Integer) queryObject.get(DocumentService.AGGREGATOR_LIMIT);
+            project = (Map<String, Boolean>) queryObject.get(DocumentService.AGGREGATOR_PROJECT);
+
+            queryObject.remove(DocumentService.AGGREGATOR_DISTINCT);
+            queryObject.remove(DocumentService.AGGREGATOR_GROUP);
+            queryObject.remove(DocumentService.AGGREGATOR_SORT);
+            queryObject.remove("$orderby");
+            queryObject.remove(DocumentService.AGGREGATOR_SKIP);
+            queryObject.remove(DocumentService.AGGREGATOR_LIMIT);
+            queryObject.remove(DocumentService.AGGREGATOR_PROJECT);
+
+            if (queryObject.containsKey("$query")) {
+                match = (Map) queryObject.get("$query");
+            } else {
+                match = queryObject;
+            }
+        }
+
+        Integer jobId = (Integer) match.get(MetaField.Current + MetaField.JobId);
+        if (jobId == null) {
+            jobId = (Integer) match.get(MetaField.JobId);
+        }
+        if (jobId != null) {
+            try {
+                // TODO: check user permission
+                ProcessInstance processInstance = runtimeService.createProcessInstanceQuery().processInstanceBusinessKey(jobId.toString()).singleResult();
+                if (processInstance != null) {
+                    // job is still running
+                    match.put(MetaField.Current + MetaField.JobId, jobId);
+                } else {
+                    // job is finished
+                    match.remove(MetaField.Current + MetaField.JobId);
+                }
+            } catch (AccessDeniedException ex) {
+                // user don't have the permission to access the current job
+                match.remove(MetaField.Current + MetaField.JobId);
+            }
+        }
+
+        Map<String, Object> aggregators = new HashMap<>();
+        aggregators.put(DocumentService.AGGREGATOR_MATCH, match);
+        if (distinct != null && distinct instanceof Map) {
+            aggregators.put(DocumentService.AGGREGATOR_DISTINCT, distinct);
+        }
+        aggregators.put(DocumentService.AGGREGATOR_GROUP, group);
+
+        aggregators.put(DocumentService.AGGREGATOR_SORT, sort);
+        aggregators.put(DocumentService.AGGREGATOR_SKIP, skip);
+        aggregators.put(DocumentService.AGGREGATOR_LIMIT, limit);
+        aggregators.put(DocumentService.AGGREGATOR_PROJECT, project);
+
+        return aggregators;
+    }
 
     // values must be in json format
     public List<Map> putValues(UUID termUuid, UUID termVersion, List<Map<String, Object>> value, Map<String, Object> context) {

@@ -523,6 +523,9 @@ public class DocumentServiceImpl implements DocumentService {
             document.removeField(MetaField.JobId);
             document.removeField(MetaField.TaskId);
             document.removeField(MetaField.ContextId);
+
+            document.removeField(MetaField.IsGroupOwner);
+            document.removeField(MetaField.OwnerId);
         }
 
         DBObject upsertDocument = new BasicDBObject();

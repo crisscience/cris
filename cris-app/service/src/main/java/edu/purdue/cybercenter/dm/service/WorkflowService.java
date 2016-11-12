@@ -225,14 +225,8 @@ public class WorkflowService {
                 String evaledTerm = cqlService.eval(sTerm, context);
                 TermName termName = new TermName(evaledTerm);
                 UUID uuid = termName.getUuid();
-                String q = termName.getQueryString();
-                Map subQuery = (Map<String, Object>) DatasetUtils.deserialize(q);
-                if (subQuery == null) {
-                    subQuery = new HashMap();
-                }
-                subQuery.put(MetaField.Current + MetaField.JobId, context.get(MetaField.JobId));
-                Map<String, Object> aggregators = new HashMap<>();
-                aggregators.put(DocumentService.AGGREGATOR_MATCH, subQuery);
+                String queryString = termName.getQueryString();
+                Map<String, Object> aggregators = datasetService.buildAggregators(queryString);
                 datasetService.find(uuid, aggregators, new File(path));
             } else {
                 throw new RuntimeException("wrong ToFile query: " + fixedName);

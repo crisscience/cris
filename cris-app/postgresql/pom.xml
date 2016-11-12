@@ -19,12 +19,8 @@
     <dependencies>
         <!-- General dependencies for standard applications -->
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-context-support</artifactId>
-        </dependency>
-        <dependency>
-           <groupId>javax.el</groupId>
-           <artifactId>javax.el-api</artifactId>
+            <groupId>javax.el</groupId>
+            <artifactId>javax.el-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.codehaus.jackson</groupId>
@@ -56,6 +52,10 @@
             <scope>test</scope>
         </dependency>
         <!-- misc. -->
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjrt</artifactId>
+        </dependency>
         <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>

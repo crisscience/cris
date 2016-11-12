@@ -155,7 +155,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
             $scope.$apply();
         }, 4000);
     });
-
+    
     this.newWorkflow = function () {
         console.log("******** new workflow");
         var yes;
@@ -464,6 +464,9 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
                 
                 //reset files-to-upload container
                 _this.filesToUpload = {};
+                
+                // notify listeners of successful save
+                $rootScope.$broadcast('workflowSaved');
             }
         }, function(error){
             console.log("Failed to save changes: " + error.data.message);
@@ -808,7 +811,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
 
         // refresh UI
         drawTask(task.id, task);
-
+        
         dojo.setStyle(dojo.byId('userTaskDetails'), 'display', 'none');
     };
     
@@ -817,7 +820,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
 
         // refresh UI
         drawTask(task.id, task);
-
+        
         dojo.setStyle(dojo.byId('serviceTaskDetails'), 'display', 'none');
     };
 
@@ -1405,7 +1408,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
 
                                         dojo.setStyle(dojo.byId('userTaskDetails'), 'display', 'block');
                                         dojo.byId('userTaskLabel').innerHTML = "Edit User Task: " + task.name;
-                                        $rootScope.$broadcast('onTaskDetailsOpened', task.id);
+                                        $rootScope.$broadcast('onTaskDetailsOpened', task.taskType);
                                     }, function (error) {
                                         _this.errorMessage = "Unable to load template: \"" + task.ui_page + "\"";
                                         _this.currentEditUT = task;
@@ -1423,7 +1426,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
 
                                         dojo.setStyle(dojo.byId('userTaskDetails'), 'display', 'block');
                                         dojo.byId('userTaskLabel').innerHTML = "Edit User Task: " + task.name;
-                                        $rootScope.$broadcast('onTaskDetailsOpened', task.id);
+                                        $rootScope.$broadcast('onTaskDetailsOpened', task.taskType);
                                     });
                                 });
                             } else {
@@ -1443,7 +1446,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
 
                                 dojo.setStyle(dojo.byId('userTaskDetails'), 'display', 'block');
                                 dojo.byId('userTaskLabel').innerHTML = "Edit User Task: " + task.name;
-                                $rootScope.$broadcast('onTaskDetailsOpened', task.id);
+                                $rootScope.$broadcast('onTaskDetailsOpened', task.taskType);
                             }
                             break;
                         case "System Task":
@@ -1456,7 +1459,7 @@ angular.module("crisWorkflow").controller("WorkflowEditorController", ["$scope",
 
                             dojo.setStyle(dojo.byId('serviceTaskDetails'), 'display', 'block');
                             dojo.byId('serviceTaskLabel').innerHTML = "Edit System Task: " + task.name;
-                            $rootScope.$broadcast('onTaskDetailsOpened', task.id);
+                            $rootScope.$broadcast('onTaskDetailsOpened', task.taskType);
                             break;
                         case "Report Task":
                             _this.currentEditRT = task;
@@ -1962,23 +1965,14 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
         template: '<div ng-include="\'view_builder_json\'"></div>',
         link: function (scope, element, attrs) {
             scope.jsonViewType = {};
-            scope.$watch("task.id", function (newValue, oldValue) {
-                if (newValue && newValue !== oldValue) {
-                    scope.deserializeJson();
-                    if (scope.item && !scope.error) {
-                        scope.serializeToJson();
-                    }
-                }
-            });
+            scope.termSubTerms = {};
             
-            $rootScope.$on('onTaskDetailsOpened', function (event, taskId) {
-                $timeout(function () {
-                    if (scope.task.id === taskId && !scope.error) {
-                        console.log('************* BROADCAST HANDLING - onTaskDetailsOpened *************');
-                        scope.deserializeJson();
-                        scope.serializeToJson();
-                    }
-                }, 600);
+            $rootScope.$on('onTaskDetailsOpened', function (event, taskType) {
+                if (scope.task.taskType === taskType) {
+                    console.log('************* BROADCAST HANDLING - onTaskDetailsOpened - ' + scope.type + ' *************');
+                    console.dir(scope.task);
+                    scope.deserializeJson();
+                }
             });
 
             // Broadcast events for updating views
@@ -2014,7 +2008,7 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
                     });
                 }
             });
-
+            
             scope.fetchTemplates();
         },
         controller: function ($scope, $compile, workflowBuilderService) {
@@ -2035,31 +2029,38 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             $scope.deserializeJson = function () {
                 $scope.queries = [];
                 var json = $scope.task[$scope.type]; // type = jsonIn or jsonOut
-                var val = workflowBuilderService.deserializeJson(json, $scope.queries, $scope.task, $scope.type);
-                if (val.error) {
-                    $scope.error = val.error;
-                } else {
-                    $scope.error = ""; // Clear previous error
-                }
-                $scope.item = val.result;
                 
-                // Get the view type (advanced or builder) from the $options object
-                // Default = builder. If no $options object but json exists, default = advanced
-                if ((val.$options && val.$options._advanced) || ((!val.$options || typeof val.$options._advanced === 'undefined') && $scope.task[$scope.type])) {
-                    $scope.jsonViewType[$scope.type] = 'advanced';
-                } else {
-                    $scope.jsonViewType[$scope.type] = 'builder';
-                }
-                
-                // Let task remember $options like view type
-                if (!$scope.task[$scope.type + '_$options']) {
-                    $scope.task[$scope.type + '_$options'] = {};
-                }
-                $scope.task[$scope.type + '_$options']._advanced = ($scope.jsonViewType[$scope.type] === 'advanced');
+                // The deserializer may make asyn calls. That's why we provide callback function to update builder once all asyn calls are complete.
+                workflowBuilderService.deserializeJson(json, $scope.queries, $scope.task, $scope.type, function () {
+                    if (this.error) {
+                        $scope.error = this.error;
+                    } else {
+                        $scope.error = ""; // Clear previous error
+                    }
+                    $scope.item = this.result;
 
-                $scope.queryAliases = [];
-                dojo.forEach($scope.queries, function (q) {
-                    $scope.queryAliases.push({id: q.key, name: q.key, query: q});
+                    // Get the view type (advanced or builder) from the $options object
+                    // Default = builder. If no $options object but json exists, default = advanced
+                    if ((this.$options && this.$options._advanced) || ((!this.$options || typeof this.$options._advanced === 'undefined') && $scope.task[$scope.type])) {
+                        $scope.jsonViewType[$scope.type] = 'advanced';
+                    } else {
+                        $scope.jsonViewType[$scope.type] = 'builder';
+                    }
+
+                    // Let task remember $options like view type
+                    if (!$scope.task[$scope.type + '_$options']) {
+                        $scope.task[$scope.type + '_$options'] = {};
+                    }
+                    $scope.task[$scope.type + '_$options']._advanced = ($scope.jsonViewType[$scope.type] === 'advanced');
+
+                    $scope.queryAliases = [];
+                    angular.forEach($scope.queries, function (q) {
+                        $scope.queryAliases.push({id: q.key, name: q.key, query: q});
+                    });
+                    
+                    $scope.$broadcast('refreshQueries');
+                    
+                    $scope.$apply();
                 });
             };
             
@@ -2069,74 +2070,56 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             };
             
             $scope.getTermNames = function(templateUUID, parentTerm) {
-                var termNames = [];
-                if ($scope.termsByTemplate && $scope.termsByTemplate[templateUUID]) {
-                    termNames = $scope.termsByTemplate[templateUUID];
-                } else {
-                    for (var i = 0; i < $scope.templates.length; i++) {
-                        if ($scope.templates[i].id === templateUUID) {
-                            termNames = termNames.concat($scope.templates[i].termNames);
-                            for (var j = termNames.length - 1; j > -1; j--) {
-                                if (['_job_id', '_experiment_id', '_project_id'].indexOf(termNames[j].id) !== -1) {
-                                    termNames.splice(j, 1);
-                                }
-                            }
-                            termNames.unshift({id: '_id', name: '_id'});
-                            
-                            if (!$scope.termsByTemplate) {
-                                $scope.termsByTemplate = {};
-                            }
-                            $scope.termsByTemplate[templateUUID] = termNames
-                            
-                            break;
+                var termNames = workflowBuilderService.getTemplateTerms(templateUUID);
+                termNames = [].concat(termNames);
+                if (termNames.length) {
+                    // remove add-on terms
+                    for (var j = termNames.length - 1; j > -1; j--) {
+                        if (['_job_id', '_experiment_id', '_project_id'].indexOf(termNames[j].id) !== -1) {
+                            termNames.splice(j, 1);
                         }
                     }
+                    termNames.unshift({id: '_id', name: '_id'});
                 }
                 
-                if (parentTerm) { // Get sub terms of composite term
+                if (parentTerm) { // if exists, return subterms of this term (parentTerm)
                     var subTerms = [];
-                    for (var h = 0; h < termNames.length; h++) {
-                        
-                        if (termNames[h].id === parentTerm && termNames[h].dataType !== 'Composite') { // data-type must be "Composite" for term to have sub-terms
-                            return null;
-                            break;
+                    
+                    var lookupKey = templateUUID + '-' + parentTerm;
+                    if (!$scope.termSubTerms[lookupKey] && termNames.length) {
+                        for (var h = 0; h < termNames.length; h++) {
+                            if (termNames[h].id === parentTerm && termNames[h].dataType !== 'Composite') { // data-type must be "Composite" for term to have sub-terms
+                                return null;
+                                break;
+                            }
+
+                            if (termNames[h].id.startsWith(parentTerm + '.')) {
+                                var termName = termNames[h].id.substring(parentTerm.length + 1, termNames[h].id.length); // +1 accounts for '.'
+                                var o = {id: termName, name: termName};
+                                workflowBuilderService.setTermProperties(o, termNames[h]);
+                                subTerms.push(o);
+                            }
                         }
-                        
-                        if (termNames[h].id.startsWith(parentTerm + '.')) {
-                            var termName = termNames[h].id.substring(parentTerm.length + 1, termNames[h].id.length); // +1 accounts for '.'
-                            var o = {id: termName, name: termName};
-                            workflowBuilderService.setTermProperties(o, termNames[h]);
-                            subTerms.push(o);
-                        }
+                        $scope.termSubTerms[lookupKey] = subTerms;
                     }
-                    return subTerms;
+                    return ($scope.termSubTerms[lookupKey] ? $scope.termSubTerms[lookupKey] : subTerms);
+                } else { // return all terms in template
+                    return termNames;
                 }
-                
-                return termNames;
             };
             
             $scope.getAttachToData = function (templateUUID, term) {
-                var data = {};
-                if ($scope.attachToDataByTemplate && $scope.attachToDataByTemplate[templateUUID]) {
-                    data = $scope.attachToDataByTemplate[templateUUID][term];
-                } else {
-                    for (var i = 0; i < $scope.templates.length; i++) {
-                        if ($scope.templates[i].id === templateUUID && $scope.templates[i].attachToData) {
-                            data = $scope.templates[i].attachToData;
-                            break;
-                        }
-                    }
-                }
-                return data;
+                return workflowBuilderService.getTemplateAttachToData(templateUUID);
             };
             
             $scope.termIsValid = function (term, templateUUID) {
                 var isInvalidTerm = true;
-                if (term.itemType === "Term" && $scope.termsByTemplate && $scope.termsByTemplate[templateUUID]) {
-                    var termNames = $scope.termsByTemplate[templateUUID];
+                if (term.itemType === "Term") {
+                    var termNames = workflowBuilderService.getTemplateTerms(templateUUID);
                     for (var j = 0; j < termNames.length; j++) {
                         if (termNames[j].id === term.variable) {
                             isInvalidTerm = false;
+                            break;
                         }
                     }
                 }
@@ -2145,34 +2128,11 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             
             $scope.templateIsValid = function (templateUUID) {
                 var result = false;
-                if (templateUUID && $scope.templates && $scope.templates.length) {
-                    for (var i = 0; i < $scope.templates.length; i++) {
-                        if ($scope.templates[i].id === templateUUID) {
-                            result = true;
-                            break;
-                        }
-                    }
-                } else {
+                if (templateUUID && $scope.templates && $scope.templates[templateUUID]) {
                     result = true;
                 }
                 return result;
             };
-            
-            $scope.getTemplates = function(index) {
-                var templates = [];
-                var usedTemplates = [];
-                for (var i = 0; i < $scope.item.length; i++) {
-                    if ($scope.item[i].variableType === 'template' && $scope.item[i].variable && i !== index) {
-                        usedTemplates.push($scope.item[i].variable);
-                    }
-                }
-                dojo.forEach($scope.templates, function(t) {
-                    if (usedTemplates.indexOf(t.id) === -1) {
-                        templates.push(t);
-                    }
-                });
-                return templates;
-            }
             
             $scope.addTermToMerge = function(index) {
                 var termsToMerge = $scope.item[index].termsToMerge;
@@ -2188,11 +2148,11 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
             };
             
             $scope.serializeToJson = function () {
-                // If deserialization error exists, do not serialize again. This prevents json string from being automatically.
-                // (Any existing json strings, with errors or not, should not be deleted)
+                // If deserialization error exists, do not serialize again. This prevents deleting or further corruping the existing json.
+                // (Any existing json, with errors or not, should not be deleted)
                 //.....
                 // Only serialize if view is not advanced. In advanced view it is up to user to manage json
-                if ($scope.error === "" && !$scope.task[$scope.type + '_$options']._advanced) {
+                if ($scope.error === "" && $scope.task[$scope.type + '_$options'] && !$scope.task[$scope.type + '_$options']._advanced) {
                     workflowBuilderService.fromBuilderToJson($scope.item, $scope.task, $scope.type, $scope.queries);
                 }
             };
@@ -2219,7 +2179,7 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
                         
                         // Set edited record's term properties
                         if (termItem && templateUUID && termItem.variable) {
-                            var terms = $scope.termsByTemplate[templateUUID];
+                            var terms = workflowBuilderService.getTemplateTerms(templateUUID);
                             if (terms) {
                                 for (var t = 0; t < terms.length; t++) {
                                     if (terms[t].id === termItem.variable) {
@@ -2234,13 +2194,24 @@ angular.module("crisWorkflow").directive("crisWorkflowJsonBuilder", function ($c
                     }
                 }, 300);
             };
+            
+            $scope.getTemplateTerms = function (templateUUID) {
+                workflowBuilderService.fetchTemplateTerms(templateUUID);
+            };
 
             $scope.fetchTemplates = function () {
                 var t = workflowBuilderService.getTemplateData();
                 t.promise.then(function(result){
                     t.thenCallback(result, $scope); // Templates array will be added to $scope in the callback
+                    
+                    // Construct template list to be used in the templates dropdown
+                    $scope.templatesList = [];
+                    for (var key in $scope.templates) {
+                        $scope.templatesList.push($scope.templates[key]);
+                    }
                 }, function (error) {
-                    $scope.templates = [];
+                    $scope.templatesList = [];
+                    $scope.templates = {};
                 });
             };
         }
@@ -2272,11 +2243,11 @@ angular.module("crisWorkflow").directive("crisWorkflowVariableTypes", ["$uibModa
                 }
             }, true);
             
-            // update staticDataType when switching terms (within same template). Each term in template has an index.
+             // update staticDataType when switching terms (within same template). Each term in template has an index.
             scope.$watchCollection('[item.index, item.template]', function (newValue, oldValue) {
                 if (newValue[0] !== oldValue[0] && newValue[1] === oldValue[1]) {
                     //console.log(newValue[0] + '-' + oldValue[0] + ' >>>> ' + newValue[1] + '-' + oldValue[1])
-
+                    
                     if (['_experiment_id', '_job_id', '_project_id'].indexOf(scope.item.term) !== -1) {
                         scope.item.valueType = "systemVariable";
                     } else {
@@ -2333,12 +2304,14 @@ angular.module("crisWorkflow").directive("crisWorkflowVariableTypes", ["$uibModa
                     var queries = eval($scope.queries);
                     for (var i = 0; i < queries.length; i++) {
                         if (queries[i].id === $scope.item.value) {
+                            var termNames = workflowBuilderService.getTemplateTerms(queries[i].query.templateUUID);
+                            termNames = [].concat(termNames);
                             dojo.forEach(queries[i].query.termNames, function (term) {
                                 if (['_job_id', '_experiment_id', '_project_id'].indexOf(term.id) === -1) { // Only template terms
                                     termNames.push(term);
                                 }
                             });
-                            // termNames.unshift({id: '_id', name: '_id'});
+                            termNames.unshift({id: '_id', name: '_id'});
                             break;
                         }
                     }
@@ -2495,7 +2468,8 @@ angular.module("crisWorkflow").directive("crisWorkflowVariableTypes", ["$uibModa
                     var dataType = "";
                     if (typeof value === 'number' && !isNaN(value)) {
                         dataType = 'Numeric|AttachTo';
-                    } else if (typeof value !== 'object' && isNaN(value) && !isNaN(Date.parse(value))) {
+                    // Storage file format (e.g. StorageFile:123) is confused for a date by Date.parse. That's why we check for the pattern "StorageFile"
+                    } else if (typeof value !== 'object' && isNaN(value) && !isNaN(Date.parse(value)) && value.indexOf('StorageFile') === -1) {
                         dataType = 'Date|Time';
                     } else if (typeof value === 'boolean') {
                         dataType = 'Boolean';
@@ -2575,21 +2549,10 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
             
             scope.$watch('selectedQuery.templateUUID', function (newValue, oldValue) {
                 if (scope.selectedQuery && newValue) {
-                    var templateIsValid = false;
-                   
-                    for (var i = 0; i < scope.templates.length; i++) {
-                        if (scope.templates[i].id === scope.selectedQuery.templateUUID) {
-                            scope.selectedQuery.termNames = scope.templates[i].termNames;
-                            scope.selectedQuery.attachToData = scope.templates[i].attachToData;
-                            templateIsValid = true;
-                            break;
-                        }
-                    }
-                   
-                    if (!templateIsValid) {
-                        scope.invalidTemplateError = "*The referenced template is invalid";
-                    } else {
+                    if (scope.templates[newValue]) { // referenced template exists, i.e. it is valid
                         scope.invalidTemplateError = "";
+                    } else {
+                        scope.invalidTemplateError = "*The referenced template is invalid";
                     }
                 }
             });
@@ -2627,7 +2590,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
             
             scope.fetchTemplates();
         },
-        controller: function($scope, $timeout, workflowBuilderService) {
+        controller: function($scope, $timeout, $interval, workflowBuilderService) {
             $scope.querySelected = function (index, event) {
                 console.log('************* Query Selected ************************');
                 $scope.isQuerySelected = true;
@@ -2688,9 +2651,13 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                 }
             };
             
-            $scope.validateQueries = function () {
+            $scope.validateQueries = function () { // set validation flags for query sections...term names, query operators, referenced template etc.
                 angular.forEach($scope.queries, function(query) {
                     $scope.queryValidator[query.key] = {isValid: true};
+                    
+                    if (!$scope.templates[query.templateUUID]) { // referenced template is invalid
+                        $scope.queryValidator[query.key] = {isValid: false};
+                    }
 
                     // Initialize validator objects for all query sections: sort, distinct, operators (e.g. $gt, $eq, etc.) termnames, etc.
                     $scope.queryValidator[query.key].queryOperatorValidator = {};
@@ -2712,11 +2679,13 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                     var allDistinctItemsValid = true;
                     var allSortItemsValid = true;
                     var allGroupItemsValid = true;
-
+                    
+                    var termNames = workflowBuilderService.getTemplateTerms(query.templateUUID);
+                    
                     // validate term names and query operators in the where section
                     angular.forEach(query.where, function (item, parentIndex) {
                         angular.forEach(item.orGroup, function (groupItem, index) {
-                            var valid = $scope.termNameIsValid(query.termNames, groupItem.term);
+                            var valid = $scope.termNameIsValid(termNames, groupItem.term);
 
                             if (!valid) {
                                 allTermsValid = false;
@@ -2739,7 +2708,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                                 validOperators.push(operatorList[k].id)
                             }
                             var operatorIsValid = (validOperators.indexOf(groupItem.queryOperator) !== -1);
-                            
+							
                             if (!operatorIsValid) {
                                 allQueryOperatorsValid = false;
                             }
@@ -2754,7 +2723,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
 
                     // validate projection items
                     dojo.forEach(query.projectionItems, function (item, $index) {
-                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+                        var valid = $scope.termNameIsValid(termNames, item.term);
 
                         // validate term names
                         $scope.queryValidator[query.key].projectionTermNameValidator[$index] = {};
@@ -2770,7 +2739,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
 
                     // validate distinct items
                     dojo.forEach(query.distinctItems, function (item, $index) {
-                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+                        var valid = $scope.termNameIsValid(termNames, item.term);
 
                         // validate term names
                         $scope.queryValidator[query.key].distinctTermNameValidator[$index] = {};
@@ -2786,7 +2755,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
 
                     // validate sort items
                     dojo.forEach(query.sortItems, function (item, $index) {
-                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+                        var valid = $scope.termNameIsValid(termNames, item.term);
 
                         // validate term names
                         $scope.queryValidator[query.key].sortTermNameValidator[$index] = {};
@@ -2802,7 +2771,7 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
 
                     // validate group items
                     dojo.forEach(query.groupItems, function (item, $index) {
-                        var valid = $scope.termNameIsValid(query.termNames, item.term);
+                        var valid = $scope.termNameIsValid(termNames, item.term);
 
                         // validate term names
                         $scope.queryValidator[query.key].groupItemTermNameValidator[$index] = {};
@@ -2873,8 +2842,14 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                 var t = workflowBuilderService.getTemplateData();
                 t.promise.then(function(result){
                     t.thenCallback(result, $scope);
+                    
+                    $scope.templatesList = [];
+                    for (var key in $scope.templates) {
+                        $scope.templatesList.push($scope.templates[key]);
+                    }
                 }, function (error) {
-                    $scope.templates = [];
+                    $scope.templatesList = [];
+                    $scope.templates = {};
                 });
             };
             
@@ -2938,9 +2913,18 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
                 return valid;
             };
             
+            $scope.getAttachToData = function () {
+                return workflowBuilderService.getTemplateAttachToData($scope.selectedQuery.templateUUID);
+            };
+            
+            $scope.getTemplateTerms = function (templateUUID) {
+                workflowBuilderService.fetchTemplateTerms(templateUUID);
+            };
+            
             $scope.getTermNames = function (groupItem) {
                 var terms = [];
-                dojo.forEach($scope.selectedQuery.termNames, function (term) {
+                var termNames = workflowBuilderService.getTemplateTerms($scope.selectedQuery.templateUUID);
+                dojo.forEach(termNames, function (term) {
                     if (groupItem && (groupItem.term === term.id)) {
                         workflowBuilderService.setTermProperties(groupItem, term);
                     }
@@ -2952,21 +2936,20 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
             // Get child terms of composite term
             $scope.getSubTerms = function (parentTerm) {
                 var subTerms = []; // child terms of composite term (parentTerm)
-                if ($scope.selectedQuery.termNames) {
-                    for (var g = 0; g < $scope.selectedQuery.termNames.length; g++) {
-                        var term = $scope.selectedQuery.termNames[g];
+                var termNames = workflowBuilderService.getTemplateTerms($scope.selectedQuery.templateUUID);
+                for (var g = 0; g < termNames.length; g++) {
+                    var term = termNames[g];
 
-                        if (term.id === parentTerm && term.dataType !== 'Composite') { // data-type must be "Composite"
-                            return null;
-                            break;
-                        }
+                    if (term.id === parentTerm && term.dataType !== 'Composite') { // data-type must be "Composite"
+                        return null;
+                        break;
+                    }
 
-                        if (parentTerm && term.id.startsWith(parentTerm + '.')) {
-                            var _termName = term.id.substring(parentTerm.length + 1, term.id.length); // +1 accounts for '.'
-                            var o = {id: _termName, name: _termName};
-                            workflowBuilderService.setTermProperties(o, term);
-                            subTerms.push(o);
-                        }
+                    if (parentTerm && term.id.startsWith(parentTerm + '.')) {
+                        var _termName = term.id.substring(parentTerm.length + 1, term.id.length); // +1 accounts for '.'
+                        var o = {id: _termName, name: _termName};
+                        workflowBuilderService.setTermProperties(o, term);
+                        subTerms.push(o);
                     }
                 }
                 return subTerms;
@@ -2996,10 +2979,17 @@ angular.module("crisWorkflow").directive("crisWorkflowQuery", function ($compile
     }
 });
 
-angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "$http", function($uibModal, $http) {
+angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "$http", "$interval", "$rootScope", function($uibModal, $http, $interval, $rootScope) {
     var templatesHttpPromise; // promise when fetching template data
     var cachedTemplates;
+    var termsByTemplate = {};
+    var attachToDataByTemplate = {};
+    var templateTermsFetchedFlags = {}; // Indicates which templates whose terms we've fetched
+    var deserializeStatus = {numActiveAsynCalls: 0}; // We need to keep track of progress of async. Only update views if status is 0.
+    var funcQueue = [];
 
+    // Matches opening and closing characters, e.g. {...},  so inner content can be extracted
+    // source: String to search. patternStart: Array of start characters. patternEnd: Array of end characters
     var balancedMatcher = function (source, patternStart, patternEnd) {
         var patternBegin = patternStart;
         var patternEnd = patternEnd;
@@ -3135,27 +3125,6 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
         return str;
     };
     
-    var _removeUnsafeSpaceCharacters = function _evalJson(jsonString) {
-        var matcher = balancedMatcher(jsonString, ['${', '#{'], ['}']);
-        var startIndex = 0;
-        var str = "";
-        while (matcher.find()) {
-            str += (jsonString.substring(startIndex, matcher.start()));
-            var contents = jsonString.substring(matcher.start() + 2, matcher.end() - 1); // Contents wrapped in ${} or #{}
-            var val = _evalJson(contents.trim());
-
-            var origVal = jsonString.substring(matcher.start(), matcher.end());
-            if (origVal.startsWith('${')) {
-                str += '${' + val + '}';
-            } else if (origVal.startsWith('#{')) {
-                str += '#{' + val + '}';
-            }
-            startIndex = matcher.end();
-        }
-        str += jsonString.substring(startIndex);
-        return str;
-    };
-    
     var deserializeQueries = function (queryItems) {
         for (var j = 0; j < queryItems.length; j++) {
             var queryItem = queryItems[j];
@@ -3170,6 +3139,7 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                     var queryFrom = queryStr.substring(0, queryStr.indexOf('('));
                     var REGEX_UUID = /([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/i;
                     queryItem.templateUUID = REGEX_UUID.exec(queryFrom)[0];
+                    _fetchTemplateTerms(queryItem.templateUUID); // fetch template terms
                     
                     var queryParams = queryStr.substring(queryStr.indexOf('(') + 1, queryStr.length - 1);
                     var deserializedParams = angular.fromJson(queryParams);
@@ -3179,6 +3149,8 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                             if (typeof paramValue !== 'number') {
                                 throw 'invalid value for $limit or $skip in the query';
                             }
+                            queryItem[key] = paramValue;
+                        } else if (key === '$op' && paramValue) {
                             queryItem[key] = paramValue;
                         } else if (key === '$sort' || key === '$orderby') {
                             if (typeof paramValue === 'object') {
@@ -3236,15 +3208,13 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                     }
                     
                     (function initValues (items) {
-                        for (var i = 0; i < items.length; i++) {
-                            var whereItem = items[i];
+                        angular.forEach(items, function (whereItem) {
                             if (whereItem.orGroup) {
                                 initValues(whereItem.orGroup);
                             } else {
-                                var valueProperties = setValueProperties(whereItem.value, queryItem.templateUUID, whereItem.term);
-                                dojo.mixin(whereItem, valueProperties);
+                                setValueProperties(whereItem.value, queryItem.templateUUID, whereItem.term, whereItem);
                             }
-                        }
+                        });
                     })(queryItem.where);
                     
                     // All where items must be in "or" group array for easy management in view. Group those without a group
@@ -3261,14 +3231,6 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                     
                     if (newGroups.length) {
                         queryItem.where = queryItem.where.concat(newGroups);
-                    }
-                    
-                    for (var r = 0; r < cachedTemplates.length; r++) {
-                        var template = cachedTemplates[r];
-                        if (template.id === queryItem.templateUUID) {
-                            queryItem.termNames = template.termNames;
-                            break;
-                        }
                     }
                 } else {
                     throw 'Invalid query in json!';
@@ -3311,7 +3273,7 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
             
             function setWhereItemValue (term, value) {
                 var whereItem = {term: term};
-                if (typeof value === 'object' && value !== null && !(value instanceof Array)) {
+                if (typeof value === 'object' && value !== null && !(value instanceof Array) && value.$date === undefined) {
                     var operator = Object.keys(value)[0]; // Mongo operator. E.g. $lt, $gt, $gte, etc.
                     if (operator && operator.trim().startsWith('$')) {
                         whereItem.queryOperator = operator;
@@ -3475,46 +3437,95 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
         }
         newJsonStr = newJsonStr.replace(/"(\$\{|\#\{)/g, '$1').replace(/\}"/g, '}'); // No quotes on local/system variables and queries
         newJsonStr = newJsonStr.replace(/"(true|false)"/g, '$1'); // No quotes around booleans
-        newJsonStr = newJsonStr.replace(/"(\$directive|\$merge|\$data|\$path)"/g, '$1'); // No quotes around $directives
+        //newJsonStr = newJsonStr.replace(/"(\$directive|\$merge|\$data|\$path)"/g, '$1'); // No quotes around $directives
+        newJsonStr = newJsonStr.replace(/"(\$\w+)"(?=\s*\:)/g, '$1'); // No quotes around directives, e.g. $directive, $data, $date, etc.
+        
         return newJsonStr;
+
+        function sanitizeJsonRecords(builderRecords, termsToMerge) {
+            var newJsonObj = {};
+            for (var i = 0; i < builderRecords.length; i++) {
+                var record = builderRecords[i];
+
+                if (record.variable && record.variableType === 'template') {
+                    newJsonObj[record.variable] = {};
+                    if (record.termsToMerge && record.termsToMerge.length) {
+                        termsToMerge[record.variable] = sanitizeJsonRecords(record.termsToMerge);
+                    }
+                    continue;
+                }
+
+                if (!record.variable || (!record.valueType && record.itemType !== 'Query') || ((record.value === null || typeof record.value === 'undefined' || (typeof record.value === 'string' && record.value.trim().length === 0)) && record.staticDataType !== "Null" && record.itemType !== 'Query')) {
+                    continue; // ignore incomplete records
+                }
+                record.value = restoreValue(record);
+
+                newJsonObj[record.variable] = record.value;
+            }
+            return newJsonObj;
+        }
     };
     
-    function setValueProperties (_value, templateUUID, termName) {
+    // Set value properties: value-type, static-data-type, etc. For the case of template term values, set properties such as if term is a list term, of a multi-file term, etc.
+    // CurrentProps is used by a query where item.
+    function setValueProperties (_value, templateUUID, termName, currentProps) {
         // Get term definition in order to refer to term properties. E.g. list flag, multi-list flag, multi-file flag
         var termDefinition = null;
-        if (templateUUID && termName && cachedTemplates) {
-            for (var t = 0; t < cachedTemplates.length; t++) {
-                if (cachedTemplates[t].id === templateUUID) { // locate template data
-                    var terms = cachedTemplates[t].termNames;
-                    for (var i = 0; i < terms.length; i++) {
-                        if (terms[i].id === termName) {
-                            termDefinition = terms[i];
-                            break;
+        if (templateUUID && termName && cachedTemplates[templateUUID]) {
+            
+            var props = currentProps ? currentProps : {}; // CurrentProps is used by a query where item.. Merge additional properties to it and return.
+            
+            if (termsByTemplate[templateUUID]) { // Terms for template (with uuid templateUUID) exist in memory
+                setTermVariableProperties(termName, templateUUID, props);
+            } else { // Terms for template (with uuid templateUUID) haven't been fetched yet. 
+                // Add function to queue for later execution once all asyn calls are finished
+                funcQueue.push(function () {
+                    setTermVariableProperties(termName, templateUUID, props);
+                });
+            }
+            return props;
+        } else {
+            var props = currentProps ? currentProps : {}; // CurrentProps is used by a query where item.. Merge additional properties to it and return.
+            return angular.merge(props, processValue(_value, templateUUID, termName));
+        }
+       
+        // for a variable that is a template term, set properties from the term definition
+        function setTermVariableProperties(_termName, _templateUUID, valueProps) {
+            var terms = termsByTemplate[_templateUUID];
+
+            var termFound = false; // Flag indicating whether referenced term is found in template definition
+            for (var i = 0; i < terms.length; i++) {
+                if (terms[i].id === _termName) {
+                    termDefinition = terms[i];
+                    termFound = true;
+
+                    // if term is list, staticDataType will be an array of term instances
+                    if (termDefinition.isListTerm) {
+                        // value must be array. Otherwise do not process it...user will be notified of invalid value in view
+                        if (_value instanceof Array) {
+                            var a = [];
+                            for (var t in _value) {
+                                var o = processValue(_value[t], _templateUUID, _termName);
+                                o.term = _termName; // Reference to term necessary to be able to extract term attributes, e.g. attach-to data
+                                a.push(o);
+                            }
+                            angular.merge(valueProps, {valueType: 'static', value: a, staticDataType: 'Array', isReadOnly: true, dataType: termDefinition.dataType, isListTerm: termDefinition.isListTerm});
+                        } else {
+                            angular.merge(valueProps, {valueType: 'static', value: _value, staticDataType: 'Array', isReadOnly: true, dataType: termDefinition.dataType, isListTerm: termDefinition.isListTerm});
                         }
+                    } else {
+                        angular.merge(valueProps, processValue(_value, _templateUUID, _termName));
                     }
                     break;
                 }
             }
-        }
-        
-        // if term is list, staticDataType will be an array of term instances
-        if (termDefinition && termDefinition.isListTerm) {
-            // value must be array. Otherwise do not process it...user will be notified of invalid value in view
-            if (_value instanceof Array) {
-                var a = [];
-                for (var t in _value) {
-                    var o = processValue(_value[t], templateUUID, termName);
-                    o.term = termName; // Reference to term necessary to be able to extract term attributes, e.g. attach-to data
-                    a.push(o);
-                }
-                return {valueType: 'static', value: a, staticDataType: 'Array', isReadOnly: true, dataType: termDefinition.dataType, isListTerm: termDefinition.isListTerm};
-            } else {
-                return {valueType: 'static', value: _value, staticDataType: 'Array', isReadOnly: true};
+
+            if (!termFound) { // referenced term not found in template definition. Therefore process as regular value
+                angular.merge(valueProps, processValue(_value, _templateUUID, _termName));
             }
-        } else {
-            return processValue(_value, templateUUID, termName);
         }
         
+        // Set variable properties to be used in the views. E.g. value type, static datatype, etc.
         function processValue (_value, templateUUID, termName) {
             var value = _value;
             var valueType = 'static';
@@ -3540,7 +3551,11 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
             if (typeof value === 'number' && !isNaN(value)) {
                 staticDataType = 'Numeric';
             } else if (typeof value !== 'object' && isNaN(value) && !isNaN(Date.parse(value))) {
+                // for older jsons still using the deprecated ISO format for date instead of the new format {$date: 2015-06-22T04:00:00.000Z}
                 staticDataType = 'Date';
+            } else if (typeof value === 'object' && value && value.$date) { // date and time values are formatted as {$date: 2015-06-22T04:00:00.000Z} in json
+                staticDataType = 'Date';
+                value = value.$date;
             } else if (typeof value === 'boolean') {
                 staticDataType = 'Boolean';
             } else if (value === null) {
@@ -3575,12 +3590,14 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
             var dataType = null;
             var listItemProps = null;
             var isMultiFile = null;
+            
+            // If value is a Term, set properties (i.e. staticDataType (e.g. date, time, etc.), isMultiFile, isReadOnly, listItemProps) based on term definition
             if (termDefinition) {
                 var previousStaticDataType = staticDataType;
                 staticDataType = termDefinition.dataType;
                 dataType = termDefinition.dataType;
                 isReadOnly = true;
-                
+
                 if (termDefinition.dataType === 'List') {
                     listItemProps = termDefinition.listItemProps; // dropdown list items from term definition
 
@@ -3762,7 +3779,10 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                 if (query['$skip']) {
                     obj['$skip'] = parseInt(query['$skip'], 10);
                 }
-                query.rawQuery = rawQuery + dojo.toJson(obj) + ')';
+                if (query['$op']) {
+                    obj['$op'] = query['$op'];
+                }
+                query.rawQuery = rawQuery + JSON.stringify(obj) + ')';
             }
         }
         
@@ -3797,29 +3817,6 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
             return valueList;
         }
     }
-
-    function sanitizeJsonRecords(builderRecords, termsToMerge) {
-        var newJsonObj = {};
-        for (var i = 0; i < builderRecords.length; i++) {
-            var record = builderRecords[i];
-            
-            if (record.variable && record.variableType === 'template') {
-                newJsonObj[record.variable] = {};
-                if (record.termsToMerge && record.termsToMerge.length) {
-                    termsToMerge[record.variable] = sanitizeJsonRecords(record.termsToMerge);
-                }
-                continue;
-            }
-            
-            if (!record.variable || (!record.valueType && record.itemType !== 'Query') || ((record.value === null || typeof record.value === 'undefined' || (typeof record.value === 'string' && record.value.trim().length === 0)) && record.staticDataType !== "Null" && record.itemType !== 'Query')) {
-                continue; // ignore incomplete records
-            }
-            record.value = restoreValue(record);
-            
-            newJsonObj[record.variable] = record.value;
-        }
-        return newJsonObj;
-    }
     
     function restoreValue (record) {
         var value = record.value;
@@ -3833,6 +3830,9 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
         if (record.valueType === 'static' && record.staticDataType === 'Numeric') {
             value = parseInt(value);  // Ensures Numerics aren't quoted after jsonifying
         }
+        if (record.valueType === 'static' && (record.staticDataType === 'Date' || record.staticDataType === 'Time')) {
+            value = {$date: record.value};  // Ensures Numerics aren't quoted after jsonifying
+        }
         if (record.valueType === 'query' && subValue) {
             value = value + subValue;
         }
@@ -3840,10 +3840,18 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
             value = record.variable;
         }
         if (record.valueType === 'static' && (record.staticDataType === 'Object' || record.staticDataType === 'Composite')) {
-            value = restoreObjectOrArrayValue(value, 'Object');
+            if (typeof value !== 'object' && !(value instanceof Array)) {
+                value = value;
+            } else {
+                value = restoreObjectOrArrayValue(value, 'Object');
+            }
         }
         if (record.valueType === 'static' && record.staticDataType === 'Array') {
-            value = restoreObjectOrArrayValue(value, 'Array');
+            if (!(value instanceof Array)) {
+                value = value;
+            } else {
+                value = restoreObjectOrArrayValue(value, 'Array');
+            }
         }
         return value;
     }
@@ -3867,7 +3875,7 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                     } else if (theArray[t].staticDataType === "Array") {
                         originalArray.push(processArrayValue(_val));
                     } else {
-                        originalArray.push(decorateValue(_val, theArray[t].valueType));
+                        originalArray.push(restoreValue(theArray[t]));
                     }
                 }
             }
@@ -3883,24 +3891,34 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                     } else if (theObject[t].value.staticDataType === "Array") {
                         originalObj[theObject[t].variable] = processArrayValue(theObject[t].value.value);
                     } else {
-                        originalObj[theObject[t].variable] = decorateValue(theObject[t].value.value, theObject[t].value.valueType);
+                        originalObj[theObject[t].variable] = restoreValue(theObject[t].value);
                     }
                 }
             }
             return originalObj;
         }
-        
-        function decorateValue (value, valueType) {
-            var _val = value;
-            if (valueType === 'systemVariable') {
-                _val = '#{' + _val + '}';
-            }
-            if (valueType === 'localVariable') {
-                _val = '${' + _val + '}';
-            }
-            return _val;
-        }
     }
+    
+    function _removeUnsafeSpaceCharacters (jsonString) {
+        var matcher = balancedMatcher(jsonString, ['${', '#{'], ['}']);
+        var startIndex = 0;
+        var str = "";
+        while (matcher.find()) {
+            str += (jsonString.substring(startIndex, matcher.start()));
+            var contents = jsonString.substring(matcher.start() + 2, matcher.end() - 1); // Contents wrapped in ${} or #{}
+            var val = _removeUnsafeSpaceCharacters (contents.trim());
+
+            var origVal = jsonString.substring(matcher.start(), matcher.end());
+            if (origVal.startsWith('${')) {
+                str += '${' + val + '}';
+            } else if (origVal.startsWith('#{')) {
+                str += '#{' + val + '}';
+            }
+            startIndex = matcher.end();
+        }
+        str += jsonString.substring(startIndex);
+        return str;
+    };
     
     function extractOptions (task, taskType) {
         var json = task[taskType].trim();
@@ -3928,6 +3946,163 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
         }(json));
     }
     
+    function _fetchTemplateTerms (_templateUUID) {
+        if (!_templateUUID) {
+            return;
+        }
+        
+        var templateRecord = cachedTemplates[_templateUUID];
+        if (!templateRecord) { // template doesn't exist
+            return;
+        }
+        
+        var templateUUID = templateRecord.id;
+        var templateVersion = templateRecord.version;
+        if (templateTermsFetchedFlags[templateUUID]) { // terms for template already fetched in previous request
+            return;
+        } else {
+            templateTermsFetchedFlags[templateUUID] = true;
+        }
+        
+        ++deserializeStatus.numActiveAsynCalls;
+        $http({
+            method: 'GET',
+            url: cris.baseUrl + "templates/load/" + templateUUID + "/" + templateVersion
+        }).then(function (resultData) {
+            var termNames = [];
+            var termDataTypes = {};
+            var attachToRecords = {};
+            var isMultiFileFlags = {};
+            var listItemProps = {};
+            var isListTermFlags = {};
+
+            (function extractTermNames(term, isTopLevel) {
+                var compositeTermName = arguments[2];
+                angular.forEach(term.term, function (term_) {
+                    var _alias = term_.alias || term_.useAlias || term_.name;
+                    var path = compositeTermName ? compositeTermName + '.' + _alias : _alias;
+                    if (path) {
+                        termDataTypes[path] = getType(term_.validation.validator[0].type, term_.validation.validator[0].property, path);
+                        termNames.push(path);
+                        isListTermFlags[path] = term_.list;
+
+                        for (var v = 0; v < term_.attachTo.length; v++) {
+                            var attachToAlias = (path + '.' + term_.attachTo[v].useAlias);
+                            termDataTypes[attachToAlias]  = "AttachTo";
+                            termNames.push(attachToAlias);
+                            isListTermFlags[attachToAlias] = term_.attachTo[v].list;
+                            getAttachToData(term_.attachTo[v], attachToAlias);
+                        }
+                    }
+                    if (term_.term && term_.term instanceof Array && term_.term.length) {
+                        extractTermNames(term_, false, path);
+                    }
+                });
+
+                if (isTopLevel) { // get term names for attach-tos in template top-level
+                    for (var v = 0; v < term.attachTo.length; v++) {
+                        var attachToAlias = term.attachTo[v].useAlias;
+                        termDataTypes[attachToAlias]  = "AttachTo";
+                        termNames.push(attachToAlias);
+                        isListTermFlags[attachToAlias] = term.attachTo[v].list;
+                        getAttachToData(term.attachTo[v], attachToAlias);
+                    }
+                }
+            })(resultData.data, true);
+
+            termNames = termNames.sort().concat(['_experiment_id', '_job_id', '_project_id']);
+            var termsCollection = [];
+            dojo.forEach(termNames, function (termName, index) {
+                var termDataType = termDataTypes[termName];
+                if (['_experiment_id', '_job_id', '_project_id'].indexOf(termName) !== -1) {
+                    termDataType = 'Numeric';
+                }
+                termsCollection.push({id: termName, name: termName, dataType: termDataType, listItemProps: listItemProps[termName], isMultiFile: isMultiFileFlags[termName], index: index, isListTerm: isListTermFlags[termName], template: templateUUID});
+            });
+            termsByTemplate[templateUUID] = termsCollection;
+            attachToDataByTemplate[templateUUID] = attachToRecords;
+            --deserializeStatus.numActiveAsynCalls;
+            
+            console.log('**********Template (' + cachedTemplates[templateUUID].name + ') Terms Fetched******************* ');
+            console.dir(termsCollection);
+            console.dir(attachToRecords);
+            
+            function getAttachToData(term, termAlias) {
+                if (attachToRecords[termAlias]) { // attach-to data for term was previously extracted and cached
+                    return;
+                }
+
+                var uuid = term.uuid;
+                var idField = term.idField;
+                var nameField = term.nameField;
+
+                if (uuid && nameField && idField) {
+                    var url = cris.baseUrl + "rest/objectus/" + uuid;
+                    ++deserializeStatus.numActiveAsynCalls;
+                    $http({
+                        method: 'GET',
+                        url: url
+                    }).then(function (result){
+                        var data = [];
+                        for (var i = 0; i < result.data.length; i++) {
+                            if (result.data[i][nameField] && result.data[i][idField]) {
+                                data.push({id: result.data[i][idField], name: result.data[i][nameField]});
+                            }
+                        }
+                        attachToRecords[termAlias] = data;
+                        --deserializeStatus.numActiveAsynCalls;
+                    }, function (error) {
+                        --deserializeStatus.numActiveAsynCalls;
+                    });
+                }
+            }
+
+            function getType (validationType, properties, termAlias) {
+                var dataType = null;
+                if (validationType === "text" || validationType === "advanced") {
+                    dataType = "Text";
+                } else if (validationType === "numeric") {
+                    dataType = "Numeric";
+                } else if (validationType === "date-time") {
+                    dataType = "Date";
+                    if ((properties instanceof Array) && properties.length && properties[0].name === 'format' && properties[0].value === 'time') {
+                        dataType = "Time";
+                    }
+                } else if (validationType === "boolean") {
+                    dataType = "Boolean";
+                } else if (validationType === "composite") {
+                    dataType = "Composite";
+                } else if (validationType === "list") {
+                    dataType = "List"
+                    if (properties instanceof Array) {
+                        var items = [];
+                        for (var i = 0; i < properties.length; i++) {
+                            if (properties[i].name === 'item' && properties[i].value) {
+                                var id = properties[i].id ? properties[i].id : properties[i].value;
+                                items.push({id: id, name: properties[i].value});
+                            }
+                        }
+
+                        listItemProps[termAlias] = {items: items};
+                        if (properties.length && properties[0].name === 'isMultiSelect' && properties[0].value === 'true') {
+                            listItemProps[termAlias].isMultiSelect = true;
+                        }
+                    }
+                } else if (validationType === "file") {
+                    dataType = 'File';
+                    if (properties.length && properties[0].name === 'multiple' && properties[0].value === 'true') {
+                        isMultiFileFlags[termAlias] = true;
+                    }
+                }
+                return dataType;
+            }
+        }, function (errorData) {
+            termsByTemplate[templateUUID] = [];
+            attachToDataByTemplate[templateUUID] = {};
+            --deserializeStatus.numActiveAsynCalls;
+        });
+    }
+    
     return {
         removeUnsafeSpaceCharacters: function (jsonString) {
             return _removeUnsafeSpaceCharacters(jsonString);
@@ -3952,6 +4127,10 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
             }
             return result;
         },
+        // Fetch Templates and create an array of {id: TEMPLATE_UUID, name: TEMPLATE_NAME,....} objects
+        // .....
+        // TODO: Right now the url returns a json that includes an xml value that contains term data. Because processing xml is tedious to process, we instead fetch template terms on-demand.
+        // We need a cleaner url that returns easy to process terms so we don't have to fetch terms in another ajax call.
         getTemplateData: function () {
             if (!templatesHttpPromise) {
                 var requestUrl = cris.baseUrl + 'templates/?showAllStatus=true&filter={"op":"equal","data":[{"op":"number","data":"statusId","isCol":true},{"op":"number","data":1,"isCol":false}]}&sort(+name)';
@@ -3964,150 +4143,19 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
             return ({
                         promise: templatesHttpPromise, 
                         thenCallback: function (result, templateStore) {
-                            
                             if (cachedTemplates) { // return cached templates if true
                                 templateStore.templates = cachedTemplates;
                                 return;
                             }
                             
                             var results = result.data;
-                            var templates_ = [];
+                            var templates_ = {};
                             
-                            // For each template fetch its latest version of terms and/or any associated attach-to data
                             angular.forEach(results, function (item) {
-                                var obj = {name: item.name, id: item['uuid']['$uuid']};
-                                var templateUUID = item.uuid.$uuid;
-                                var templateVersion = item.versionNumber.$uuid;
-                                $http({
-                                    method: 'GET',
-                                    url: cris.baseUrl + "templates/load/" + templateUUID + "/" + templateVersion
-                                }).then(function (resultData) {
-                                    
-                                    var termNames = [];
-                                    var termDataTypes = {};
-                                    var attachToRecords = {};
-                                    var isMultiFileFlags = {};
-                                    var listItemProps = {};
-                                    var isListTermFlags = {};
-                                    
-                                    (function extractTermNames(term, isTopLevel) {
-                                        var compositeTermName = arguments[2];
-                                        angular.forEach(term.term, function (term_) {
-                                            var _alias = term_.alias || term_.useAlias || term_.name;
-                                            var path = compositeTermName ? compositeTermName + '.' + _alias : _alias;
-                                            if (path) {
-                                                termDataTypes[path] = getType(term_.validation.validator[0].type, term_.validation.validator[0].property, path);
-                                                termNames.push(path);
-                                                isListTermFlags[path] = term_.list;
-                                                
-                                                for (var v = 0; v < term_.attachTo.length; v++) {
-                                                    var attachToAlias = (path + '.' + term_.attachTo[v].useAlias);
-                                                    termDataTypes[attachToAlias]  = "AttachTo";
-                                                    termNames.push(attachToAlias);
-                                                    isListTermFlags[attachToAlias] = term_.attachTo[v].list;
-                                                    getAttachToData(term_.attachTo[v], attachToAlias);
-                                                }
-                                            }
-                                            if (term_.term && term_.term instanceof Array && term_.term.length) {
-                                                extractTermNames(term_, false, path);
-                                            }
-                                        });
-                                        
-                                        if (isTopLevel) { // get term names for attach-tos in template top-level
-                                            for (var v = 0; v < term.attachTo.length; v++) {
-                                                var attachToAlias = term.attachTo[v].useAlias;
-                                                termDataTypes[attachToAlias]  = "AttachTo";
-                                                termNames.push(attachToAlias);
-                                                isListTermFlags[attachToAlias] = term.attachTo[v].list;
-                                                getAttachToData(term.attachTo[v], attachToAlias);
-                                            }
-                                        }
-                                    })(resultData.data, true);
-                                    
-                                    termNames = termNames.sort().concat(['_experiment_id', '_job_id', '_project_id']);
-                                    var termsCollection = [];
-                                    dojo.forEach(termNames, function (termName, index) {
-                                        var termDataType = termDataTypes[termName];
-                                        if (['_experiment_id', '_job_id', '_project_id'].indexOf(termName) !== -1) {
-                                            termDataType = 'Numeric';
-                                        }
-                                        termsCollection.push({id: termName, name: termName, dataType: termDataType, listItemProps: listItemProps[termName], isMultiFile: isMultiFileFlags[termName], index: index, isListTerm: isListTermFlags[termName], template: templateUUID});
-                                    });
-                                    obj.termNames = termsCollection;
-                                    obj.attachToData = attachToRecords;
-                                    
-                                    function getAttachToData(term, termAlias) {
-                                        if (attachToRecords[termAlias]) { // attach-to data for term was previously extracted and cached
-                                            return;
-                                        }
-                                            
-                                        var uuid = term.uuid;
-                                        var idField = term.idField;
-                                        var nameField = term.nameField;
-
-                                        if (uuid && nameField && idField) {
-                                            var url = cris.baseUrl + "rest/objectus/" + uuid;
-                                            $http({
-                                                method: 'GET',
-                                                url: url
-                                            }).then(function (result){
-                                                var data = [];
-                                                for (var i = 0; i < result.data.length; i++) {
-                                                    if (result.data[i][nameField] && result.data[i][idField]) {
-                                                        data.push({id: result.data[i][idField], name: result.data[i][nameField]});
-                                                    }
-                                                }
-                                                attachToRecords[termAlias] = data;
-                                            }, function (error) {
-                                                
-                                            });
-                                        }
-                                    }
-                                    
-                                    function getType (validationType, properties, termAlias) {
-                                        var dataType = null;
-                                        if (validationType === "text" || validationType === "advanced") {
-                                            dataType = "Text";
-                                        } else if (validationType === "numeric") {
-                                            dataType = "Numeric";
-                                        } else if (validationType === "date-time") {
-                                            dataType = "Date";
-                                            if ((properties instanceof Array) && properties.length && properties[0].name === 'format' && properties[0].value === 'time') {
-                                                dataType = "Time";
-                                            }
-                                        } else if (validationType === "boolean") {
-                                            dataType = "Boolean";
-                                        } else if (validationType === "composite") {
-                                            dataType = "Composite";
-                                        } else if (validationType === "list") {
-                                            dataType = "List"
-                                            if (properties instanceof Array) {
-                                                var items = [];
-                                                for (var i = 0; i < properties.length; i++) {
-                                                    if (properties[i].name === 'item' && properties[i].value) {
-                                                        var id = properties[i].id ? properties[i].id : properties[i].value;
-                                                        items.push({id: id, name: properties[i].value});
-                                                    }
-                                                }
-                                                
-                                                listItemProps[termAlias] = {items: items};
-                                                if (properties.length && properties[0].name === 'isMultiSelect' && properties[0].value === 'true') {
-                                                    listItemProps[termAlias].isMultiSelect = true;
-                                                }
-                                            }
-                                        } else if (validationType === "file") {
-                                            dataType = 'File';
-                                            if (properties.length && properties[0].name === 'multiple' && properties[0].value === 'true') {
-                                                isMultiFileFlags[termAlias] = true;
-                                            }
-                                        }
-                                        return dataType;
-                                    }
-                                }, function (errorData) {
-                                    
-                                });
-                                templates_.push(obj);
+                                var obj = {name: item.name, id: item['uuid']['$uuid'], version: item.versionNumber.$uuid};
+                                templates_[item['uuid']['$uuid']] = obj;
                             });
+                            
                             templateStore.templates = templates_;
                             cachedTemplates = templates_; // Cache templates for next retrieval
                             
@@ -4115,6 +4163,9 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                             console.dir(templates_);
                         }
                     });
+        },
+        fetchTemplateTerms: function (templateUUID) {
+            _fetchTemplateTerms (templateUUID);
         },
         getSystemVariables: function () {
             return [{id: 'current_project.id', name: 'current_project.id'},
@@ -4149,7 +4200,23 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                 {id: 'current_user.timeUpdated', name: 'current_user.timeUpdated'},
                 {id: 'current_date', name: 'current_date'}];
         },
-        deserializeJson: function (json, queryItems, task, taskType) {
+        getTemplateTerms: function (templateUUID) {
+            var terms = termsByTemplate[templateUUID];
+            if (terms) {
+                return terms;
+            } else {
+                return [];
+            }
+        },
+        getTemplateAttachToData: function (templateUUID) {
+            var attachToData = attachToDataByTemplate[templateUUID];
+            if (attachToData) {
+                return attachToData;
+            } else {
+                return {};
+            }
+        },
+        deserializeJson: function (json, queryItems, task, taskType, readyCallback) {
             console.log('************Deserialize Json**********************');
             var result = [];
             var error = "";
@@ -4218,6 +4285,7 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                                         valProps.variable = key;
                                         valProps.variableType = 'template';
                                         valProps.termsToMerge = [];
+                                        _fetchTemplateTerms(key); // Fetch this template's terms
                                         for (var y = 0; y < value.length; y++) {
                                             var itemToMerge = value[y];
                                             if (itemToMerge && typeof itemToMerge === 'object' && !(itemToMerge instanceof Array)) {
@@ -4247,6 +4315,7 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                                     valProps.termsToMerge = [];
                                     valProps.variableType = 'template';
                                     valProps.variable = variableId;
+                                    _fetchTemplateTerms(variableId); // Fetch this template's terms
                                     for (var h = 0; h < jsonObj['$data'].length; h++) {
                                         var itemToMerge = jsonObj['$data'][h][variableId];
                                         if (itemToMerge && typeof itemToMerge === 'object' && !(itemToMerge instanceof Array)) {
@@ -4280,8 +4349,23 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                 } else {
                     error = "Error: Invalid json format";
                 }
+                console.log('************ Deserialization Complete ***************');
                 console.dir(result);
                 console.dir(queryItems);
+            }
+            
+            if (readyCallback) {
+                // If all async calls are complete, notify caller (by calling the readyCallback)
+                var callbackInterval = $interval(function () {
+                    if (deserializeStatus.numActiveAsynCalls === 0) {
+                        while (funcQueue.length > 0) {
+                            var func = funcQueue.pop();
+                            func();
+                        }
+                        readyCallback.call({result: result, error: error, $options: $options});
+                        $interval.cancel(callbackInterval);
+                    }
+                }, 100, 0, false);
             }
             
             function initVariableValue(value, variableId) {
@@ -4292,6 +4376,7 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                 }
                 var valueProperties = setValueProperties(value);
                 if (variableType === 'template' && value !== null) {
+                    _fetchTemplateTerms(variableId); // Fetch this template's terms
                     valueProperties.termsToMerge = [];
                     if (typeof value === 'object') {
                         for (var e in value) {
@@ -4308,11 +4393,9 @@ angular.module("crisWorkflow").factory('workflowBuilderService', ["$uibModal", "
                         valueProperties.termsToMerge.push({itemType: 'Query', variable: value});
                     }
                 }
-                dojo.mixin(valueProperties, {variableType: variableType, variable: variableId});
+                angular.merge(valueProperties, {variableType: variableType, variable: variableId});
                 return valueProperties;
             }
-            
-            return {result: result, error: error, $options: $options};
         },
         fromBuilderToJson: function (builderRecords, task, jsonType, queries) {
             console.log('************From builder to Json');

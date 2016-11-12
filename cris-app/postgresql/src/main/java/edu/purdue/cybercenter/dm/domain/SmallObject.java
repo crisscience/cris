@@ -1,5 +1,6 @@
 package edu.purdue.cybercenter.dm.domain;
 
+import edu.purdue.cybercenter.dm.domain.listener.CrisAssetListener;
 import edu.purdue.cybercenter.dm.domain.listener.CrisEntityListener;
 import edu.purdue.cybercenter.dm.util.EnumAssetType;
 import edu.purdue.cybercenter.dm.util.JsonRestRef;
@@ -24,7 +25,7 @@ import org.springframework.beans.factory.annotation.Configurable;
 @Entity
 @Table(schema = "public", name = "small_object")
 @Audited
-@EntityListeners({CrisEntityListener.class, CrisAsset.class})
+@EntityListeners({CrisEntityListener.class, CrisAssetListener.class})
 @Configurable
 public class SmallObject extends AbstractCrisAsset {
     private static final long serialVersionUID = 1L;

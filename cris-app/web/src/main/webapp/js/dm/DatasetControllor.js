@@ -66,7 +66,7 @@ angular.module("crisDataset").controller("DatasetController", ["$scope","$uibMod
     
     // Set query string for experiments dropdown
     $scope.$watch('selectedProject', function (value) {
-        var queryStr = "/?sort(+name)" + (value ? ("&projectId=" + value) : "");
+        var queryStr = "/?sort(+name)" + (value ? ("&projectId=" + value) : "&projectId=0");
         $scope.selectedExperiment = null;
         $scope.experimentQueryStr = queryStr;
     });

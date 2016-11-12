@@ -1282,6 +1282,11 @@ angular.module("dataset").directive("node", function($compile) {
                     globus = false;
                 }
 
+                if (currentTerm.properties && currentTerm.properties.multiple === "true") {
+                    scope.multiple = true;
+                } else {
+                    scope.multiple = false;
+                }
                 if (globus) {
                     scope.fileList = [];
                     scope.browseFile = function(path, multiple, storageFile, fileList) {
@@ -1289,15 +1294,10 @@ angular.module("dataset").directive("node", function($compile) {
                     };
                     tag = "button";
                     buttonText = '<span class="glyphicon glyphicon-folder-open"></span>&nbsp; Browse Globus Files...';
-                    propNgClick = 'browseFile(path, multiple, null, fileList)'
+                    propNgClick = 'browseFile(path, multiple, null, fileList)';
                     htmlTemplate = '<button type="button" class="btn btn-primary" ng-hide="' + propNgReadonly + '"';
                 } else {
-                    tag = 'cris-file-uploader'
-                    if (currentTerm.properties && currentTerm.properties.multiple === "true") {
-                        scope.multiple = true;
-                    } else {
-                        scope.multiple = false;
-                    }
+                    tag = 'cris-file-uploader';
                     htmlTemplate = '<cris-file-uploader is-multiple="multiple" path="{{path}}" is-required="' + propNgRequired + '" ng-hide="' + propNgReadonly + '"';
                 }
             } else if (currentTermType === "attachTo") {
@@ -1361,7 +1361,6 @@ angular.module("dataset").directive("node", function($compile) {
                 element.append("<span class='error' style='white-space:normal;' ng-show=\"message[''].valid === false\" ng-bind-template=\"&nbsp;* {{message[''].errorList[0].errorMessage}}\"></span>");
             }
 
-            var globus = false;
             if (currentTermType === "file") {
                 if (globus) {
                     // list existing file(s)
@@ -1774,8 +1773,8 @@ function processTerm(term, defaultValue, path, nestLevel) {
                 nameTerm = attachToTemplate[i];
             }
         }
-        definition["id-field-validation"] = idTerm.validation.validator[0];
-        definition["name-field-validation"] = nameTerm.validation.validator[0];
+        definition["id-field-validation"] = idTerm ? idTerm.validation.validator[0] : null;
+        definition["name-field-validation"] = nameTerm ? nameTerm.validation.validator[0] : null;
     } else {
         // for everything else
         if (validation && validation.length > 0) {

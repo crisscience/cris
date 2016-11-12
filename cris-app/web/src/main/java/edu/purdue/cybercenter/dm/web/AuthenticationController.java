@@ -4,8 +4,6 @@ import edu.purdue.cybercenter.dm.domain.Configuration;
 import edu.purdue.cybercenter.dm.domain.User;
 import edu.purdue.cybercenter.dm.util.SecurityHelper;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.mail.Address;
 import javax.mail.Message.RecipientType;
 import javax.mail.MessagingException;
@@ -25,12 +23,16 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Controller
 public class AuthenticationController {
 
     private static final int MIN_USERNAME_LENGTH = 8;
     private static final int MIN_PASSWORD_LENGTH = 8;
+
+    static final private Logger LOGGER = LoggerFactory.getLogger(AuthenticationController.class.getName());
 
     @Autowired
     private JavaMailSender mailSender;
@@ -149,7 +151,7 @@ public class AuthenticationController {
             message.setSubject("Password Reset Instruction");
             message.setText("Dear " + user.getFirstName() + ":\n\n" + "Please cut and paste the token into the token field: " + token + "\n\n" + "Sincerely,\n\n" + Configuration.findProperty("wsName") + " Team");
         } catch (MessagingException ex) {
-            Logger.getLogger(AuthenticationController.class.getName()).log(Level.SEVERE, null, ex);
+            LOGGER.error("", ex);
         }
         mailSender.send(message);
 

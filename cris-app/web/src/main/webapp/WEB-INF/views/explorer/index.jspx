@@ -14,7 +14,7 @@
     <spring:url value="/templates/terms" var="urlTemplateTerms"/>
     <spring:url value="/projects/search/" var="urlSearch"/>
     
-    <div id="idExplorer" data-ng-controller="crisExplorerController" style="white-space: nowrap;">
+    <div id="idExplorer" data-ng-controller="crisExplorerController">
         <div style="display:inline-block;width:22%;max-height:672px;overflow:auto;" ng-show="expanded">
             <div id="treeDataset"><!-- --></div>
         </div>

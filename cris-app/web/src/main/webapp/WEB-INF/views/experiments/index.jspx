@@ -118,7 +118,11 @@
                         showMessageModal({uibModal: $uibModal, message: "You must specify a name for the experiment"});
                         return;
                     }
-                    data = $scope.record;
+                    data = {};
+                    data.name = $scope.record.name;
+                    data.projectId = {$ref: cris.baseUrl + 'projects/' + $scope.record._project_id};
+                    data.isPublic = $scope.record.isPublic;
+                    data.description = $scope.record.description;
                     method = "POST";
                 } else {
                     if ($scope.selectedRecord) {

@@ -403,8 +403,8 @@ function showYesNoModal(attrs) {
                                 <p>' + attrs.message + '</p> \
                             </div> \
                             <div class="modal-footer"> \
-                                <span class="pull-left"><input type="button" value="Yes" class="btn btn-primary" ng-click="ok()" /></span> \
-                                <span class="pull-right"><input type="button" value="No" class="btn btn-warning" ng-click="cancel()" /></span> \
+                                <span class="pull-left"><input type="button" value="No" class="btn btn-warning" ng-click="cancel()" /></span> \
+                                <span class="pull-right"><input type="button" value="Yes" class="btn btn-primary" ng-click="ok()" /></span> \
                             </div> \
                         </div>';
     attrs.uibModal.open({

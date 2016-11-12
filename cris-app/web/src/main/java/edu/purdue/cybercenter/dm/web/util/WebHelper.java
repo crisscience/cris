@@ -37,8 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -81,6 +79,8 @@ import org.activiti.engine.repository.ProcessDefinitionQuery;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Component;
@@ -125,6 +125,8 @@ public class WebHelper {
     private static final String PREFIX_TASK = "task_";
     private static final String PREFIX_EXCLUSIVE_GATEWAY = "exgw_";
     private static final String PREFIX_FLOW = "flow_";
+
+    static final private Logger LOGGER = LoggerFactory.getLogger(WebHelper.class.getName());
 
     private static DatasetService datasetService;
     @Autowired
@@ -534,6 +536,14 @@ public class WebHelper {
             FieldExtension extensionField = new FieldExtension();
             extensionField.setFieldName("commandLine");
             extensionField.setStringValue((String) data.get("commandline"));
+            extensionFields.add(extensionField);
+        }
+
+        if (data.get("clearWorkingDirectory") != null) {
+            Boolean clearWorkingDirectory = (Boolean) data.get("clearWorkingDirectory");
+            FieldExtension extensionField = new FieldExtension();
+            extensionField.setFieldName("clearWorkingDirectory");
+            extensionField.setStringValue(clearWorkingDirectory.toString());
             extensionFields.add(extensionField);
         }
 
@@ -1105,11 +1115,12 @@ public class WebHelper {
     private static Map<String, Object> createServiceTask(String jsonId, Map<String, Object> crisProperties, FlowElement flowElement) {
         ServiceTask serviceTask = (ServiceTask) flowElement;
 
-        Map<String, String> activitiProperties = getActivitiFields(serviceTask.getFieldExtensions(), Arrays.asList("filesToPlace", "jsonIn", "commandLine", "jsonOut", "preFilter", "postFilter", "filesToCollect", "files", "uiLocation", "orientation"));
+        Map<String, String> activitiProperties = getActivitiFields(serviceTask.getFieldExtensions(), Arrays.asList("filesToPlace", "jsonIn", "commandLine", "jsonOut", "clearWorkingDirectory", "preFilter", "postFilter", "filesToCollect", "files", "uiLocation", "orientation"));
         String filesToPlace = activitiProperties.get("filesToPlace");
         String jsonIn = activitiProperties.get("jsonIn");
         String commandLine = activitiProperties.get("commandLine");
         String jsonOut = activitiProperties.get("jsonOut");
+        String clearWorkingDirectory = activitiProperties.get("clearWorkingDirectory");
         String preFilter = activitiProperties.get("preFilter");
         String postFilter = activitiProperties.get("postFilter");
         String filesToCollect = activitiProperties.get("filesToCollect");
@@ -1142,6 +1153,7 @@ public class WebHelper {
         task.put("jsonIn", jsonIn);
         task.put("commandline", commandLine);
         task.put("jsonOut", jsonOut);
+        task.put("clearWorkingDirectory", clearWorkingDirectory == null ? null : Boolean.parseBoolean(clearWorkingDirectory));
         task.put("prefilter", preFilter);
         task.put("postfilter", postFilter);
         task.put("filesToCollect", filesToCollect);
@@ -1979,7 +1991,7 @@ public class WebHelper {
                             storageFiles = globusStorageFileManager.putFile(Helper.deepSerialize(inputObj), null, false);
                             datasetService.mergeValueToObjectus(objectuses, globusFileKey + "." + alias, storageFilesToStorageFileIds(storageFiles));
                         } catch (IOException ex) {
-                            Logger.getLogger(WebHelper.class.getName()).log(Level.SEVERE, null, ex);
+                            LOGGER.error("", ex);
                         }
                     });
 

@@ -16,13 +16,9 @@ import edu.purdue.cybercenter.dm.service.WorkflowService;
 import edu.purdue.cybercenter.dm.util.Helper;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.activiti.engine.delegate.DelegateExecution;
 import org.activiti.engine.delegate.Expression;
 import org.activiti.engine.delegate.JavaDelegate;
@@ -42,7 +38,7 @@ public class ServiceTaskDelegate implements JavaDelegate {
     static final private String IsValid = "isValid";
     static final private String ErrorMessage = "errorMessage";
 
-    private Expression clearWorkingDir;
+    private Expression clearWorkingDirectory;
     private Expression filesToPlace;
     private Expression jsonIn;
     private Expression preFilter;
@@ -73,11 +69,13 @@ public class ServiceTaskDelegate implements JavaDelegate {
     @Override
     public void execute(DelegateExecution de) throws Exception {
         Map<String, Object> context = buildContext(de);
-        clearWorkingDirectory(context);
-        placeFiles(context, de);
 
+        clearWorkingDirectory(context);
+
+        placeFiles(context, de);
         Map<String, Object> mergedJsonOut = execute(context);
         Map<String, Object> filesJsonOut = collectFiles(context);
+
         if (filesJsonOut != null) {
             for (Map.Entry<String, Object> entry : filesJsonOut.entrySet()) {
                 Object existing = mergedJsonOut.get(entry.getKey());
@@ -135,23 +133,16 @@ public class ServiceTaskDelegate implements JavaDelegate {
     }
 
     protected void clearWorkingDirectory(Map<String, Object> context) {
-        String sClearWorkingDir = clearWorkingDir != null ? clearWorkingDir.getExpressionText() : null;
-        if ("true".equals(sClearWorkingDir)) {
+        String sClearWorkingDirectory = clearWorkingDirectory != null ? clearWorkingDirectory.getExpressionText() : null;
+        if (sClearWorkingDirectory != null && Boolean.parseBoolean(sClearWorkingDirectory) == true) {
             Integer jobId = (Integer) context.get(MetaField.JobId);
             String dirPath = AppConfigConst.getJobTmpPath() + AppConfigConst.FILE_SEPARATOR + jobId + "/";
             if (dirPath.endsWith(jobId + "/")) {
-                // just make sure
-                Collection jobFiles = FileUtils.listFiles(new File(dirPath), null, false);
-                Iterator itJobFile = jobFiles.iterator();
-                while (itJobFile.hasNext()) {
-                    File jobFile = (File) itJobFile.next();
-                    try {
-                        FileUtils.forceDelete(jobFile);
-                    } catch (IOException ex) {
-                        Logger.getLogger(ServiceTaskDelegate.class.getName()).log(Level.SEVERE, "unable to remove job file: " + jobFile.getName(), ex);
-                    }
+                try {
+                    FileUtils.cleanDirectory(new File(dirPath));
+                } catch (IOException ex) {
+                    // nothing to  clean
                 }
-
             }
         }
     }

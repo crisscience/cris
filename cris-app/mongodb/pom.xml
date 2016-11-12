@@ -13,9 +13,6 @@
     <name>cris-mongodb</name>
     <packaging>jar</packaging>
 
-    <properties>
-    </properties>
-
     <dependencies>
         <!-- General dependencies for standard applications -->
         <!-- Spring dependencies -->
@@ -34,9 +31,4 @@
             <artifactId>cris-util</artifactId>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-        </plugins>
-    </build>
 </project>

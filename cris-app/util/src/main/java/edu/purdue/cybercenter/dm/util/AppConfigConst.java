@@ -19,7 +19,8 @@ public final class AppConfigConst {
     public static final String JOB_TMP_PATH = "jobTmpPath";             // %APP_TMP_PATH/job/{job_id}
 
     private static final String TMP_PATH_VALUE = System.getProperty("java.io.tmpdir");
-    private static final String APP_TMP_PATH_VALUE = TMP_PATH_VALUE + FILE_SEPARATOR + "workarea";
+    private static final String DEFAULT_APP_DATA_PATH = "/data/cris";
+    private static final String APP_TMP_PATH_VALUE = DEFAULT_APP_DATA_PATH + FILE_SEPARATOR + "workarea";
     private static final String SESSION_TMP_PATH_VALUE = APP_TMP_PATH_VALUE + FILE_SEPARATOR + "session";
     private static final String JOB_TMP_PATH_VALUE = APP_TMP_PATH_VALUE + FILE_SEPARATOR + "job";
 

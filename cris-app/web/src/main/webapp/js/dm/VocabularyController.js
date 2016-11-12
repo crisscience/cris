@@ -734,7 +734,7 @@ crisVocabulary.directive("crisTemplateVersion", function() {
                             var storeData = [];
                             dojo.forEach(data, function(item){
                                 var version = item['versionNumber']['$uuid'];
-                                var timeUpdated = locale.format(new Date(item['timeUpdated']['$date']), {selector: "date", datePattern: "yyyy/MM/dd, h:m:s a"});
+                                var timeUpdated = locale.format(new Date(item['timeUpdated']['$date']), {selector: "date", datePattern: "yyyy/MM/dd, hh:mm:ss a"});
                                 templateInfo[version] = {id: item.id, data: item};
                                 storeData.push({id: version, name: timeUpdated});
                             });
@@ -794,7 +794,7 @@ crisVocabulary.directive("crisVocabularyVersion", function() {
                             var storeData = [];
                             dojo.forEach(data, function(item){
                                 var version = item['versionNumber']['$uuid'];
-                                var timeUpdated = locale.format(new Date(item['timeUpdated']['$date']), {selector: "date", datePattern: "yyyy/MM/dd, h:m:s a"});
+                                var timeUpdated = locale.format(new Date(item['timeUpdated']['$date']), {selector: "date", datePattern: "yyyy/MM/dd, hh:mm:ss a"});
                                 vocabularyInfo[version] = {id: item.id, data: item};
                                 storeData.push({id: version, name: timeUpdated});
                             });

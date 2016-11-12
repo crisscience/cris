@@ -50,7 +50,7 @@ public class ProductBuildInfo {
             this.workspace = props.getProperty("jenkins.workspace");
             this.revision = props.getProperty("jenkins.svn.revision");
 
-            if (this.buildId == null || this.buildId.isEmpty()) {
+            if (this.buildId == null || this.buildId.isEmpty() || (this.buildId.startsWith("${") && this.buildId.endsWith("}"))) {
                 this.buildTimestamp = new Date();
             } else {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
